@@ -264,6 +264,90 @@ export function parseGrants(rows, codeToFunc = {}) {
     }));
 }
 
+// ── Balance Sheet (Statement of Financial Position) ─────────────────────────
+// Line items have their label in col 1 and value in col 6; section totals have
+// the label in col 0 with the value on the same row OR the next row (col 6).
+export function parseBalanceSheet(rows) {
+  const SECTIONS = {
+    "current assets": "currentAssets",
+    "non-current assets": "nonCurrentAssets",
+    "current liabilities": "currentLiabilities",
+    "non-current liabilities": "nonCurrentLiabilities",
+    "community equity": "equity",
+  };
+  const mk = (label) => ({ label, lines: [], total: 0 });
+  const bs = {
+    currentAssets: mk("Current Assets"),
+    nonCurrentAssets: mk("Non-current Assets"),
+    currentLiabilities: mk("Current Liabilities"),
+    nonCurrentLiabilities: mk("Non-current Liabilities"),
+    equity: mk("Community Equity"),
+    totalAssets: 0,
+    totalLiabilities: 0,
+    netCommunityAssets: 0,
+    totalEquity: 0,
+  };
+  const valAt = (i) => {
+    const v = cell(rows[i], 6);
+    return money(v !== "" ? v : cell(rows[i + 1] ?? [], 6));
+  };
+  let cur = null;
+  for (let i = 0; i < rows.length; i++) {
+    const c0 = cell(rows[i], 0);
+    const c1 = cell(rows[i], 1);
+    const key0 = c0.toLowerCase();
+    if (key0 in SECTIONS) { cur = bs[SECTIONS[key0]]; continue; }
+    if (/^total current assets/i.test(c0)) { bs.currentAssets.total = valAt(i); cur = null; continue; }
+    if (/^total non-current assets/i.test(c0)) { bs.nonCurrentAssets.total = valAt(i); cur = null; continue; }
+    if (/^total assets/i.test(c0)) { bs.totalAssets = valAt(i); cur = null; continue; }
+    if (/^total current liabilities/i.test(c0)) { bs.currentLiabilities.total = valAt(i); cur = null; continue; }
+    if (/^total non-current liabilities/i.test(c0)) { bs.nonCurrentLiabilities.total = valAt(i); cur = null; continue; }
+    if (/^total liabilities/i.test(c0)) { bs.totalLiabilities = valAt(i); cur = null; continue; }
+    if (/^net community assets/i.test(c0)) { bs.netCommunityAssets = valAt(i); cur = null; continue; }
+    if (/^total community equity/i.test(c0)) { bs.totalEquity = valAt(i); cur = null; continue; }
+    if (cur && c1 && cell(rows[i], 6) !== "") {
+      const amt = money(cell(rows[i], 6));
+      if (amt !== 0) cur.lines.push({ label: c1, amount: round(amt) });
+    }
+  }
+  return bs;
+}
+
+// ── Statement of Cash Flows ─────────────────────────────────────────────────
+export function parseCashFlow(rows) {
+  const mk = (label) => ({ label, lines: [], net: 0 });
+  const cf = {
+    operating: mk("Operating activities"),
+    investing: mk("Investing activities"),
+    financing: mk("Financing activities"),
+    netChange: 0,
+    cashStart: 0,
+    cashEnd: 0,
+  };
+  const valAt = (i) => {
+    const v = cell(rows[i], 6);
+    return money(v !== "" ? v : cell(rows[i + 1] ?? [], 6));
+  };
+  let cur = null;
+  for (let i = 0; i < rows.length; i++) {
+    const label = cell(rows[i], 0) || cell(rows[i], 1);
+    if (/cash flows from/i.test(label) && /operating/i.test(label)) { cur = cf.operating; continue; }
+    if (/cash flows from/i.test(label) && /investing/i.test(label)) { cur = cf.investing; continue; }
+    if (/cash flows from/i.test(label) && /financing/i.test(label)) { cur = cf.financing; continue; }
+    if (/^net cash .*operating/i.test(label)) { cf.operating.net = valAt(i); cur = null; continue; }
+    if (/^net cash .*investing/i.test(label)) { cf.investing.net = valAt(i); cur = null; continue; }
+    if (/^net cash .*financing/i.test(label)) { cf.financing.net = valAt(i); cur = null; continue; }
+    if (/^net increase .*cash held/i.test(label)) { cf.netChange = valAt(i); cur = null; continue; }
+    if (/^cash at beginning/i.test(label)) { cf.cashStart = valAt(i); cur = null; continue; }
+    if (/^cash at end/i.test(label)) { cf.cashEnd = valAt(i); cur = null; continue; }
+    if (cur && label && cell(rows[i], 6) !== "") {
+      const amt = money(cell(rows[i], 6));
+      if (amt !== 0) cur.lines.push({ label, amount: round(amt) });
+    }
+  }
+  return cf;
+}
+
 // ── assemble the snapshot ───────────────────────────────────────────────────
 /**
  * Build a FinancialSnapshot from classified report rows.

@@ -58,6 +58,8 @@ export default async function ReportsPage() {
         periods={periods}
         departments={departments}
         monthlySpend={snapshot.monthlySpend}
+        balanceSheet={snapshot.balanceSheet}
+        cashFlow={snapshot.cashFlow}
       />
     </Content>
   );

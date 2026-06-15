@@ -1,6 +1,6 @@
 import "server-only";
 import type { FinancialSnapshot } from "@/lib/types";
-import { readRuntimeSnapshot } from "@/lib/feed/store";
+import { readRuntimeSnapshot, readRuntimeStatements } from "@/lib/feed/store";
 import { readOverrides, applyOverrides } from "@/lib/feed/overrides";
 import bundled from "@/data/snapshot.json";
 
@@ -19,7 +19,20 @@ import bundled from "@/data/snapshot.json";
  */
 export async function loadSnapshotFromFeed(): Promise<FinancialSnapshot> {
   const overrides = await readOverrides();
-  return applyOverrides(await loadRawSnapshotFromFeed(), overrides);
+  const snapshot = applyOverrides(await loadRawSnapshotFromFeed(), overrides);
+
+  // Overlay the formal statements (Balance Sheet / Cash Flow). They live in a
+  // separate store so the twice-daily ODBC push can't wipe them, so they're
+  // layered on here regardless of the main snapshot's source.
+  const statements = await readRuntimeStatements();
+  if (statements?.balanceSheet || statements?.cashFlow) {
+    return {
+      ...snapshot,
+      balanceSheet: statements.balanceSheet ?? snapshot.balanceSheet,
+      cashFlow: statements.cashFlow ?? snapshot.cashFlow,
+    };
+  }
+  return snapshot;
 }
 
 /**

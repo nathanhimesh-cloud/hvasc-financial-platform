@@ -10,7 +10,7 @@ import {
   Wallet,
   Lock,
 } from "lucide-react";
-import type { BrandColor } from "@/lib/types";
+import type { BrandColor, BalanceSheet, CashFlow } from "@/lib/types";
 import { Panel, PanelHeader } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { bgDim, textColor } from "@/lib/colors";
@@ -53,6 +53,8 @@ export function ReportsView({
   periods,
   departments,
   monthlySpend,
+  balanceSheet,
+  cashFlow,
 }: {
   fyLabel: string;
   monthOfYear: number;
@@ -61,6 +63,8 @@ export function ReportsView({
   periods: ReportPeriod[];
   departments: ReportDept[];
   monthlySpend: { month: string; amount: number }[];
+  balanceSheet?: BalanceSheet;
+  cashFlow?: CashFlow;
 }) {
   const latestIdx = periods.length ? periods[periods.length - 1].idx : monthOfYear;
   const [statement, setStatement] = useState<Statement>("pnl");
@@ -145,12 +149,14 @@ export function ReportsView({
       {/* Statement tabs */}
       <div className="flex flex-wrap items-center gap-1 border-b border-border pb-px">
         <StatementTab active={statement === "pnl"} onClick={() => setStatement("pnl")} icon={FileText} label="Profit & Loss" />
-        <StatementTab active={statement === "balance"} onClick={() => {}} icon={Scale} label="Balance Sheet" soon />
-        <StatementTab active={statement === "cashflow"} onClick={() => {}} icon={Banknote} label="Cashflow" soon />
+        <StatementTab active={statement === "balance"} onClick={() => setStatement("balance")} icon={Scale} label="Balance Sheet" soon={!balanceSheet} />
+        <StatementTab active={statement === "cashflow"} onClick={() => setStatement("cashflow")} icon={Banknote} label="Cashflow" soon={!cashFlow} />
       </div>
 
-      {statement !== "pnl" ? (
-        <ComingSoon statement={statement} />
+      {statement === "balance" ? (
+        balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} /> : <ComingSoon statement="balance" />
+      ) : statement === "cashflow" ? (
+        cashFlow ? <CashFlowView cf={cashFlow} fyLabel={fyLabel} /> : <ComingSoon statement="cashflow" />
       ) : (
         <>
           {/* Filter bar */}
@@ -408,6 +414,118 @@ function ComingSoon({ statement }: { statement: Statement }) {
         </p>
       </div>
     </Panel>
+  );
+}
+
+// ── Balance Sheet ────────────────────────────────────────────────────────────
+function StatementBlock({
+  label,
+  lines,
+  totalLabel,
+  total,
+}: {
+  label?: string;
+  lines: { label: string; amount: number }[];
+  totalLabel: string;
+  total: number;
+}) {
+  return (
+    <div>
+      {label && (
+        <div className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          {label}
+        </div>
+      )}
+      {lines.map((l, i) => (
+        <div key={i} className="flex items-center justify-between border-b border-border py-2 text-[13px] last:border-0">
+          <span className="text-foreground">{l.label}</span>
+          <span className={cn("font-mono tabular-nums", l.amount < 0 ? "text-red" : "text-foreground")}>
+            {formatCurrency(l.amount)}
+          </span>
+        </div>
+      ))}
+      <div className="mt-1 flex items-center justify-between border-t border-border pt-2.5">
+        <span className="text-[13px] font-medium text-foreground">{totalLabel}</span>
+        <span className={cn("font-mono text-[13px] font-semibold tabular-nums", total < 0 ? "text-red" : "text-foreground")}>
+          {formatCurrency(total)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function GrandTotal({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="mt-3 flex items-center justify-between border-t-2 border-[rgba(255,255,255,0.16)] pt-3">
+      <span className="text-[14px] font-semibold text-foreground">{label}</span>
+      <span className="font-mono text-[15px] font-semibold tabular-nums text-foreground">{formatCurrency(value)}</span>
+    </div>
+  );
+}
+
+function BalanceSheetView({ bs, fyLabel }: { bs: BalanceSheet; fyLabel: string }) {
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard color="teal" icon={Scale} label="Total Assets" value={formatCompact(bs.totalAssets)} meta={bs.asAt ? `as at ${bs.asAt}` : fyLabel} />
+        <KpiCard color="amber" icon={TrendingDown} label="Total Liabilities" value={formatCompact(bs.totalLiabilities)} meta="owed by council" />
+        <KpiCard color="green" icon={Wallet} label="Net Community Assets" value={formatCompact(bs.netCommunityAssets)} meta="assets − liabilities" />
+      </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Panel>
+          <PanelHeader title="Assets" subtitle="What the council owns" />
+          <StatementBlock label={bs.currentAssets.label} lines={bs.currentAssets.lines} totalLabel="Total current assets" total={bs.currentAssets.total} />
+          <div className="h-4" />
+          <StatementBlock label={bs.nonCurrentAssets.label} lines={bs.nonCurrentAssets.lines} totalLabel="Total non-current assets" total={bs.nonCurrentAssets.total} />
+          <GrandTotal label="Total Assets" value={bs.totalAssets} />
+        </Panel>
+        <Panel>
+          <PanelHeader title="Liabilities & Equity" subtitle="What it owes + community equity" />
+          <StatementBlock label={bs.currentLiabilities.label} lines={bs.currentLiabilities.lines} totalLabel="Total current liabilities" total={bs.currentLiabilities.total} />
+          <div className="h-4" />
+          <StatementBlock label={bs.nonCurrentLiabilities.label} lines={bs.nonCurrentLiabilities.lines} totalLabel="Total non-current liabilities" total={bs.nonCurrentLiabilities.total} />
+          <GrandTotal label="Total Liabilities" value={bs.totalLiabilities} />
+          <div className="h-5" />
+          <StatementBlock label={bs.equity.label} lines={bs.equity.lines} totalLabel="Total community equity" total={bs.totalEquity} />
+        </Panel>
+      </div>
+    </>
+  );
+}
+
+// ── Cash Flow ──────────────────────────────────────────────────────────────
+function CashFlowView({ cf, fyLabel }: { cf: CashFlow; fyLabel: string }) {
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard color={cf.operating.net >= 0 ? "green" : "red"} icon={TrendingUp} label="Operating Cash" value={formatSignedCompact(cf.operating.net)} meta="from operations" />
+        <KpiCard color="blue" icon={Banknote} label="Investing Cash" value={formatSignedCompact(cf.investing.net)} meta="capital movement" />
+        <KpiCard color={cf.cashEnd >= 0 ? "teal" : "red"} icon={Wallet} label="Cash at Period End" value={formatCompact(cf.cashEnd)} meta={`net change ${formatSignedCompact(cf.netChange)}`} />
+      </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <Panel>
+          <PanelHeader title="Operating" subtitle={`Activities · ${fyLabel}`} />
+          <StatementBlock lines={cf.operating.lines} totalLabel="Net operating cash" total={cf.operating.net} />
+        </Panel>
+        <Panel>
+          <PanelHeader title="Investing" subtitle="Activities" />
+          <StatementBlock lines={cf.investing.lines} totalLabel="Net investing cash" total={cf.investing.net} />
+        </Panel>
+        <Panel>
+          <PanelHeader title="Financing" subtitle="Activities" />
+          <StatementBlock lines={cf.financing.lines.length ? cf.financing.lines : [{ label: "No financing activity", amount: 0 }]} totalLabel="Net financing cash" total={cf.financing.net} />
+        </Panel>
+      </div>
+      <Panel>
+        <PanelHeader title="Cash Position" subtitle="Movement over the period" />
+        <div className="flex flex-col gap-3">
+          <SummaryLine label="Net increase/(decrease) in cash" value={formatSignedCompact(cf.netChange)} tone={cf.netChange >= 0 ? "pos" : "neg"} />
+          <SummaryLine label="Cash at beginning of period" value={formatCurrency(cf.cashStart)} tone="pos" />
+          <div className="my-1 border-t border-border" />
+          <SummaryLine label="Cash at end of period" value={formatCurrency(cf.cashEnd)} tone="pos" big />
+        </div>
+      </Panel>
+    </>
   );
 }
 

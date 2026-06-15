@@ -1,12 +1,22 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import * as XLSX from "xlsx";
-import { buildSnapshot, classifyRows, detectFyMonth, type BuildInput } from "@/lib/feed/parse.mjs";
+import {
+  buildSnapshot,
+  classifyRows,
+  detectFyMonth,
+  parseBalanceSheet,
+  parseCashFlow,
+  type BuildInput,
+} from "@/lib/feed/parse.mjs";
 import {
   writeRuntimeSnapshot,
   writeRuntimeInputs,
   readRuntimeInputs,
+  readRuntimeStatements,
+  writeRuntimeStatements,
   storeKind,
   type RuntimeInputs,
+  type RuntimeStatements,
 } from "@/lib/feed/store";
 import { clearSnapshotCache } from "@/lib/data";
 
@@ -39,7 +49,12 @@ export async function POST(request: Request) {
   // Merge onto previously-uploaded reports so you can add one file at a time
   // (e.g. drop in a FY25 baseline without re-uploading the current-year set).
   const input: RuntimeInputs = (await readRuntimeInputs()) ?? {};
+  // Formal statements (Balance Sheet / Cash Flow) live in their own overlay so
+  // the live ODBC feed never wipes them — merge new ones onto whatever's stored.
+  const statements: RuntimeStatements = (await readRuntimeStatements()) ?? {};
   const classified: { name: string; kind: string }[] = [];
+  let reportTouched = false; // a file that feeds buildSnapshot
+  let statementTouched = false; // a Balance Sheet / Cash Flow
 
   for (const file of files) {
     let rows: string[][];
@@ -55,48 +70,76 @@ export async function POST(request: Request) {
     if (kind === "byFunction") {
       if (isFy25) input.fy25ByFunction = rows;
       else input.byFunction = rows;
+      reportTouched = true;
     } else if (kind === "income" && !isFy25) {
       const mo = detectFyMonth(file.name);
       if (mo) {
         input.monthly = [...(input.monthly ?? []).filter((x) => x.idx !== mo.idx), { ...mo, rows }];
         tag = `income (${mo.label} monthly)`;
       } else input.income = rows;
-    } else if (kind === "grants" && !isFy25) input.grants = rows;
+      reportTouched = true;
+    } else if (kind === "grants" && !isFy25) {
+      input.grants = rows;
+      reportTouched = true;
+    } else if (kind === "balanceSheet") {
+      statements.balanceSheet = parseBalanceSheet(rows);
+      statementTouched = true;
+    } else if (kind === "cashFlow") {
+      statements.cashFlow = parseCashFlow(rows);
+      statementTouched = true;
+    }
     classified.push({ name: file.name, kind: tag + (isFy25 ? " (FY25)" : "") });
   }
 
-  if (!input.byFunction) {
+  // Nothing usable: not a report we build from, not a statement, and no prior
+  // Note 3a to merge onto.
+  if (!statementTouched && !input.byFunction) {
     return Response.json(
       {
         ok: false,
         error:
-          "No current-year 'Analysis by function' (Note 3a) yet. Upload the current-year Note 3a — once, on its own or with these files — and it'll be remembered for future single-file uploads.",
+          "Nothing recognised. Upload the current-year 'Analysis by function' (Note 3a), or a Balance Sheet / Cash Flow statement.",
         classified,
       },
       { status: 400 },
     );
   }
 
-  let snapshot;
-  try {
-    snapshot = buildSnapshot(input as BuildInput);
-    snapshot.meta = { ...snapshot.meta, source: snapshot.meta?.source ?? "Upload", generatedAt: new Date().toISOString().slice(0, 10) };
-  } catch (err) {
-    return Response.json(
-      { ok: false, error: `Failed to build snapshot: ${(err as Error).message}`, classified },
-      { status: 422 },
-    );
+  // Save the formal-statement overlay first (independent of the main snapshot).
+  if (statementTouched) {
+    statements.updatedAt = new Date().toISOString().slice(0, 10);
+    try {
+      await writeRuntimeStatements(statements);
+    } catch (err) {
+      return Response.json(
+        { ok: false, error: `Parsed statement but couldn't save: ${(err as Error).message}`, classified },
+        { status: 500 },
+      );
+    }
   }
 
-  let location: string;
-  try {
-    location = await writeRuntimeSnapshot(snapshot);
-    await writeRuntimeInputs(input); // remember reports so future uploads can merge
-  } catch (err) {
-    return Response.json(
-      { ok: false, error: `Parsed OK but couldn't save: ${(err as Error).message}`, classified },
-      { status: 500 },
-    );
+  // Rebuild the main snapshot only when a report that feeds it was uploaded (or
+  // one was already stored). A statements-only upload skips this.
+  let snapshot: ReturnType<typeof buildSnapshot> | null = null;
+  if (reportTouched || input.byFunction) {
+    try {
+      snapshot = buildSnapshot(input as BuildInput);
+      snapshot.meta = { ...snapshot.meta, source: snapshot.meta?.source ?? "Upload", generatedAt: new Date().toISOString().slice(0, 10) };
+    } catch (err) {
+      return Response.json(
+        { ok: false, error: `Failed to build snapshot: ${(err as Error).message}`, classified },
+        { status: 422 },
+      );
+    }
+    try {
+      await writeRuntimeSnapshot(snapshot);
+      await writeRuntimeInputs(input); // remember reports so future uploads can merge
+    } catch (err) {
+      return Response.json(
+        { ok: false, error: `Parsed OK but couldn't save: ${(err as Error).message}`, classified },
+        { status: 500 },
+      );
+    }
   }
 
   // Bust caches so the dashboard reflects the new data.
@@ -107,14 +150,19 @@ export async function POST(request: Request) {
   return Response.json({
     ok: true,
     store: storeKind(),
-    location,
     classified,
-    summary: {
-      departments: snapshot.departments.length,
-      grants: snapshot.grants.length,
-      revenueLines: snapshot.revenueLines.length,
-      baseline: snapshot.meta?.baseline,
-      totalYtdSpend: snapshot.departments.reduce((a, d) => a + d.ytdActual, 0),
+    statements: {
+      balanceSheet: !!statements.balanceSheet,
+      cashFlow: !!statements.cashFlow,
     },
+    summary: snapshot
+      ? {
+          departments: snapshot.departments.length,
+          grants: snapshot.grants.length,
+          revenueLines: snapshot.revenueLines.length,
+          baseline: snapshot.meta?.baseline,
+          totalYtdSpend: snapshot.departments.reduce((a, d) => a + d.ytdActual, 0),
+        }
+      : null,
   });
 }

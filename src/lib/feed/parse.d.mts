@@ -1,4 +1,4 @@
-import type { FinancialSnapshot } from "@/lib/types";
+import type { FinancialSnapshot, BalanceSheet, CashFlow } from "@/lib/types";
 
 export type Rows = string[][];
 export type ReportKind =
@@ -21,6 +21,8 @@ export interface BuildInput {
 
 export function classifyRows(rows: Rows): ReportKind;
 export function buildSnapshot(input: BuildInput): FinancialSnapshot;
+export function parseBalanceSheet(rows: Rows): BalanceSheet;
+export function parseCashFlow(rows: Rows): CashFlow;
 export function detectFyMonth(name: string): { idx: number; label: string } | null;
 export const FUNCTIONS: { name: string; icon: string; color: string }[];
 export function money(s: unknown): number;

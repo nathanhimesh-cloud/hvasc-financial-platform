@@ -1,7 +1,7 @@
 import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { FinancialSnapshot } from "@/lib/types";
+import type { FinancialSnapshot, BalanceSheet, CashFlow } from "@/lib/types";
 
 /**
  * Runtime snapshot store — where uploaded / ODBC-pushed data lives AFTER the
@@ -21,6 +21,8 @@ const BLOB_KEY = "feed/snapshot.json";
 const LOCAL_FILE = path.join(process.cwd(), ".data", "snapshot.json");
 const INPUTS_BLOB_KEY = "feed/inputs.json";
 const LOCAL_INPUTS = path.join(process.cwd(), ".data", "inputs.json");
+const STATEMENTS_BLOB_KEY = "feed/statements.json";
+const LOCAL_STATEMENTS = path.join(process.cwd(), ".data", "statements.json");
 
 function hasBlob(): boolean {
   // Two ways the store is available:
@@ -93,6 +95,26 @@ export async function writeRuntimeSnapshot(snapshot: FinancialSnapshot): Promise
 
 export async function readRuntimeSnapshot(): Promise<FinancialSnapshot | null> {
   return readJson<FinancialSnapshot>(BLOB_KEY, LOCAL_FILE);
+}
+
+/**
+ * Formal statements (Balance Sheet, Cash Flow) live in a SEPARATE overlay so
+ * they survive the twice-daily ODBC snapshot push (which only writes the
+ * operational data). They come from uploading the Practical exports, and the
+ * read layer overlays them onto whatever the main snapshot is.
+ */
+export interface RuntimeStatements {
+  balanceSheet?: BalanceSheet;
+  cashFlow?: CashFlow;
+  updatedAt?: string;
+}
+
+export async function writeRuntimeStatements(s: RuntimeStatements): Promise<void> {
+  await writeJson(STATEMENTS_BLOB_KEY, LOCAL_STATEMENTS, s);
+}
+
+export async function readRuntimeStatements(): Promise<RuntimeStatements | null> {
+  return readJson<RuntimeStatements>(STATEMENTS_BLOB_KEY, LOCAL_STATEMENTS);
 }
 
 /** Where uploads are being persisted, for display in the UI. */

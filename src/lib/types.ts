@@ -171,6 +171,52 @@ export interface MonthlyStatement extends IncomeStatement {
   month: string;
 }
 
+/** A line in a formal statement (balance sheet / cash flow). */
+export interface StatementLine {
+  label: string;
+  amount: number;
+}
+
+/** A balance-sheet section (assets/liabilities/equity) with its subtotal. */
+export interface StatementSection {
+  label: string;
+  lines: StatementLine[];
+  total: number;
+}
+
+/** Statement of Financial Position (balance sheet). From the Practical export. */
+export interface BalanceSheet {
+  currentAssets: StatementSection;
+  nonCurrentAssets: StatementSection;
+  totalAssets: number;
+  currentLiabilities: StatementSection;
+  nonCurrentLiabilities: StatementSection;
+  totalLiabilities: number;
+  netCommunityAssets: number;
+  equity: StatementSection;
+  totalEquity: number;
+  /** "As at" label, e.g. "30 June 2026". */
+  asAt?: string;
+}
+
+/** A cash-flow activity section (operating/investing/financing) with its net. */
+export interface CashFlowSection {
+  label: string;
+  lines: StatementLine[];
+  net: number;
+}
+
+/** Statement of Cash Flows. From the Practical export. */
+export interface CashFlow {
+  operating: CashFlowSection;
+  investing: CashFlowSection;
+  financing: CashFlowSection;
+  netChange: number;
+  cashStart: number;
+  cashEnd: number;
+  asAt?: string;
+}
+
 /** Everything a view needs in one bundle. */
 export interface FinancialSnapshot {
   period: ReportingPeriod;
@@ -185,6 +231,10 @@ export interface FinancialSnapshot {
    * Income Statement exports. Drives the period filter on the Reports tab.
    */
   monthlyStatements?: MonthlyStatement[];
+  /** Statement of Financial Position — from an uploaded Practical export. */
+  balanceSheet?: BalanceSheet;
+  /** Statement of Cash Flows — from an uploaded Practical export. */
+  cashFlow?: CashFlow;
   /** Optional provenance/caveats (present on live feeds, absent on seed). */
   meta?: SnapshotMeta;
 }
