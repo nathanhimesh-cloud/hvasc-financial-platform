@@ -63,7 +63,7 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
   -Settings $settings -RunLevel Highest -Force `
   -User $cred.UserName -Password $cred.GetNetworkCredential().Password | Out-Null
 
-Write-Host "`nInstalled '$TaskName' — runs daily at $($Times -join ' and ')." -ForegroundColor Green
+Write-Host "`nInstalled '$TaskName' - runs daily at $($Times -join ' and ')." -ForegroundColor Green
 Write-Host "Test it now with:" -ForegroundColor Cyan
 Write-Host "    Start-ScheduledTask -TaskName '$TaskName'"
-Write-Host "Logs: $ScriptDir\logs\"
+Write-Host "Logs go to: $ScriptDir\logs"
