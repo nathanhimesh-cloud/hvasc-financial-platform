@@ -25,12 +25,15 @@ $ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path $File)) { throw "Snapshot file not found: $File. Run 05-build-snapshot.ps1 first." }
 $endpoint = ($Url.TrimEnd('/')) + '/api/feed/snapshot'
-$body = [System.IO.File]::ReadAllText($File)
+# Send the RAW BYTES, not a string. Windows PowerShell prepends a UTF-8 BOM to
+# string bodies, which makes the server's request.json() fail ("Body must be
+# JSON."). Reading bytes from the no-BOM file and posting them avoids that.
+$body = [System.IO.File]::ReadAllBytes($File)
 
 Write-Host "Pushing $File -> $endpoint" -ForegroundColor Cyan
 $headers = @{ 'x-upload-password' = $Password }
 try {
-  $resp = Invoke-RestMethod -Method Put -Uri $endpoint -ContentType 'application/json; charset=utf-8' -Headers $headers -Body $body
+  $resp = Invoke-RestMethod -Method Put -Uri $endpoint -ContentType 'application/json' -Headers $headers -Body $body
   Write-Host "OK." -ForegroundColor Green
   $resp | ConvertTo-Json -Depth 6 | Write-Host
 } catch {
