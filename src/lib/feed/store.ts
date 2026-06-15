@@ -23,7 +23,12 @@ const INPUTS_BLOB_KEY = "feed/inputs.json";
 const LOCAL_INPUTS = path.join(process.cwd(), ".data", "inputs.json");
 
 function hasBlob(): boolean {
-  return !!process.env.BLOB_READ_WRITE_TOKEN;
+  // Two ways the store is available:
+  //   - BLOB_READ_WRITE_TOKEN  → explicit token (local dev, external scripts)
+  //   - BLOB_STORE_ID          → store connected via OIDC (Vercel's recommended
+  //     mode; the SDK exchanges the runtime OIDC token automatically, so no
+  //     long-lived token is needed in the deployment).
+  return !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 }
 
 async function writeJson(blobKey: string, localFile: string, data: unknown, pretty = false): Promise<string> {
