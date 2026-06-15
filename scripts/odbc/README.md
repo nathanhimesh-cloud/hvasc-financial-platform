@@ -16,6 +16,7 @@ mapping and the discovery findings behind these queries.
 | `05-build-snapshot.ps1` | Reads Practical, writes `snapshot.json` next to the script. Prints a validation summary. |
 | `06-push.ps1` | PUTs `snapshot.json` to `/api/feed/snapshot` on the live site → Vercel Blob. |
 | `07-run-feed.ps1` | Build + push with logging. **This is what the Scheduled Task runs.** |
+| `08-install-task.ps1` | Installs the twice-daily Scheduled Task (stores secrets as machine env vars, registers the task as the service account). |
 
 ## How the data maps (proven in discovery)
 
@@ -46,13 +47,16 @@ mapping and the discovery findings behind these queries.
    ```
    For the scheduled task, set `PRACTICAL_PWD` as a machine/service-account
    environment variable so the unattended run can read it.
-3. **Scheduled Task** (nightly, as `sandsservice`):
-   ```cmd
-   schtasks /Create /TN "HVASC Financial Feed" /RU "hvasc\sandsservice" /RP <service-account-password> ^
-     /SC DAILY /ST 06:00 /RL HIGHEST ^
-     /TR "powershell -ExecutionPolicy Bypass -File D:\SandS\odbc\07-run-feed.ps1 -Url https://<your-app>.vercel.app -Password <UPLOAD_PASSWORD>"
+3. **Scheduled Task** (twice daily, as `sandsservice`) — run the installer once:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\08-install-task.ps1 -Url https://<your-app>.vercel.app
    ```
-   Logs land in `odbc\logs\` (last 30 runs kept).
+   It prompts (securely) for the Practical DB password, the website
+   `UPLOAD_PASSWORD`, and the service-account password, stores the first two as
+   machine env vars, and registers the task to run at **06:00 and 18:00**
+   (change with `-Times "07:00","19:00"`). Logs land in `odbc\logs\`
+   (last 30 runs kept). Test immediately with
+   `Start-ScheduledTask -TaskName "HVASC Financial Feed"`.
 
 ## Safety
 
