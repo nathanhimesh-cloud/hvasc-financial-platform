@@ -4,13 +4,13 @@ import path from "node:path";
 import type { FinancialSnapshot } from "@/lib/types";
 
 /**
- * Runtime snapshot store — where uploaded data lives AFTER the bundled
- * snapshot.json (which is only the build-time fallback).
+ * Runtime snapshot store — where uploaded / ODBC-pushed data lives AFTER the
+ * bundled snapshot.json (which is only the build-time fallback).
  *
- *   - Production (Vercel): Vercel Blob, when BLOB_READ_WRITE_TOKEN is set.
- *     (Create a Blob store in the Vercel dashboard → the token is injected
- *     automatically.) Vercel's filesystem is read-only, so Blob is required for
- *     uploads to persist there.
+ *   - Production (Vercel): a PRIVATE Vercel Blob store, when BLOB_READ_WRITE_TOKEN
+ *     is set. Blobs are written with `access: "private"` and read back with the
+ *     authenticated SDK `get()` — the financial data is never exposed at a public
+ *     URL. (Create the Blob store in the Vercel dashboard → token auto-injected.)
  *   - Local dev / anywhere with a writable disk: a JSON file under .data/.
  *
  * Reads/writes degrade gracefully: if neither is available, callers fall back
@@ -26,12 +26,12 @@ function hasBlob(): boolean {
   return !!process.env.BLOB_READ_WRITE_TOKEN;
 }
 
-async function writeJson(blobKey: string, localFile: string, data: unknown): Promise<string> {
-  const body = JSON.stringify(data);
+async function writeJson(blobKey: string, localFile: string, data: unknown, pretty = false): Promise<string> {
+  const body = JSON.stringify(data, null, pretty ? 2 : undefined);
   if (hasBlob()) {
     const { put } = await import("@vercel/blob");
     const res = await put(blobKey, body, {
-      access: "public",
+      access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
@@ -46,19 +46,17 @@ async function writeJson(blobKey: string, localFile: string, data: unknown): Pro
 async function readJson<T>(blobKey: string, localFile: string): Promise<T | null> {
   try {
     if (hasBlob()) {
-      const { list } = await import("@vercel/blob");
-      const { blobs } = await list({ prefix: blobKey, limit: 1 });
-      if (!blobs.length) return null;
-      // Cache the payload (revalidate window + on-demand bust via the
-      // "snapshot" tag, which both write paths invalidate). This avoids
-      // re-downloading the blob on every render — cheaper and faster.
-      const res = await fetch(blobs[0].url, { next: { revalidate: 600, tags: ["snapshot"] } });
-      if (!res.ok) return null;
-      return (await res.json()) as T;
+      // Private blob: read with the authenticated SDK (token), not a public URL.
+      // Vercel CDN-caches private reads by default, so this stays cheap/fast.
+      const { get } = await import("@vercel/blob");
+      const res = await get(blobKey, { access: "private" });
+      if (!res || res.statusCode !== 200 || !res.stream) return null;
+      const text = await new Response(res.stream).text();
+      return JSON.parse(text) as T;
     }
     return JSON.parse(await fs.readFile(localFile, "utf8")) as T;
   } catch {
-    return null;
+    return null; // nothing stored yet → caller uses bundled fallback
   }
 }
 
@@ -85,42 +83,11 @@ export async function readRuntimeInputs(): Promise<RuntimeInputs | null> {
 }
 
 export async function writeRuntimeSnapshot(snapshot: FinancialSnapshot): Promise<string> {
-  const body = JSON.stringify(snapshot, null, 2);
-
-  if (hasBlob()) {
-    const { put } = await import("@vercel/blob");
-    const res = await put(BLOB_KEY, body, {
-      access: "public",
-      contentType: "application/json",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
-    return res.url;
-  }
-
-  await fs.mkdir(path.dirname(LOCAL_FILE), { recursive: true });
-  await fs.writeFile(LOCAL_FILE, body, "utf8");
-  return LOCAL_FILE;
+  return writeJson(BLOB_KEY, LOCAL_FILE, snapshot, true);
 }
 
 export async function readRuntimeSnapshot(): Promise<FinancialSnapshot | null> {
-  try {
-    if (hasBlob()) {
-      const { list } = await import("@vercel/blob");
-      const { blobs } = await list({ prefix: BLOB_KEY, limit: 1 });
-      if (!blobs.length) return null;
-      // Cache the payload (revalidate window + on-demand bust via the
-      // "snapshot" tag, which both write paths invalidate). This avoids
-      // re-downloading the blob on every render — cheaper and faster.
-      const res = await fetch(blobs[0].url, { next: { revalidate: 600, tags: ["snapshot"] } });
-      if (!res.ok) return null;
-      return (await res.json()) as FinancialSnapshot;
-    }
-    const text = await fs.readFile(LOCAL_FILE, "utf8");
-    return JSON.parse(text) as FinancialSnapshot;
-  } catch {
-    return null; // nothing uploaded yet → caller uses bundled fallback
-  }
+  return readJson<FinancialSnapshot>(BLOB_KEY, LOCAL_FILE);
 }
 
 /** Where uploads are being persisted, for display in the UI. */
