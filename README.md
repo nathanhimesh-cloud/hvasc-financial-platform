@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hope Vale ASC — Financial Intelligence Platform
 
-## Getting Started
+A financial dashboard for **Hope Vale Aboriginal Shire Council (HVASC)**, built
+by **SandS Australia**. It rebuilds the original static demo
+(`../HopeVale_Financial_Intelligence_Platform_DEMO.html`) as a real Next.js app
+with a clean data layer ready to connect to the council's accounting system.
 
-First, run the development server:
+Three views:
+
+- **CFO Dashboard** — budget vs actual, allocation, revenue, department summary
+- **Grant Tracker** — grant register with spend, report deadlines, acquittals
+- **Manager View** — per-department budget/spend/GL/grant cards (+ drill-down)
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
+npm run build      # production build (type-check + lint)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Runs on **seed data** out of the box — no credentials or VPN needed.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Next.js 16 (App Router) · React 19 · TypeScript
+- Tailwind CSS v4 + shadcn/ui
+- Dark + gold/teal brand theme in `src/app/globals.css`
 
-## Learn More
+> Node ≥ 20.19 is recommended (Next 16). It runs on 20.15 with a harmless
+> engine warning, but bump Node when convenient.
 
-To learn more about Next.js, take a look at the following resources:
+## Project structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+  app/(app)/              # route group sharing the sidebar/topbar shell
+    page.tsx              #   /            CFO Dashboard
+    grants/page.tsx       #   /grants      Grant Tracker
+    departments/          #   /departments Manager View (+ /[slug] drill-down)
+  components/
+    layout/               # sidebar, topbar
+    kit/                  # brand primitives (KpiCard, pills, panel)
+    dashboard/ grants/ managers/   # per-view feature components
+  data/seed.ts            # demo figures (replaceable)
+  lib/
+    types.ts              # domain models
+    data/                 # data-access layer: index.ts (source switch) + csv-adapter.ts
+    derive.ts             # KPI / variance / allocation calculations
+    format.ts colors.ts nav.ts
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Data access — how live council data will flow
 
-## Deploy on Vercel
+**There is no API.** The accounting system is **Civica Practical Plus**
+(version 2020.12.4.1), a desktop app over a **Firebird** database. Access is
+only possible from inside the council network:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **VPN** — Sophos Connect to `vpn.hopevale.qld.gov.au` (SSL/UDP).
+2. **Remote Desktop** to `172.20.72.12` (server `hvasc-app02`, the "PP Server").
+   Practical logins are in the handover docs (e.g. `SHAUN`, `SAM`, `LEVI`).
+3. Practical DB lives at `D:\Practical\PCSWIN\Pcs.qdb` on `hvasc-app02`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Two supported data routes, selected by the `DATA_SOURCE` env var
+(see `.env.example`):
+
+| Source | Status | How |
+| --- | --- | --- |
+| `seed` | ✅ default | Illustrative demo figures. |
+| `csv` | ✅ ready to wire | A scheduled task (service account `sandsservice`) exports Practical reports to `\\hvasc-ad02\Data Share\Sands Reports`; this app reads them over the VPN. Implement column mapping in `src/lib/data/csv-adapter.ts`, then set `DATA_SOURCE=csv` + `REPORTS_DIR`. |
+| `odbc` | ⏳ pending Civica | Direct read-only query via the Firebird ODBC driver (`PCSACCESS` account). Approval was referred to Civica. Stub in `src/lib/data/index.ts`. |
+
+To switch sources without touching any view code, change `DATA_SOURCE` — every
+page calls `getSnapshot()` and is agnostic to the origin.
+
+### Important data caveats (from the council)
+
+- New **GL codes** are still being finalised — map via the Chart of Accounts
+  report under General Ledger.
+- The **FY2026 budget** is not yet loaded, so budget-vs-actual is partial until
+  it is.
+- **Grants**: kept in an Excel register; revenue tracked by GL code, expenditure
+  by **job codes**.
+- 4 departments / cost-(revenue-)centres: Water, Roads, Storage, Child Care.
+
+## Documentation
+
+All project docs live in **[`docs/`](./docs)**:
+
+- **[docs/DATA-REQUIREMENTS.md](./docs/DATA-REQUIREMENTS.md)** — what each view
+  shows and where the data comes from.
+- **[docs/ACCESS-GUIDE.md](./docs/ACCESS-GUIDE.md)** — step-by-step access to the
+  Practical system.
+- **[docs/ROADMAP.md](./docs/ROADMAP.md)** — prioritised backlog.
+
+## What to do next
+
+See the [roadmap](./docs/ROADMAP.md). Phase 1 (real data integration) is the
+highest-value next step.

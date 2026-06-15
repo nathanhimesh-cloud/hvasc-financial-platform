@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Runtime uploaded feed (local dev)
+.data
+
+# ODBC feed — generated output, never commit live financial data or logs
+/scripts/odbc/snapshot.json
+/scripts/odbc/logs/
+/scripts/odbc/discover*-output.txt

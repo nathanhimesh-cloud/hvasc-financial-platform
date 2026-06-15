@@ -1,0 +1,1598 @@
+{
+  "period": {
+    "label": "May 2026",
+    "fyLabel": "FY2025–26",
+    "monthOfYear": 11,
+    "monthsInYear": 12,
+    "live": true,
+    "budgetEstimated": false,
+    "budgetBasis": "Compared to FY25 actuals (prior year) — no FY26 budget loaded",
+    "comparisonLabel": "FY25",
+    "trendEstimated": false
+  },
+  "departments": [
+    {
+      "id": "governance",
+      "slug": "governance",
+      "name": "Governance",
+      "icon": "landmark",
+      "color": "gold",
+      "kind": "cost-revenue",
+      "annualBudget": 4164173,
+      "ytdActual": 8631874.87,
+      "ytdBudget": 3817158.58,
+      "status": "over-budget",
+      "glLines": [
+        {
+          "code": "1282-2000-0000",
+          "account": "Depreciation",
+          "amount": 4941357.11,
+          "flagged": true
+        },
+        {
+          "code": "1260-2000-0000",
+          "account": "Administration",
+          "amount": 1539650.47
+        },
+        {
+          "code": "1255-2000-0000",
+          "account": "Salaries",
+          "amount": 1254794.33
+        },
+        {
+          "code": "1200-2295-0000",
+          "account": "GENERAL ADMINISTRATION-",
+          "amount": 882230.98
+        },
+        {
+          "code": "1635-2000-0000",
+          "account": "ONCOSTS SUB PROG-",
+          "amount": 515196.63
+        },
+        {
+          "code": "1625-2000-0000",
+          "account": "Annual",
+          "amount": 318659.45
+        }
+      ]
+    },
+    {
+      "id": "community-services",
+      "slug": "community-services",
+      "name": "Community Services",
+      "icon": "users",
+      "color": "violet",
+      "kind": "cost-revenue",
+      "annualBudget": 1645192,
+      "ytdActual": 3155840.36,
+      "ytdBudget": 1508092.67,
+      "status": "over-budget",
+      "glLines": [
+        {
+          "code": "7025-2000-0000",
+          "account": "Salaries and",
+          "amount": 764117.77
+        },
+        {
+          "code": "7030-2000-0000",
+          "account": "Administration",
+          "amount": 706015.52
+        },
+        {
+          "code": "7525-2000-0000",
+          "account": "Salaries",
+          "amount": 537763.91
+        },
+        {
+          "code": "7710-2000-0000",
+          "account": "Salaries and Wages",
+          "amount": 291824.37
+        },
+        {
+          "code": "7615-2000-0000",
+          "account": "Administration Expens",
+          "amount": 128572.51
+        },
+        {
+          "code": "4085-2000-0000",
+          "account": "DLG & P Identified R-Salaries and W",
+          "amount": 127929.1
+        }
+      ]
+    },
+    {
+      "id": "housing",
+      "slug": "housing",
+      "name": "Housing",
+      "icon": "home",
+      "color": "blue",
+      "kind": "cost-revenue",
+      "annualBudget": 778107,
+      "ytdActual": 777303.57,
+      "ytdBudget": 713264.75,
+      "status": "over-budget",
+      "glLines": [
+        {
+          "code": "5210-2000-0000",
+          "account": "Administration",
+          "amount": 760747.37,
+          "flagged": true
+        },
+        {
+          "code": "5120-2000-0000",
+          "account": "Administration",
+          "amount": 14810
+        },
+        {
+          "code": "5125-2000-0000",
+          "account": "Council Housing",
+          "amount": 1746.2
+        }
+      ]
+    },
+    {
+      "id": "water",
+      "slug": "water",
+      "name": "Water",
+      "icon": "droplets",
+      "color": "teal",
+      "kind": "cost",
+      "annualBudget": 104922,
+      "ytdActual": 388108.89,
+      "ytdBudget": 96178.5,
+      "status": "over-budget",
+      "glLines": [
+        {
+          "code": "4120-2000-0000",
+          "account": "Administration Expenses",
+          "amount": 221377.38,
+          "flagged": true
+        },
+        {
+          "code": "4115-2000-0000",
+          "account": "Salaries and Wages",
+          "amount": 166731.51
+        }
+      ]
+    },
+    {
+      "id": "youth-and-recreation",
+      "slug": "youth-and-recreation",
+      "name": "Youth and Recreation",
+      "icon": "trophy",
+      "color": "amber",
+      "kind": "cost-revenue",
+      "annualBudget": 108893,
+      "ytdActual": 278888.01,
+      "ytdBudget": 99818.58,
+      "status": "over-budget",
+      "glLines": [
+        {
+          "code": "3440-2000-0000",
+          "account": "ILC Administration Expenses",
+          "amount": 105179.3
+        },
+        {
+          "code": "3315-2000-0000",
+          "account": "Salaries and wages",
+          "amount": 72454.32
+        },
+        {
+          "code": "3435-2000-0000",
+          "account": "Salaries & Wages",
+          "amount": 44471.02
+        },
+        {
+          "code": "3320-2000-0000",
+          "account": "S & R Administration E",
+          "amount": 36145.42
+        },
+        {
+          "code": "3370-2000-0000",
+          "account": "Administration Expenses",
+          "amount": 20637.95
+        }
+      ]
+    },
+    {
+      "id": "sewerage",
+      "slug": "sewerage",
+      "name": "Sewerage",
+      "icon": "waves",
+      "color": "indigo",
+      "kind": "cost",
+      "annualBudget": 87800,
+      "ytdActual": 152305.2,
+      "ytdBudget": 80483.33,
+      "status": "over-budget",
+      "glLines": [
+        {
+          "code": "4165-2000-0000",
+          "account": "Salaries and Wages",
+          "amount": 76219.95,
+          "flagged": true
+        },
+        {
+          "code": "4170-2000-0000",
+          "account": "Administration Expenses",
+          "amount": 76085.25
+        }
+      ]
+    },
+    {
+      "id": "essential-services",
+      "slug": "essential-services",
+      "name": "Essential Services",
+      "icon": "zap",
+      "color": "amber",
+      "kind": "cost",
+      "annualBudget": 83764.19,
+      "ytdActual": 76783.84,
+      "ytdBudget": 76783.84,
+      "status": "on-track",
+      "glLines": [
+        {
+          "code": "4220-2000-0000",
+          "account": "Administration",
+          "amount": 76783.84,
+          "flagged": true
+        }
+      ]
+    },
+    {
+      "id": "environment-management",
+      "slug": "environment-management",
+      "name": "Environment Management",
+      "icon": "leaf",
+      "color": "green",
+      "kind": "cost",
+      "annualBudget": 13068,
+      "ytdActual": 13632.34,
+      "ytdBudget": 11979,
+      "status": "over-budget",
+      "glLines": [
+        {
+          "code": "7215-2000-0000",
+          "account": "Environmental Health-Admin",
+          "amount": 7500,
+          "flagged": true
+        },
+        {
+          "code": "6250-2275-0000",
+          "account": "Motor Vehicle Expenses",
+          "amount": 4000.52
+        },
+        {
+          "code": "6400-2210-0000",
+          "account": "Administration Expenses",
+          "amount": 1381.82
+        },
+        {
+          "code": "6250-2010-0000",
+          "account": "Travel & Accom",
+          "amount": 750
+        }
+      ]
+    },
+    {
+      "id": "economic-development",
+      "slug": "economic-development",
+      "name": "Economic Development",
+      "icon": "briefcase",
+      "color": "blue",
+      "kind": "cost",
+      "annualBudget": 9156153,
+      "ytdActual": 7121.19,
+      "ytdBudget": 8393140.25,
+      "status": "on-track",
+      "glLines": [
+        {
+          "code": "8365-2000-0000",
+          "account": "Private Works",
+          "amount": 6533.47,
+          "flagged": true
+        },
+        {
+          "code": "8245-2000-0000",
+          "account": "Operating Expenses",
+          "amount": 587.72
+        }
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "id": "1210-1100-0000",
+      "name": "SGFA",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 2885896.54,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "1156-1100-0000",
+      "name": "FAGS 10/11 Grant Allocation",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 2054016,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "5360-1100-0000",
+      "name": "W4Q 2024-2027 GRANT FUNDING",
+      "funder": "State Government (Capital)",
+      "departmentId": "governance",
+      "total": 847131.51,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7015-1100-0000",
+      "name": "Grant - IEI Revenue",
+      "funder": "State Government",
+      "departmentId": "community-services",
+      "total": 751045.39,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7705-1100-0000",
+      "name": "HACC Grant",
+      "funder": "General Purpose Grant",
+      "departmentId": "community-services",
+      "total": 609996.15,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1140-0000",
+      "name": "NDRRA 24 SUB 4 HVAC0019 ELIM",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 607329.08,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1144-0000",
+      "name": "NDRRA 24 SUB 5 HVAC0021 BULLS",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 512404,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7560-1100-0000",
+      "name": "FACS (Fed) - Child Care Centre Grant",
+      "funder": "General Purpose Grant",
+      "departmentId": "governance",
+      "total": 457030,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1139-0000",
+      "name": "NDRRA 24 SUB 2 HVAC0016",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 420217.15,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1132-0000",
+      "name": "QRA Betterment Alligator Creek Rd",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 408761.5,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1138-0000",
+      "name": "NDRRA 24 SUB 3 HVAC0017 TOWN",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 281008.12,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1143-0000",
+      "name": "NDRRA 24 SUB 7 HVAC0023 SPRING",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 217669.64,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7605-1100-0000",
+      "name": "Animal Management",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 213948,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "3960-1100-0000",
+      "name": "C&K Grant Funding",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 181868.35,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "3310-1100-0000",
+      "name": "Sport",
+      "funder": "State Government",
+      "departmentId": "youth-and-recreation",
+      "total": 167830.25,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7149-1100-0000",
+      "name": "Community Connector Grant Funding",
+      "funder": "General Purpose Grant",
+      "departmentId": "governance",
+      "total": 167135.61,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "3150-1100-0000",
+      "name": "Ribs Broadcasting DCITA Grant",
+      "funder": "General Purpose Grant",
+      "departmentId": "governance",
+      "total": 121636.09,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7260-1100-0000",
+      "name": "YOUTH & SOCIAL SUPPORT GRANT",
+      "funder": "General Purpose Grant",
+      "departmentId": "governance",
+      "total": 117605.4,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "3432-1100-0000",
+      "name": "State Library Grant",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 92937,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "1725-1100-0000",
+      "name": "Food Security Plan Grant",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 67783.5,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1142-0000",
+      "name": "QRA LGGR CAPITAL GRANT",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 64037.5,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1131-0000",
+      "name": "QRRRF 22-23 Spring Hill Rd Culverts",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 42514.21,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1141-0000",
+      "name": "NDRRA 24 SUB 6 HVAC0022",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 35969.01,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7021-1100-0000",
+      "name": "Medication Chart (eNRMC) Grant",
+      "funder": "General Purpose Grant",
+      "departmentId": "community-services",
+      "total": 20000,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "4080-1133-0000",
+      "name": "QRA Betterment Cooktown-Mcivor Rd",
+      "funder": "State Government (Capital)",
+      "departmentId": "essential-services",
+      "total": 17896.52,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7146-1100-0000",
+      "name": "Dis Services Day Service - Recurrent",
+      "funder": "State Government",
+      "departmentId": "community-services",
+      "total": 15637,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "1720-1100-0000",
+      "name": "Gambling Community Benefit Grant",
+      "funder": "State Government (Capital)",
+      "departmentId": "governance",
+      "total": 14535.81,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7148-1100-0000",
+      "name": "QCSS EMERGENCY RELIEF GRANT",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 10000,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "1210-1107-0000",
+      "name": "GET READY GRANT",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 6102,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "3810-1100-0000",
+      "name": "NAIDOC WEEK ICC GRANT",
+      "funder": "State Government",
+      "departmentId": "governance",
+      "total": 5000,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7150-1100-0000",
+      "name": "QCSS Disabiity Training Grant",
+      "funder": "State Government",
+      "departmentId": "community-services",
+      "total": 3750,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    },
+    {
+      "id": "7146-1900-0000",
+      "name": "Dis Services Day Serv Non-Recurrent",
+      "funder": "State Government",
+      "departmentId": "community-services",
+      "total": 2872,
+      "spent": 0,
+      "reportDue": {
+        "label": "—",
+        "level": "muted"
+      },
+      "acquittal": {
+        "label": "—",
+        "level": "muted"
+      },
+      "status": "not-started",
+      "statusChip": {
+        "label": "FUNDING RECEIVED",
+        "level": "muted"
+      }
+    }
+  ],
+  "revenueLines": [
+    {
+      "id": "rates-and-utility-charges",
+      "label": "Rates & utility charges",
+      "ytd": 505315.8
+    },
+    {
+      "id": "fees-and-charges",
+      "label": "Fees & charges",
+      "ytd": 192154.41
+    },
+    {
+      "id": "rental-income",
+      "label": "Rental income",
+      "ytd": 722001.13
+    },
+    {
+      "id": "interest-received",
+      "label": "Interest received",
+      "ytd": 1872073.41
+    },
+    {
+      "id": "sales-contract-and-recoverable-works",
+      "label": "Sales – contract & recoverable works",
+      "ytd": 4462863.37
+    },
+    {
+      "id": "other-recurrent-income",
+      "label": "Other recurrent income",
+      "ytd": 1929790.75
+    },
+    {
+      "id": "grants-and-subsidies",
+      "label": "Grants & subsidies",
+      "ytd": 15284251.11
+    }
+  ],
+  "monthlySpend": [
+    {
+      "month": "Jul",
+      "amount": 942364.36
+    },
+    {
+      "month": "Aug",
+      "amount": 1858545.28
+    },
+    {
+      "month": "Sep",
+      "amount": 2181882.82
+    },
+    {
+      "month": "Oct",
+      "amount": 1036434.02
+    },
+    {
+      "month": "Nov",
+      "amount": 1858482.34
+    },
+    {
+      "month": "Dec",
+      "amount": 1280417.8
+    },
+    {
+      "month": "Jan",
+      "amount": 1653487.55
+    },
+    {
+      "month": "Feb",
+      "amount": 1643605.95
+    },
+    {
+      "month": "Mar",
+      "amount": 1797961.44
+    },
+    {
+      "month": "Apr",
+      "amount": 1099480.27
+    },
+    {
+      "month": "May",
+      "amount": 2990896.43
+    }
+  ],
+  "incomeTotals": {
+    "totalIncome": 25013722.7,
+    "totalExpenses": 18343558.26,
+    "netResult": 6670164.44,
+    "revenueLines": [
+      {
+        "id": "rates-and-utility-charges",
+        "label": "Rates & utility charges",
+        "ytd": 505315.8
+      },
+      {
+        "id": "fees-and-charges",
+        "label": "Fees & charges",
+        "ytd": 192154.41
+      },
+      {
+        "id": "rental-income",
+        "label": "Rental income",
+        "ytd": 722001.13
+      },
+      {
+        "id": "interest-received",
+        "label": "Interest received",
+        "ytd": 1872073.41
+      },
+      {
+        "id": "sales-contract-and-recoverable-works",
+        "label": "Sales – contract & recoverable works",
+        "ytd": 4462863.37
+      },
+      {
+        "id": "other-recurrent-income",
+        "label": "Other recurrent income",
+        "ytd": 1929790.75
+      },
+      {
+        "id": "grants-and-subsidies",
+        "label": "Grants & subsidies",
+        "ytd": 15284251.11
+      }
+    ]
+  },
+  "monthlyStatements": [
+    {
+      "idx": 1,
+      "month": "Jul",
+      "totalIncome": 4210156.82,
+      "totalExpenses": 942364.36,
+      "netResult": 3267792.46,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 62583.99
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 36996.25
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 81461.48
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 6.58
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 355523.97
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 208507.74
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 3465076.81
+        }
+      ]
+    },
+    {
+      "idx": 2,
+      "month": "Aug",
+      "totalIncome": 7932777.07,
+      "totalExpenses": 2800909.64,
+      "netResult": 5131867.43,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 76900.56
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 58038.62
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 91817.76
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 130301.1
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 506244.6
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 360624.34
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 6708850.09
+        }
+      ]
+    },
+    {
+      "idx": 3,
+      "month": "Sep",
+      "totalIncome": 10369917.05,
+      "totalExpenses": 4982792.46,
+      "netResult": 5387124.59,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 76900.56
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 80000.25
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 93057.76
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 381997.29
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 844987.07
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 524606.31
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 8323095.09
+        }
+      ]
+    },
+    {
+      "idx": 4,
+      "month": "Oct",
+      "totalIncome": 12887980.45,
+      "totalExpenses": 6019226.48,
+      "netResult": 6868753.97,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 254256.66
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 73892.49
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 357115.66
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 502004.46
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 2300204.59
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 717802.67
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 8637431.2
+        }
+      ]
+    },
+    {
+      "idx": 5,
+      "month": "Nov",
+      "totalIncome": 15278522.59,
+      "totalExpenses": 7877708.82,
+      "netResult": 7400813.77,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 254256.66
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 140197.76
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 157835.66
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 511046.07
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 1918130.77
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 863379.46
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 11388403.49
+        }
+      ]
+    },
+    {
+      "idx": 6,
+      "month": "Dec",
+      "totalIncome": 15640330.68,
+      "totalExpenses": 9158126.62,
+      "netResult": 6482204.06,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 254256.66
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 141714.39
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 158915.66
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 673825.96
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 2028815.08
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 882156.25
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 11455373.96
+        }
+      ]
+    },
+    {
+      "idx": 7,
+      "month": "Jan",
+      "totalIncome": 16637159.2,
+      "totalExpenses": 10811614.17,
+      "netResult": 5825545.03,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 256117.83
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 159168.14
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 242224.81
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 1072293.88
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 2270944.47
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 1052576.22
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 11538561.13
+        }
+      ]
+    },
+    {
+      "idx": 8,
+      "month": "Feb",
+      "totalIncome": 18853993.13,
+      "totalExpenses": 12455220.12,
+      "netResult": 6398773.01,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 295113.6
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 172305.89
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 406969.35
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 1255743.55
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 2689345.87
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 1386165.3
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 12603076.850000001
+        }
+      ]
+    },
+    {
+      "idx": 9,
+      "month": "Mar",
+      "totalIncome": 19866107.55,
+      "totalExpenses": 14253181.56,
+      "netResult": 5612925.99,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 275269.92
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 175901.18
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 509529.39
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 1454741.05
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 2979772.81
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 1576565.98
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 12849054.5
+        }
+      ]
+    },
+    {
+      "idx": 10,
+      "month": "Apr",
+      "totalIncome": 22372709.34,
+      "totalExpenses": 15352661.83,
+      "netResult": 7020047.51,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 277326.5
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 182531.67
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 627703.13
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 1647963.19
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 3251937.83
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 1748936.94
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 14591037.36
+        }
+      ]
+    },
+    {
+      "idx": 11,
+      "month": "May",
+      "totalIncome": 25013722.7,
+      "totalExpenses": 18343558.26,
+      "netResult": 6670164.44,
+      "revenueLines": [
+        {
+          "id": "rates-and-utility-charges",
+          "label": "Rates & utility charges",
+          "ytd": 505315.8
+        },
+        {
+          "id": "fees-and-charges",
+          "label": "Fees & charges",
+          "ytd": 192154.41
+        },
+        {
+          "id": "rental-income",
+          "label": "Rental income",
+          "ytd": 722001.13
+        },
+        {
+          "id": "interest-received",
+          "label": "Interest received",
+          "ytd": 1872073.41
+        },
+        {
+          "id": "sales-contract-and-recoverable-works",
+          "label": "Sales – contract & recoverable works",
+          "ytd": 4462863.37
+        },
+        {
+          "id": "other-recurrent-income",
+          "label": "Other recurrent income",
+          "ytd": 1929790.75
+        },
+        {
+          "id": "grants-and-subsidies",
+          "label": "Grants & subsidies",
+          "ytd": 15284251.11
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "source": "Civica Practical exports — Analysis by function, Income Statement, Note 5",
+    "baseline": "fy25-actuals",
+    "notes": [
+      "Budget baseline = FY25 actuals by function.",
+      "Monthly trend built from month-by-month Income Statement exports.",
+      "Grants show funding received (Note 5). Spend % and report/acquittal deadlines need the council's Excel grants register + job-costing export."
+    ],
+    "generatedAt": "2026-06-12"
+  }
+}

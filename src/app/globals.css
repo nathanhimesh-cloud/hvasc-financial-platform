@@ -1,26 +1,193 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
+/*
+  HVASC Financial Intelligence Platform — Vercel-style dark theme.
+  Near-black surfaces, hairline borders, Geist type. Colour is reserved for
+  data: a cool category palette for departments + RAG status for performance.
+*/
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-heading);
+
+  /* shadcn semantic tokens */
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* brand surface tokens */
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-card-hover: var(--card-hover);
+
+  /* secondary body text */
+  --color-subtle: #8f8f8f;
+
+  /* brand accent (used sparingly: active state, focus) */
+  --color-gold: #e0b252;
+  --color-gold-light: #f0d070;
+  --color-gold-dim: rgba(224, 178, 82, 0.12);
+
+  /* category palette — department identity (cool tones) */
+  --color-teal: #2dd4bf;
+  --color-teal-dim: rgba(45, 212, 191, 0.12);
+  --color-blue: #4f9dff;
+  --color-blue-dim: rgba(79, 157, 255, 0.12);
+  --color-indigo: #8b8bf0;
+  --color-violet: #b07cf0;
+  --color-violet-dim: rgba(176, 124, 240, 0.12);
+  --color-indigo-dim: rgba(139, 139, 240, 0.12);
+
+  /* status palette — RAG performance */
+  --color-green: #45d483;
+  --color-green-dim: rgba(69, 212, 131, 0.12);
+  --color-amber: #f5a623;
+  --color-amber-dim: rgba(245, 166, 35, 0.12);
+  --color-red: #f56565;
+  --color-red-dim: rgba(245, 101, 101, 0.12);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --radius: 10px;
+
+  --background: #000000;
+  --foreground: #ededed;
+  --surface: #0a0a0a;
+  --card: #0a0a0a;
+  --card-hover: #111111;
+  --elevated: #1a1a1a;
+  --card-foreground: #ededed;
+  --popover: #0a0a0a;
+  --popover-foreground: #ededed;
+
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ededed;
+  --muted: #1a1a1a;
+  --muted-foreground: #a1a1a1;
+  --accent: #1a1a1a;
+  --accent-foreground: #ededed;
+  --destructive: #f56565;
+
+  --border: rgba(255, 255, 255, 0.09);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: rgba(224, 178, 82, 0.5);
+
+  --chart-1: #2dd4bf;
+  --chart-2: #4f9dff;
+  --chart-3: #8b8bf0;
+  --chart-4: #b07cf0;
+  --chart-5: #e0b252;
+
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #a1a1a1;
+  --sidebar-primary: #ededed;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #ededed;
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+  --sidebar-ring: rgba(224, 178, 82, 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overflow-x: hidden;
+  }
+  html {
+    @apply font-sans;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #262626;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #333333;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(69, 212, 131, 0.4);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 4px rgba(69, 212, 131, 0);
+  }
+}
+
+/* Horizontal bar fill grows in from the left on mount. */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-bar {
+  transform-origin: left;
+  animation: grow-x 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
