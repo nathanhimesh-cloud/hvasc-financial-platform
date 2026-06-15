@@ -24,10 +24,16 @@ param(
   [string]$TaskName = "HVASC Financial Feed",
   [string]$ServiceAccount = "hvasc\sandsservice",
   [string[]]$Times = @("06:00", "18:00"),
-  [string]$ScriptDir = $PSScriptRoot
+  [string]$ScriptDir = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# $PSScriptRoot can be empty as a param default on Windows PowerShell 4.0, so
+# resolve the script's own folder here instead.
+if (-not $ScriptDir) {
+  $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+}
 
 # ── 1. store the two secrets as machine env vars (read by 05 and 06) ─────────
 function Set-MachineSecret([string]$Name, [string]$Prompt) {
