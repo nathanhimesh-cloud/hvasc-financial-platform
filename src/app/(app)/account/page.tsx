@@ -1,16 +1,24 @@
 import { LogOut, Moon } from "lucide-react";
-import { getDataSource } from "@/lib/data";
+import { getDataSource, getSnapshot } from "@/lib/data";
 import { PROFILE } from "@/lib/profile";
 import { Content, Panel, PanelHeader } from "@/components/kit/panel";
+
+export const dynamic = "force-dynamic";
 
 const SOURCE_LABEL: Record<string, string> = {
   seed: "Demo / seed data",
   csv: "Practical CSV exports",
-  odbc: "Practical ODBC (direct)",
+  odbc: "Civica Practical — live ODBC feed",
+  feed: "Civica Practical — live feed",
 };
 
-export default function AccountPage() {
+export default async function AccountPage() {
   const source = getDataSource();
+  const snapshot = await getSnapshot();
+  const live = snapshot.period.live;
+  const sourceLabel = live
+    ? "Civica Practical — live feed (read-only)"
+    : SOURCE_LABEL[source] ?? source;
 
   return (
     <Content className="max-w-3xl">
@@ -51,13 +59,18 @@ export default function AccountPage() {
       <Panel className="mb-4">
         <PanelHeader title="Data Access" subtitle="CURRENT SOURCE" />
         <dl className="flex flex-col gap-3 text-[13px]">
-          <Row label="Active data source" value={SOURCE_LABEL[source] ?? source} />
+          <Row label="Status" value={live ? "Live" : "Demo / seed"} />
+          <Row label="Source" value={sourceLabel} />
           <Row label="Accounting system" value="Civica Practical Plus" />
-          <Row label="Reports share" value="\\hvasc-ad02\\Data Share\\Sands Reports" mono />
+          <Row label="Refresh" value="Automatic — twice daily (6am & 6pm)" />
+          {snapshot.meta?.generatedAt && (
+            <Row label="Last updated" value={snapshot.meta.generatedAt} />
+          )}
         </dl>
         <p className="mt-3 text-[12px] text-muted-foreground">
-          See <span className="font-mono">docs/ACCESS-GUIDE.md</span> for how to
-          connect live data.
+          Figures are read <span className="text-foreground">read-only</span> from
+          Civica Practical on the council server and refreshed automatically — no
+          manual export or upload.
         </p>
       </Panel>
 
