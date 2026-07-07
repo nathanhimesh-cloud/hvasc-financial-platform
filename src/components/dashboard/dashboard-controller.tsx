@@ -176,6 +176,9 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
   const ytdSpend = depts.reduce((a, d) => a + d.ytdActual, 0);
   const grantTotal = grants.reduce((a, g) => a + g.total, 0);
   const revenue = snapshot.revenueLines.reduce((a, r) => a + r.ytd, 0);
+  // Grant dependency (CFO recommendation C2): grants as a share of total revenue.
+  const grantRevenue = snapshot.revenueLines.find((r) => r.id === "grants-and-subsidies")?.ytd ?? grantTotal;
+  const grantDependency = revenue > 0 ? grantRevenue / revenue : 0;
   const overBudget = depts.filter((d) => d.status === "over-budget").length;
   const surplus = fin.net >= 0;
   const margin = fin.income > 0 ? fin.net / fin.income : 0;
@@ -188,6 +191,7 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
     { key: "net-result", label: surplus ? "Net Surplus" : "Net Deficit", value: fin.net, format: "compact", color: surplus ? "green" : "red", icon: "wallet", meta: fin.label },
     { key: "active-grants", label: "Active Grants", value: grants.length, format: "plain", color: "gold", icon: "file-text", meta: `${formatCompact(grantTotal)} tracked` },
     { key: "grant-funding", label: "Grant Funding", value: grantTotal, format: "compact", color: "gold", icon: "banknote", meta: `Across ${grants.length} grants` },
+    { key: "grant-dependency", label: "Grant Dependency", value: grantDependency, format: "percent", color: grantDependency > 0.75 ? "amber" : "gold", icon: "percent", meta: "Grants ÷ total revenue" },
     { key: "revenue-centres", label: "Revenue Centres (YTD)", value: revenue, format: "compact", color: "teal", icon: "coins", meta: `${snapshot.revenueLines.length} income lines` },
     { key: "ytd-spend", label: "YTD Spend (by function)", value: ytdSpend, format: "compact", color: "amber", icon: "activity", meta: `${depts.length} departments` },
     { key: "total-budget", label: comparisonLabel === "FY25" ? "FY25 Total Spend" : "Total Budget", value: totalBudget, format: "compact", color: "gold", icon: "wallet", meta: comparisonLabel === "FY25" ? "Prior full year" : "Loaded budget" },

@@ -167,6 +167,12 @@ export interface SnapshotMeta {
   generatedAt?: string;
   /** How the budget baseline was derived, e.g. "fy25-actuals" or "run-rate". */
   baseline?: string;
+  /**
+   * Count of active GL accounts NOT rolled into a report line/department
+   * (brief A7). A non-zero value means totals may silently understate — surfaced
+   * on the Account Mapping page so it can never drift unnoticed.
+   */
+  unmappedAccounts?: number;
   /** Human-readable caveats shown to maintainers. */
   notes?: string[];
 }

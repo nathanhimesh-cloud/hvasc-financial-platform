@@ -26,7 +26,8 @@ export interface DeptNavItem {
 interface SidebarProps {
   departments: DeptNavItem[];
   grantsBadge: number;
-  periodLabel: string;
+  /** ISO date of the last successful sync (snapshot.meta.generatedAt). */
+  lastSync?: string;
   collapsed: boolean;
   onToggle: () => void;
 }
@@ -34,7 +35,7 @@ interface SidebarProps {
 export function Sidebar({
   departments,
   grantsBadge,
-  periodLabel,
+  lastSync,
   collapsed,
   onToggle,
 }: SidebarProps) {
@@ -162,20 +163,8 @@ export function Sidebar({
         </NavGroup>
       </nav>
 
-      {/* Reporting period */}
-      {!collapsed && (
-        <div className="px-4 pb-3">
-          <div className="rounded-md border border-sidebar-border bg-card px-3 py-2.5">
-            <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
-              Reporting Period
-            </div>
-            <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green [animation:pulse-dot_2s_infinite]" />
-              {periodLabel}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Data sync status (replaces the old Reporting Period block — brief B10) */}
+      {!collapsed && <SyncStatus lastSync={lastSync} />}
 
       {/* Help + Profile */}
       <div className="border-t border-sidebar-border p-2.5">
@@ -184,6 +173,50 @@ export function Sidebar({
       </div>
     </aside>
   );
+}
+
+// 6:00am · 12:30pm · 6:00pm AEST (Queensland has no daylight saving), in minutes.
+const SYNC_SLOTS = [6 * 60, 12 * 60 + 30, 18 * 60];
+
+function SyncStatus({ lastSync }: { lastSync?: string }) {
+  const [nextLabel, setNextLabel] = useState("");
+  useEffect(() => {
+    // AEST = UTC+10 year-round. Shift so the UTC fields read AEST wall-clock time.
+    const aest = new Date(Date.now() + 10 * 3600 * 1000);
+    const cur = aest.getUTCHours() * 60 + aest.getUTCMinutes();
+    let slot = SYNC_SLOTS.find((s) => s > cur);
+    const day = slot === undefined ? "tomorrow" : "today";
+    if (slot === undefined) slot = SYNC_SLOTS[0];
+    const h = Math.floor(slot / 60);
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    const ap = h < 12 ? "am" : "pm";
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNextLabel(`${h12}:${(slot % 60).toString().padStart(2, "0")}${ap} ${day}`);
+  }, []);
+
+  return (
+    <div className="px-4 pb-3">
+      <div className="rounded-md border border-sidebar-border bg-card px-3 py-2.5">
+        <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+          Data Sync
+        </div>
+        <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-green [animation:pulse-dot_2s_infinite]" />
+          {lastSync ? `Last: ${formatSyncDate(lastSync)}` : "Awaiting first sync"}
+        </div>
+        <div className="mt-1 font-mono text-[10px] text-muted-foreground">
+          {nextLabel ? `Next ~${nextLabel} · AEST` : "6am · 12:30pm · 6pm AEST"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatSyncDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 function HelpLink({ collapsed }: { collapsed: boolean }) {

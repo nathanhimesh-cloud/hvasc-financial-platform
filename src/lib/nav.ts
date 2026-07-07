@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Landmark,
   LayoutGrid,
-  Upload,
   FileText,
   Tags,
   type LucideIcon,
@@ -23,10 +22,14 @@ export const overviewNav: NavLink[] = [
   { href: "/reports", label: "Detailed Reports", icon: FileText },
 ];
 
-/** "Data" section — tools that change what the reports show. */
+/**
+ * "Data" section — tools that change what the reports show.
+ * Data Upload is intentionally removed (brief B10): data now comes via the
+ * automated Practical sync, not manual file uploads. The /data route still
+ * exists but is unlinked.
+ */
 export const dataNav: NavLink[] = [
   { href: "/mapping", label: "Account Mapping", icon: Tags },
-  { href: "/data", label: "Data Upload", icon: Upload },
 ];
 
 /** First item in the Departments section — the manager grid. */

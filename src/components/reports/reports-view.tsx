@@ -19,6 +19,7 @@ import { Panel, PanelHeader } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { IntegrityBanner } from "@/components/kit/integrity-banner";
 import { DataStamp } from "@/components/kit/data-stamp";
+import { PrintButton } from "@/components/kit/print-button";
 import { BudgetVsActual } from "./budget-vs-actual";
 import { TransactionsView } from "./transactions-view";
 import { bgDim, textColor } from "@/lib/colors";
@@ -169,12 +170,15 @@ export function ReportsView({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
       {/* Provenance stamp + reconciliation status (Brief A1 + A4) */}
       <div className="flex flex-col gap-3">
-        <DataStamp generatedAt={generatedAt} periodLabel={periodName} fyLabel={fyLabel} source={source} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <DataStamp generatedAt={generatedAt} periodLabel={periodName} fyLabel={fyLabel} source={source} />
+          <PrintButton />
+        </div>
         <IntegrityBanner report={integrity} />
       </div>
 
       {/* Statement tabs */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-border pb-px">
+      <div className="no-print flex flex-wrap items-center gap-1 border-b border-border pb-px">
         <StatementTab active={statement === "pnl"} onClick={() => setStatement("pnl")} icon={FileText} label="Profit & Loss" />
         <StatementTab active={statement === "budget"} onClick={() => setStatement("budget")} icon={Table} label="Budget vs Actual" soon={!budgetData} />
         <StatementTab active={statement === "balance"} onClick={() => setStatement("balance")} icon={Scale} label="Balance Sheet" soon={!balanceSheet} />

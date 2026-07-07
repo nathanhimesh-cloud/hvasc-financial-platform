@@ -11,7 +11,8 @@ interface AppShellProps {
   departments: DeptNavItem[];
   deptNames: Record<string, string>;
   grantsBadge: number;
-  periodLabel: string;
+  /** ISO date of the last successful sync (snapshot.meta.generatedAt). */
+  lastSync?: string;
   metaCtx: PageMetaContext;
   children: React.ReactNode;
 }
@@ -22,7 +23,7 @@ export function AppShell({
   departments,
   deptNames,
   grantsBadge,
-  periodLabel,
+  lastSync,
   metaCtx,
   children,
 }: AppShellProps) {
@@ -47,7 +48,7 @@ export function AppShell({
       <Sidebar
         departments={departments}
         grantsBadge={grantsBadge}
-        periodLabel={periodLabel}
+        lastSync={lastSync}
         collapsed={collapsed}
         onToggle={toggle}
       />
@@ -57,7 +58,9 @@ export function AppShell({
           collapsed ? "ml-[64px]" : "ml-[248px]",
         )}
       >
-        <Topbar deptNames={deptNames} metaCtx={metaCtx} />
+        <div className="no-print">
+          <Topbar deptNames={deptNames} metaCtx={metaCtx} />
+        </div>
         <main className="pb-10">{children}</main>
       </div>
     </TooltipProvider>

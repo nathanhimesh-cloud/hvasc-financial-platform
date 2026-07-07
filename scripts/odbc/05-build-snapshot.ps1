@@ -340,6 +340,17 @@ $priorYear = [ordered]@{
   closingEquity = $pyEquity
 }
 
+# ── 6e. unmapped-accounts count (brief A7) ───────────────────────────────────
+# Active income/expense accounts whose function (L1ACCNT) isn't one we roll up —
+# they'd silently drop out of department totals. Surface the count so it can't
+# drift unnoticed. 0 = every active account is mapped.
+$funcKeys = ($FUNCS.Keys | ForEach-Object { "'$_'" }) -join ','
+$unmappedAccounts = [int](Invoke-Scalar @"
+SELECT COUNT(*) FROM GLMST m
+WHERE m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5,6)
+  AND m.L1ACCNT NOT IN ($funcKeys)
+"@)
+
 # ── 7. assemble + write ──────────────────────────────────────────────────────
 $snapshot = [ordered]@{
   period = [ordered]@{
@@ -364,6 +375,7 @@ $snapshot = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"
     baseline = $(if ($hasRealBudget) { 'fy-budget' } else { 'fy25-actuals' })
     generatedAt = (Get-Date -Format 'yyyy-MM-dd')
+    unmappedAccounts = $unmappedAccounts
     notes = @(
       "Live read-only feed from the General Ledger (GLMST/GLBAL) at period $cur, FY$yr.",
       "Departments = GL-native functions (GLMST.L1ACCNT). Spend is operating expenditure; depreciation (`$$deprec) is excluded so the net result ties to the income statement.",
@@ -385,6 +397,8 @@ Write-Host ("  grants      : {0}" -f $grants.Count)
 Write-Host ("  revenueLines: {0}" -f $revenueLines.Count)
 Write-Host ("  transactions: {0}{1}" -f $transactions.Count, $(if ($trnCapped) { " (CAPPED at $TRN_CAP — older txns not included)" } else { "" }))
 Write-Host ("  daily points: {0}" -f $dailySpend.Count)
+$umCol = if ($unmappedAccounts -gt 0) { 'Yellow' } else { 'Green' }
+Write-Host ("  unmapped acc: {0}  (active accts not in a department; 0 = all mapped)" -f $unmappedAccounts) -ForegroundColor $umCol
 Write-Host ""
 Write-Host "Balance Sheet (live) - VALIDATE:" -ForegroundColor Cyan
 Write-Host ("  Total Assets       : {0,18:N2}" -f $bsTotalAssets)

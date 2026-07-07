@@ -45,7 +45,7 @@ export default async function AppLayout({
       departments={departments}
       deptNames={deptNames}
       grantsBadge={grants.needingAction}
-      periodLabel={snapshot.period.label}
+      lastSync={snapshot.meta?.generatedAt}
       metaCtx={metaCtx}
     >
       {children}

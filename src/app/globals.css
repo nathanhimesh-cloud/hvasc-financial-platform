@@ -155,6 +155,32 @@
   }
 }
 
+/* Print / export-to-PDF: swap to a light palette and hide the app chrome so a
+   report prints clean (brief B3 — export to PDF). Elements marked `.no-print`
+   (buttons, filters, sidebar, topbar) are dropped from the printout. */
+@media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #111827;
+    --card: #ffffff;
+    --card-hover: #ffffff;
+    --elevated: #f3f4f6;
+    --card-foreground: #111827;
+    --muted: #f3f4f6;
+    --muted-foreground: #4b5563;
+    --border: #d1d5db;
+    --sidebar-border: #d1d5db;
+  }
+  body {
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+  aside,
+  .no-print {
+    display: none !important;
+  }
+}
+
 @keyframes pulse-dot {
   0%,
   100% {

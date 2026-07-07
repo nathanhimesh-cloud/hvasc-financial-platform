@@ -51,8 +51,17 @@ export default async function MappingPage() {
     departmentId: grantOv[g.id]?.departmentId ?? "",
   }));
 
+  const unmapped = base.meta?.unmappedAccounts ?? 0;
+
   return (
     <Content>
+      {unmapped > 0 && (
+        <div className="mb-4 rounded-lg border border-amber/40 bg-amber/10 px-4 py-2.5 text-[12px] text-amber">
+          <span className="font-semibold">{unmapped}</span> active GL account{unmapped === 1 ? "" : "s"} aren&apos;t
+          mapped to a department, so their amounts may be missing from department totals. Check the chart of accounts
+          in Practical (brief A7).
+        </div>
+      )}
       <MappingForm
         departments={departments}
         accounts={accounts}
