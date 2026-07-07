@@ -1,6 +1,6 @@
 import "server-only";
 import type { FinancialSnapshot } from "@/lib/types";
-import { readRuntimeSnapshot, readRuntimeStatements } from "@/lib/feed/store";
+import { readRuntimeSnapshot } from "@/lib/feed/store";
 import { readOverrides, applyOverrides } from "@/lib/feed/overrides";
 import bundled from "@/data/snapshot.json";
 
@@ -21,19 +21,12 @@ export async function loadSnapshotFromFeed(): Promise<FinancialSnapshot> {
   const overrides = await readOverrides();
   const snapshot = applyOverrides(await loadRawSnapshotFromFeed(), overrides);
 
-  // Formal statements (Balance Sheet / Cash Flow). A LIVE statement built into
-  // the pushed snapshot (e.g. the ODBC Balance Sheet from 05b-balance-sheet.ps1)
-  // wins; the separate statements store is only a fallback for statements the
-  // live feed doesn't yet build (e.g. Cash Flow, still a month-end upload). This
-  // ordering means the live Balance Sheet is never hidden behind a stale one.
-  const statements = await readRuntimeStatements();
-  if (snapshot.balanceSheet || snapshot.cashFlow || statements?.balanceSheet || statements?.cashFlow) {
-    return {
-      ...snapshot,
-      balanceSheet: snapshot.balanceSheet ?? statements?.balanceSheet,
-      cashFlow: snapshot.cashFlow ?? statements?.cashFlow,
-    };
-  }
+  // Live statements only. The Balance Sheet is now built live in the ODBC feed
+  // (05-build-snapshot.ps1). We deliberately do NOT fall back to the legacy
+  // statements store: it held a one-off PRIOR-YEAR upload, and overlaying it made
+  // a stale FY24-25 Cash Flow / Balance Sheet appear under the current year. Cash
+  // Flow simply isn't shown until a current one exists (FR module still locked),
+  // rather than mixing in last year's numbers.
   return snapshot;
 }
 
