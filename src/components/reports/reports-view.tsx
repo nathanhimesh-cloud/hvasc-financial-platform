@@ -9,10 +9,16 @@ import {
   TrendingDown,
   Wallet,
   Lock,
+  Table,
 } from "lucide-react";
 import type { BrandColor, BalanceSheet, CashFlow } from "@/lib/types";
+import type { IntegrityReport } from "@/lib/integrity";
+import type { BudgetReportData } from "@/lib/budget-report";
 import { Panel, PanelHeader } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
+import { IntegrityBanner } from "@/components/kit/integrity-banner";
+import { DataStamp } from "@/components/kit/data-stamp";
+import { BudgetVsActual } from "./budget-vs-actual";
 import { bgDim, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
 import {
@@ -42,7 +48,7 @@ export interface ReportDept {
   annualBudget: number;
 }
 
-type Statement = "pnl" | "balance" | "cashflow";
+type Statement = "pnl" | "budget" | "balance" | "cashflow";
 type Mode = "cumulative" | "monthly";
 
 export function ReportsView({
@@ -55,6 +61,10 @@ export function ReportsView({
   monthlySpend,
   balanceSheet,
   cashFlow,
+  integrity,
+  generatedAt,
+  source,
+  budgetData,
 }: {
   fyLabel: string;
   monthOfYear: number;
@@ -65,6 +75,10 @@ export function ReportsView({
   monthlySpend: { month: string; amount: number }[];
   balanceSheet?: BalanceSheet;
   cashFlow?: CashFlow;
+  integrity: IntegrityReport;
+  generatedAt?: string;
+  source?: string;
+  budgetData?: BudgetReportData;
 }) {
   const latestIdx = periods.length ? periods[periods.length - 1].idx : monthOfYear;
   const [statement, setStatement] = useState<Statement>("pnl");
@@ -146,14 +160,23 @@ export function ReportsView({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+      {/* Provenance stamp + reconciliation status (Brief A1 + A4) */}
+      <div className="flex flex-col gap-3">
+        <DataStamp generatedAt={generatedAt} periodLabel={periodName} fyLabel={fyLabel} source={source} />
+        <IntegrityBanner report={integrity} />
+      </div>
+
       {/* Statement tabs */}
       <div className="flex flex-wrap items-center gap-1 border-b border-border pb-px">
         <StatementTab active={statement === "pnl"} onClick={() => setStatement("pnl")} icon={FileText} label="Profit & Loss" />
+        <StatementTab active={statement === "budget"} onClick={() => setStatement("budget")} icon={Table} label="Budget vs Actual" soon={!budgetData} />
         <StatementTab active={statement === "balance"} onClick={() => setStatement("balance")} icon={Scale} label="Balance Sheet" soon={!balanceSheet} />
         <StatementTab active={statement === "cashflow"} onClick={() => setStatement("cashflow")} icon={Banknote} label="Cashflow" soon={!cashFlow} />
       </div>
 
-      {statement === "balance" ? (
+      {statement === "budget" ? (
+        budgetData ? <BudgetVsActual data={budgetData} /> : <ComingSoon statement="balance" />
+      ) : statement === "balance" ? (
         balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} /> : <ComingSoon statement="balance" />
       ) : statement === "cashflow" ? (
         cashFlow ? <CashFlowView cf={cashFlow} fyLabel={fyLabel} /> : <ComingSoon statement="cashflow" />

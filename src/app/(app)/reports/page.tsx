@@ -1,6 +1,8 @@
 import { Content } from "@/components/kit/panel";
 import { getSnapshot } from "@/lib/data";
 import { ReportsView, type ReportPeriod, type ReportDept } from "@/components/reports/reports-view";
+import { assessIntegrity } from "@/lib/integrity";
+import { budgetReportFY27 } from "@/data/budget-report-fy27";
 import type { IncomeStatement } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage() {
   const snapshot = await getSnapshot();
   const { period } = snapshot;
+  const integrity = assessIntegrity(snapshot);
 
   // Cumulative P&L checkpoints (Jul…current). Fall back to a single YTD point
   // built from incomeTotals if the snapshot predates monthly statements.
@@ -60,6 +63,10 @@ export default async function ReportsPage() {
         monthlySpend={snapshot.monthlySpend}
         balanceSheet={snapshot.balanceSheet}
         cashFlow={snapshot.cashFlow}
+        integrity={integrity}
+        generatedAt={snapshot.meta?.generatedAt}
+        source={snapshot.meta?.source}
+        budgetData={budgetReportFY27}
       />
     </Content>
   );

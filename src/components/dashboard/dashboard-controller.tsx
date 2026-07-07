@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import type { BrandColor, FinancialSnapshot } from "@/lib/types";
 import { deriveDepartments, grantNeedsAction } from "@/lib/derive";
+import { assessIntegrity } from "@/lib/integrity";
+import { IntegrityStatusPill } from "@/components/kit/integrity-banner";
 import { formatCompact } from "@/lib/format";
 import { bgColor } from "@/lib/colors";
 import { KpiCard } from "@/components/kit/kpi-card";
@@ -102,6 +104,7 @@ interface PeriodPoint {
 export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot }) {
   const allDepts = useMemo(() => deriveDepartments(snapshot), [snapshot]);
   const allDeptIds = useMemo(() => allDepts.map((d) => d.id), [allDepts]);
+  const integrity = useMemo(() => assessIntegrity(snapshot), [snapshot]);
 
   const periods: PeriodPoint[] = useMemo(() => {
     const ms = snapshot.monthlyStatements ?? [];
@@ -236,6 +239,7 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
     <div>
       {/* Toolbar */}
       <div className="mb-4 flex items-center gap-3">
+        <IntegrityStatusPill report={integrity} />
         {filtered && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold-dim px-2.5 py-0.5 font-mono text-[10px] text-gold-light">
             <Filter className="h-3 w-3" strokeWidth={2} />
