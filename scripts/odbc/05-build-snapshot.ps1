@@ -393,10 +393,10 @@ Write-Host ("  Total Equity       : {0,18:N2}" -f $bsTotalEquity)
 $bsCol = if ([math]::Abs($bsGap) -le 1) { 'Green' } else { 'Red' }
 Write-Host ("  BALANCE gap        : {0,18:N2}  (should be 0)" -f $bsGap) -ForegroundColor $bsCol
 Write-Host ""
-Write-Host ("Prior year ($pyFyLabel) - VALIDATE:") -ForegroundColor Cyan
-Write-Host ("  Income        : {0,18:N2}   (expect ~25,013,723)" -f $pyIncome)
-Write-Host ("  Expenses      : {0,18:N2}   (expect ~18,343,558)" -f $pyExpense)
-Write-Host ("  Closing equity: {0,18:N2}" -f $pyEquity)
+Write-Host ("Prior year ($pyFyLabel) - VALIDATE against the audited FY statements:") -ForegroundColor Cyan
+Write-Host ("  Income        : {0,18:N2}   (FULL prior year - not the mid-year figure)" -f $pyIncome)
+Write-Host ("  Expenses      : {0,18:N2}   (FULL prior year, operating basis)" -f $pyExpense)
+Write-Host ("  Closing equity: {0,18:N2}   (should ~= this year's opening equity)" -f $pyEquity)
 Write-Host ""
 Write-Host "Income statement (operating basis):" -ForegroundColor Cyan
 Write-Host ("  Income   : {0,18:N2}   (known ~25,013,723)" -f $income)
