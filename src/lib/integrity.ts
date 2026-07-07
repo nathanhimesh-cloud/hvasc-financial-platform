@@ -203,8 +203,8 @@ export function assessIntegrity(snapshot: FinancialSnapshot): IntegrityReport {
     checkBalanceSheet(balanceSheet),
     checkCashFlowReconciles(cashFlow),
     checkCashAgrees(balanceSheet, cashFlow),
-    // Prior-period equity isn't captured yet; the check reports "awaiting data".
-    checkResultTiesToEquity(incomeTotals, undefined, balanceSheet?.totalEquity),
+    // Movement = current equity − prior-year closing equity (from GLBAL.LASTYEAR).
+    checkResultTiesToEquity(incomeTotals, snapshot.priorYear?.closingEquity, balanceSheet?.totalEquity),
   ];
 
   const failedCount = checks.filter((c) => c.status === "fail").length;

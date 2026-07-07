@@ -325,6 +325,21 @@ $balanceSheet = [ordered]@{
 }
 $bsGap = R2 ($bsTotalAssets - ($bsTotalLiab + $bsTotalEquity))
 
+# ── 6d. prior year (from GLBAL.LASTYEAR at period 12 = last year's close) ─────
+# Same live GL, just the prior-year column. Period 12 gives last year's full-year
+# P&L and closing balances. Feeds the "result ties to equity" check + comparatives.
+$pyIncome  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5")
+$pyExpense = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE=6")
+$pyEquity  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ACCNTTYPE=11")
+$pyFyLabel = "FY$($yr-2)-" + (($yr-1).ToString().Substring(2))   # prior FY, e.g. FY2025-26
+$priorYear = [ordered]@{
+  fyLabel       = $pyFyLabel
+  income        = $pyIncome
+  expenses      = $pyExpense
+  netResult     = R2 ($pyIncome - $pyExpense)
+  closingEquity = $pyEquity
+}
+
 # ── 7. assemble + write ──────────────────────────────────────────────────────
 $snapshot = [ordered]@{
   period = [ordered]@{
@@ -344,6 +359,7 @@ $snapshot = [ordered]@{
   dailySpend    = $dailySpend
   transactions  = $transactions
   balanceSheet  = $balanceSheet
+  priorYear     = $priorYear
   meta = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"
     baseline = $(if ($hasRealBudget) { 'fy-budget' } else { 'fy25-actuals' })
@@ -376,6 +392,11 @@ Write-Host ("  Total Liabilities  : {0,18:N2}" -f $bsTotalLiab)
 Write-Host ("  Total Equity       : {0,18:N2}" -f $bsTotalEquity)
 $bsCol = if ([math]::Abs($bsGap) -le 1) { 'Green' } else { 'Red' }
 Write-Host ("  BALANCE gap        : {0,18:N2}  (should be 0)" -f $bsGap) -ForegroundColor $bsCol
+Write-Host ""
+Write-Host ("Prior year ($pyFyLabel) - VALIDATE:") -ForegroundColor Cyan
+Write-Host ("  Income        : {0,18:N2}   (expect ~25,013,723)" -f $pyIncome)
+Write-Host ("  Expenses      : {0,18:N2}   (expect ~18,343,558)" -f $pyExpense)
+Write-Host ("  Closing equity: {0,18:N2}" -f $pyEquity)
 Write-Host ""
 Write-Host "Income statement (operating basis):" -ForegroundColor Cyan
 Write-Host ("  Income   : {0,18:N2}   (known ~25,013,723)" -f $income)

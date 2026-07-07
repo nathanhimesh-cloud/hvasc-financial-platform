@@ -171,6 +171,17 @@ export interface SnapshotMeta {
   notes?: string[];
 }
 
+/** Prior-year totals, from GLBAL.LASTYEAR — for comparatives and the equity tie-out. */
+export interface PriorYear {
+  /** e.g. "FY2025-26". */
+  fyLabel: string;
+  income: number;
+  expenses: number;
+  netResult: number;
+  /** Prior-year closing total community equity. */
+  closingEquity: number;
+}
+
 /** A council-level income statement (P&L) for one period. */
 export interface IncomeStatement {
   /** Total income for the period. */
@@ -263,6 +274,8 @@ export interface FinancialSnapshot {
   dailySpend?: DailySpendPoint[];
   /** Recent GL transactions (from GLTRN) for the transaction report / drill-down. */
   transactions?: Transaction[];
+  /** Prior-year totals (from GLBAL.LASTYEAR) for comparatives + the equity check. */
+  priorYear?: PriorYear;
   /** Optional provenance/caveats (present on live feeds, absent on seed). */
   meta?: SnapshotMeta;
 }
