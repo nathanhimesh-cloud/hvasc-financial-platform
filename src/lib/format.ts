@@ -31,3 +31,20 @@ export function formatSignedCompact(value: number): string {
 export function formatPercent(ratio: number, digits = 0): string {
   return `${(ratio * 100).toFixed(digits)}%`;
 }
+
+/**
+ * The Australian financial year (Jul–Jun) a date falls in, e.g. "30 June 2025"
+ * → "FY2024-25". Returns null if the date can't be parsed. Used to tag each
+ * statement with its own year so a prior-year Balance Sheet / Cash Flow is never
+ * silently presented under the current reporting year.
+ */
+export function financialYearOf(dateish: string | undefined | null): string | null {
+  if (!dateish) return null;
+  const d = new Date(dateish);
+  if (Number.isNaN(d.getTime())) return null;
+  const m = d.getMonth(); // 0 = Jan … 6 = Jul
+  const y = d.getFullYear();
+  const startYear = m >= 6 ? y : y - 1; // FY starts in July
+  const endYY = ((startYear + 1) % 100).toString().padStart(2, "0");
+  return `FY${startYear}-${endYY}`;
+}

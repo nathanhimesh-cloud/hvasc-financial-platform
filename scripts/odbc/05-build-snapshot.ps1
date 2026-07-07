@@ -75,8 +75,12 @@ function Slugify([string]$s) {
 $cur = [int](Invoke-Scalar 'SELECT MTH FROM GLCON')
 $yr  = [int](Invoke-Scalar 'SELECT YR FROM GLCON')
 if ($cur -lt 1 -or $cur -gt 12) { $cur = 11 }
-$periodLabel = "$($MONTHS[$cur-1]) $yr"
-$fyLabel     = "FY$($yr-1)-" + ($yr.ToString().Substring(2))   # FY2025-26
+# GLCON.YR is the FY-ENDING year. The FY runs Jul(1)..Jun(12), so months 1-6
+# (Jul-Dec) are in calendar year (yr-1) and months 7-12 (Jan-Jun) are in (yr).
+# Using $yr directly gave the wrong "Jul 2027" for July 2026.
+$calYr       = if ($cur -le 6) { $yr - 1 } else { $yr }
+$periodLabel = "$($MONTHS[$cur-1]) $calYr"
+$fyLabel     = "FY$($yr-1)-" + ($yr.ToString().Substring(2))   # FY2026-27
 Write-Host "Period: $periodLabel  (month $cur of FY$yr)" -ForegroundColor Cyan
 
 # ── 2. department rollup (operating; excludes depreciation ISCONTROL='N') ─────
@@ -228,6 +232,99 @@ foreach ($c in $cumRows) {
   }
 }
 
+# ── 6b. transactions + daily spend (from GLTRN) ──────────────────────────────
+# Individual transactions for the current FY, most-recent first, capped so the
+# snapshot stays a reasonable size. Drives the transaction report / drill-down
+# (brief B3) and the daily spend series. Early in the year this is every txn; if
+# the cap is hit, older transactions aren't included (flagged in the summary).
+$TRN_CAP = 5000
+$fyStart = ("{0}-07-01" -f ($yr - 1))   # FY starts 1 July of the prior calendar year
+$trnRows = Invoke-Rows @"
+SELECT FIRST $TRN_CAP t.GLACCOUNT, m.DESCRIPT AS ACCTNAME, t.TRNDATE,
+       t.DESCRIPT AS TRNDESC, t.DEBIT, t.CREDIT, t.REF, m.ACCNTTYPE
+FROM GLTRN t JOIN GLMST m ON m.GLACCOUNT = t.GLACCOUNT
+WHERE t.TRNDATE >= '$fyStart' AND m.RECACTIVE='Y'
+ORDER BY t.TRNDATE DESC
+"@
+
+$transactions = @()
+$dailyMap = @{}
+foreach ($t in $trnRows) {
+  $debit  = R2 $t.DEBIT
+  $credit = R2 $t.CREDIT
+  $d = if ($t.TRNDATE) { ([datetime]$t.TRNDATE).ToString('yyyy-MM-dd') } else { '' }
+  $transactions += [ordered]@{
+    date        = $d
+    code        = [string]$t.GLACCOUNT
+    account     = ([string]$t.ACCTNAME).Trim()
+    description = ([string]$t.TRNDESC).Trim()
+    ref         = ([string]$t.REF).Trim()
+    debit       = $debit
+    credit      = $credit
+  }
+  # Daily spend = expense accounts only (ACCNTTYPE 6), net of any credits.
+  if ([int]$t.ACCNTTYPE -eq 6 -and $d) {
+    if (-not $dailyMap.ContainsKey($d)) { $dailyMap[$d] = 0.0 }
+    $dailyMap[$d] = [double]$dailyMap[$d] + ($debit - $credit)
+  }
+}
+$dailySpend = @()
+foreach ($k in ($dailyMap.Keys | Sort-Object)) {
+  $dailySpend += [ordered]@{ date = $k; amount = (R2 $dailyMap[$k]) }
+}
+$trnCapped = ($trnRows.Count -ge $TRN_CAP)
+
+# ── 6c. balance sheet (Statement of Financial Position, live from GLBAL) ──────
+# Classify by GLMST.ACCNTTYPE: 7=current assets, 8=non-current, 9=current
+# liabilities, 10=non-current, 11=equity. Totals are reliable; the current/non-
+# current LIABILITY split (9 vs 10) and the cash line are the bits to validate
+# against a Balance Sheet you trust. No ABS() in SQL (Firebird 1.5 lacks it) —
+# lines are sorted by size in PowerShell.
+$BS_SECTIONS = @(
+  @{ key = 'currentAssets';         label = 'Current assets';          types = @(7)  }
+  @{ key = 'nonCurrentAssets';      label = 'Non-current assets';      types = @(8)  }
+  @{ key = 'currentLiabilities';    label = 'Current liabilities';     types = @(9)  }
+  @{ key = 'nonCurrentLiabilities'; label = 'Non-current liabilities'; types = @(10) }
+  @{ key = 'equity';                label = 'Community equity';        types = @(11) }
+)
+$bsAllTypes = ($BS_SECTIONS | ForEach-Object { $_.types }) -join ','
+$bsRows = Invoke-Rows @"
+SELECT m.ACCNTTYPE, m.GLACCOUNT, m.DESCRIPT, b.BALANCE
+FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y'
+  AND m.ACCNTTYPE IN ($bsAllTypes) AND b.BALANCE <> 0
+ORDER BY m.ACCNTTYPE
+"@
+function Build-BsSection($def) {
+  $lines = @(); $total = 0.0
+  $match = @($bsRows | Where-Object { $def.types -contains [int]$_.ACCNTTYPE }) |
+    Sort-Object { [math]::Abs([double]$_.BALANCE) } -Descending
+  foreach ($row in $match) {
+    $amt = R2 $row.BALANCE
+    $lines += [ordered]@{ label = ([string]$row.DESCRIPT).Trim(); amount = $amt }
+    $total += $amt
+  }
+  return [ordered]@{ label = $def.label; lines = $lines; total = (R2 $total) }
+}
+$bsSec = @{}
+foreach ($def in $BS_SECTIONS) { $bsSec[$def.key] = Build-BsSection $def }
+$bsTotalAssets = R2 ($bsSec.currentAssets.total + $bsSec.nonCurrentAssets.total)
+$bsTotalLiab   = R2 ($bsSec.currentLiabilities.total + $bsSec.nonCurrentLiabilities.total)
+$bsTotalEquity = R2 $bsSec.equity.total
+$balanceSheet = [ordered]@{
+  currentAssets         = $bsSec.currentAssets
+  nonCurrentAssets      = $bsSec.nonCurrentAssets
+  totalAssets           = $bsTotalAssets
+  currentLiabilities    = $bsSec.currentLiabilities
+  nonCurrentLiabilities = $bsSec.nonCurrentLiabilities
+  totalLiabilities      = $bsTotalLiab
+  netCommunityAssets    = R2 ($bsTotalAssets - $bsTotalLiab)
+  equity                = $bsSec.equity
+  totalEquity           = $bsTotalEquity
+  asAt                  = $periodLabel
+}
+$bsGap = R2 ($bsTotalAssets - ($bsTotalLiab + $bsTotalEquity))
+
 # ── 7. assemble + write ──────────────────────────────────────────────────────
 $snapshot = [ordered]@{
   period = [ordered]@{
@@ -244,6 +341,9 @@ $snapshot = [ordered]@{
   monthlySpend  = $monthlySpend
   incomeTotals  = [ordered]@{ totalIncome = $income; totalExpenses = $expenses; netResult = $netResult; revenueLines = $revenueLines }
   monthlyStatements = $monthlyStatements
+  dailySpend    = $dailySpend
+  transactions  = $transactions
+  balanceSheet  = $balanceSheet
   meta = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"
     baseline = $(if ($hasRealBudget) { 'fy-budget' } else { 'fy25-actuals' })
@@ -267,6 +367,15 @@ Write-Host "Wrote $OutFile" -ForegroundColor Green
 Write-Host ("  departments : {0}" -f $departments.Count)
 Write-Host ("  grants      : {0}" -f $grants.Count)
 Write-Host ("  revenueLines: {0}" -f $revenueLines.Count)
+Write-Host ("  transactions: {0}{1}" -f $transactions.Count, $(if ($trnCapped) { " (CAPPED at $TRN_CAP — older txns not included)" } else { "" }))
+Write-Host ("  daily points: {0}" -f $dailySpend.Count)
+Write-Host ""
+Write-Host "Balance Sheet (live) - VALIDATE:" -ForegroundColor Cyan
+Write-Host ("  Total Assets       : {0,18:N2}" -f $bsTotalAssets)
+Write-Host ("  Total Liabilities  : {0,18:N2}" -f $bsTotalLiab)
+Write-Host ("  Total Equity       : {0,18:N2}" -f $bsTotalEquity)
+$bsCol = if ([math]::Abs($bsGap) -le 1) { 'Green' } else { 'Red' }
+Write-Host ("  BALANCE gap        : {0,18:N2}  (should be 0)" -f $bsGap) -ForegroundColor $bsCol
 Write-Host ""
 Write-Host "Income statement (operating basis):" -ForegroundColor Cyan
 Write-Host ("  Income   : {0,18:N2}   (known ~25,013,723)" -f $income)

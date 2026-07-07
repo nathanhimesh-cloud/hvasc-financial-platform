@@ -102,6 +102,30 @@ export interface MonthlySpend {
   amount: number;
 }
 
+/** A point in the daily spend series, built from GLTRN by transaction date. */
+export interface DailySpendPoint {
+  /** ISO date, e.g. "2026-07-03". */
+  date: string;
+  /** Net operating spend posted that day. */
+  amount: number;
+}
+
+/** A single general-ledger transaction (from GLTRN) for the drill-down / report. */
+export interface Transaction {
+  /** ISO date, e.g. "2026-07-03". */
+  date: string;
+  /** GL account code. */
+  code: string;
+  /** Account name (from GLMST). */
+  account: string;
+  /** Transaction narrative (from GLTRN). */
+  description: string;
+  /** Reference / document number. */
+  ref: string;
+  debit: number;
+  credit: number;
+}
+
 /** The active reporting context. */
 export interface ReportingPeriod {
   /** e.g. "March 2026". */
@@ -235,6 +259,10 @@ export interface FinancialSnapshot {
   balanceSheet?: BalanceSheet;
   /** Statement of Cash Flows — from an uploaded Practical export. */
   cashFlow?: CashFlow;
+  /** Daily operating spend series (from GLTRN), for the daily trend. */
+  dailySpend?: DailySpendPoint[];
+  /** Recent GL transactions (from GLTRN) for the transaction report / drill-down. */
+  transactions?: Transaction[];
   /** Optional provenance/caveats (present on live feeds, absent on seed). */
   meta?: SnapshotMeta;
 }

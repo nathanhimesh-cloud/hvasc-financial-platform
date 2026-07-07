@@ -67,6 +67,8 @@ export default async function ReportsPage() {
         generatedAt={snapshot.meta?.generatedAt}
         source={snapshot.meta?.source}
         budgetData={budgetReportFY27}
+        transactions={snapshot.transactions ?? []}
+        dailySpend={snapshot.dailySpend ?? []}
       />
     </Content>
   );

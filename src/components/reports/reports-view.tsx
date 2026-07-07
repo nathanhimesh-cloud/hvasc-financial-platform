@@ -10,8 +10,9 @@ import {
   Wallet,
   Lock,
   Table,
+  Receipt,
 } from "lucide-react";
-import type { BrandColor, BalanceSheet, CashFlow } from "@/lib/types";
+import type { BrandColor, BalanceSheet, CashFlow, Transaction, DailySpendPoint } from "@/lib/types";
 import type { IntegrityReport } from "@/lib/integrity";
 import type { BudgetReportData } from "@/lib/budget-report";
 import { Panel, PanelHeader } from "@/components/kit/panel";
@@ -19,6 +20,7 @@ import { KpiCard } from "@/components/kit/kpi-card";
 import { IntegrityBanner } from "@/components/kit/integrity-banner";
 import { DataStamp } from "@/components/kit/data-stamp";
 import { BudgetVsActual } from "./budget-vs-actual";
+import { TransactionsView } from "./transactions-view";
 import { bgDim, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
 import {
@@ -26,6 +28,7 @@ import {
   formatCurrency,
   formatPercent,
   formatSignedCompact,
+  financialYearOf,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +51,7 @@ export interface ReportDept {
   annualBudget: number;
 }
 
-type Statement = "pnl" | "budget" | "balance" | "cashflow";
+type Statement = "pnl" | "budget" | "balance" | "cashflow" | "transactions";
 type Mode = "cumulative" | "monthly";
 
 export function ReportsView({
@@ -65,6 +68,8 @@ export function ReportsView({
   generatedAt,
   source,
   budgetData,
+  transactions,
+  dailySpend,
 }: {
   fyLabel: string;
   monthOfYear: number;
@@ -79,6 +84,8 @@ export function ReportsView({
   generatedAt?: string;
   source?: string;
   budgetData?: BudgetReportData;
+  transactions: Transaction[];
+  dailySpend: DailySpendPoint[];
 }) {
   const latestIdx = periods.length ? periods[periods.length - 1].idx : monthOfYear;
   const [statement, setStatement] = useState<Statement>("pnl");
@@ -172,6 +179,7 @@ export function ReportsView({
         <StatementTab active={statement === "budget"} onClick={() => setStatement("budget")} icon={Table} label="Budget vs Actual" soon={!budgetData} />
         <StatementTab active={statement === "balance"} onClick={() => setStatement("balance")} icon={Scale} label="Balance Sheet" soon={!balanceSheet} />
         <StatementTab active={statement === "cashflow"} onClick={() => setStatement("cashflow")} icon={Banknote} label="Cashflow" soon={!cashFlow} />
+        <StatementTab active={statement === "transactions"} onClick={() => setStatement("transactions")} icon={Receipt} label="Transactions" soon={!transactions.length} />
       </div>
 
       {statement === "budget" ? (
@@ -180,6 +188,8 @@ export function ReportsView({
         balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} /> : <ComingSoon statement="balance" />
       ) : statement === "cashflow" ? (
         cashFlow ? <CashFlowView cf={cashFlow} fyLabel={fyLabel} /> : <ComingSoon statement="cashflow" />
+      ) : statement === "transactions" ? (
+        <TransactionsView transactions={transactions} dailySpend={dailySpend} />
       ) : (
         <>
           {/* Filter bar */}
@@ -486,9 +496,30 @@ function GrandTotal({ label, value }: { label: string; value: number }) {
   );
 }
 
+/** Returns the statement's own FY if it doesn't match the reporting year (else null). */
+function fyMismatch(asAt: string | undefined, currentFy: string): string | null {
+  const stmtFy = financialYearOf(asAt);
+  if (!stmtFy) return null;
+  const norm = (s: string) => s.replace(/[–—]/g, "-").toUpperCase();
+  return norm(stmtFy) === norm(currentFy) ? null : stmtFy;
+}
+
+/** Amber note when a statement belongs to a different financial year than the report. */
+function StatementYearNote({ statementFy, currentFy, kind }: { statementFy: string; currentFy: string; kind: string }) {
+  return (
+    <div className="rounded-lg border border-amber/40 bg-amber/10 px-4 py-2.5 text-[12px] text-amber">
+      This {kind} is from <span className="font-semibold">{statementFy}</span> (prior year). A current-year
+      {" "}(<span className="font-semibold">{currentFy}</span>) statement hasn&apos;t been loaded yet — the
+      figures below are last year&apos;s, shown for reference only.
+    </div>
+  );
+}
+
 function BalanceSheetView({ bs, fyLabel }: { bs: BalanceSheet; fyLabel: string }) {
+  const mismatch = fyMismatch(bs.asAt, fyLabel);
   return (
     <>
+      {mismatch && <StatementYearNote statementFy={mismatch} currentFy={fyLabel} kind="Balance Sheet" />}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard color="teal" icon={Scale} label="Total Assets" value={formatCompact(bs.totalAssets)} meta={bs.asAt ? `as at ${bs.asAt}` : fyLabel} />
         <KpiCard color="amber" icon={TrendingDown} label="Total Liabilities" value={formatCompact(bs.totalLiabilities)} meta="owed by council" />
@@ -518,8 +549,10 @@ function BalanceSheetView({ bs, fyLabel }: { bs: BalanceSheet; fyLabel: string }
 
 // ── Cash Flow ──────────────────────────────────────────────────────────────
 function CashFlowView({ cf, fyLabel }: { cf: CashFlow; fyLabel: string }) {
+  const mismatch = fyMismatch(cf.asAt, fyLabel);
   return (
     <>
+      {mismatch && <StatementYearNote statementFy={mismatch} currentFy={fyLabel} kind="Cash Flow" />}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard color={cf.operating.net >= 0 ? "green" : "red"} icon={TrendingUp} label="Operating Cash" value={formatSignedCompact(cf.operating.net)} meta="from operations" />
         <KpiCard color="blue" icon={Banknote} label="Investing Cash" value={formatSignedCompact(cf.investing.net)} meta="capital movement" />

@@ -21,15 +21,17 @@ export async function loadSnapshotFromFeed(): Promise<FinancialSnapshot> {
   const overrides = await readOverrides();
   const snapshot = applyOverrides(await loadRawSnapshotFromFeed(), overrides);
 
-  // Overlay the formal statements (Balance Sheet / Cash Flow). They live in a
-  // separate store so the twice-daily ODBC push can't wipe them, so they're
-  // layered on here regardless of the main snapshot's source.
+  // Formal statements (Balance Sheet / Cash Flow). A LIVE statement built into
+  // the pushed snapshot (e.g. the ODBC Balance Sheet from 05b-balance-sheet.ps1)
+  // wins; the separate statements store is only a fallback for statements the
+  // live feed doesn't yet build (e.g. Cash Flow, still a month-end upload). This
+  // ordering means the live Balance Sheet is never hidden behind a stale one.
   const statements = await readRuntimeStatements();
-  if (statements?.balanceSheet || statements?.cashFlow) {
+  if (snapshot.balanceSheet || snapshot.cashFlow || statements?.balanceSheet || statements?.cashFlow) {
     return {
       ...snapshot,
-      balanceSheet: statements.balanceSheet ?? snapshot.balanceSheet,
-      cashFlow: statements.cashFlow ?? snapshot.cashFlow,
+      balanceSheet: snapshot.balanceSheet ?? statements?.balanceSheet,
+      cashFlow: snapshot.cashFlow ?? statements?.cashFlow,
     };
   }
   return snapshot;

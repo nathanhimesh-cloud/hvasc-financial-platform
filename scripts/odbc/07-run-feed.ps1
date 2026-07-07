@@ -23,6 +23,8 @@ function Log($m) { $line = "$(Get-Date -Format 's')  $m"; $line | Tee-Object -Fi
 
 try {
   Log "=== HVASC feed run starting ==="
+  # 05 now builds the COMPLETE snapshot in one pass — P&L, departments, grants,
+  # revenue, monthly + daily trend, transactions, AND the live Balance Sheet.
   Log "Building snapshot from Practical..."
   & (Join-Path $PSScriptRoot '05-build-snapshot.ps1') *>> $log
   if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "build step exited $LASTEXITCODE" }

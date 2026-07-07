@@ -1,8 +1,9 @@
 <#
-  08-install-task.ps1  —  install the twice-daily feed as a Windows Scheduled Task
+  08-install-task.ps1  —  install the thrice-daily feed as a Windows Scheduled Task
   ---------------------------------------------------------------------------
-  Registers a task on HVASC-APP02 that runs 07-run-feed.ps1 (build + push) at
-  two times each day, as the service account, whether or not anyone is logged in.
+  Registers a task on HVASC-APP02 that runs 07-run-feed.ps1 (build + balance
+  sheet + push) at three times each day, as the service account, whether or not
+  anyone is logged in.
   Also stores the two secrets it needs as machine environment variables so the
   unattended run can read them (nothing secret is written into the task itself).
 
@@ -16,14 +17,15 @@
     - the website UPLOAD_PASSWORD          (-> HVASC_UPLOAD_PASSWORD)
     - the service-account password         (to run the task as sandsservice)
 
-  Defaults to 06:00 and 18:00. Change with  -Times "07:00","19:00".
+  Defaults to 06:00, 12:30 and 18:00 (Hope Vale time / AEST — QLD has no DST).
+  Change with  -Times "07:00","12:30","19:00".
 #>
 
 param(
   [Parameter(Mandatory = $true)][string]$Url,
   [string]$TaskName = "HVASC Financial Feed",
   [string]$ServiceAccount = "hvasc\sandsservice",
-  [string[]]$Times = @("06:00", "18:00"),
+  [string[]]$Times = @("06:00", "12:30", "18:00"),
   [string]$ScriptDir = ""
 )
 
