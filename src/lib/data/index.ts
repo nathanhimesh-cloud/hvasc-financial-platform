@@ -3,6 +3,7 @@ import type { FinancialSnapshot } from "@/lib/types";
 import { seedSnapshot } from "@/data/seed";
 import { loadSnapshotFromCsv } from "./csv-adapter";
 import { loadSnapshotFromFeed } from "./feed";
+import { clearDbSnapshotCache } from "./db-source";
 
 /**
  * Data-access layer.
@@ -88,10 +89,13 @@ export async function getSnapshotForPeriod(
 }
 
 /**
- * Kept for API compatibility with the write routes. Per-request memoization is
- * handled by React `cache()`; cross-request invalidation is handled by
- * `revalidateTag("snapshot")`, which the write routes call. No-op here.
+ * Called by the write routes after a push or a mapping edit.
+ *
+ * Per-request memoization is handled by React `cache()`, and cross-request
+ * invalidation by `revalidateTag("snapshot")`. But the database source keeps its
+ * own 60-second TTL memo in module scope, and that has to be dropped explicitly,
+ * or a fresh sync wouldn't appear for up to a minute.
  */
 export function clearSnapshotCache(): void {
-  /* intentionally empty */
+  clearDbSnapshotCache();
 }

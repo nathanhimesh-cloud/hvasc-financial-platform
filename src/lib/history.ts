@@ -80,6 +80,29 @@ export async function listPeriods(): Promise<PeriodRef[]> {
   }
 }
 
+/**
+ * The most recent stored period — the snapshot the dashboard should serve.
+ *
+ * Reads only `payload`, which is ~30 KB: transactions live in `gl_transactions`,
+ * not in here. A whole-payload read per page request would be wasteful, so this
+ * sits behind the TTL cache in lib/data/db-source.ts.
+ */
+export async function loadLatestSnapshot(): Promise<FinancialSnapshot | null> {
+  try {
+    const db = sql();
+    if (!db) return null;
+    const rows = (await db`
+      SELECT payload FROM snapshots
+      ORDER BY fy_label DESC, period_month DESC
+      LIMIT 1
+    `) as Array<{ payload: FinancialSnapshot }>;
+    return rows.length ? rows[0].payload : null;
+  } catch (err) {
+    console.error("[history] loadLatestSnapshot failed:", err);
+    return null;
+  }
+}
+
 /** Load one stored period's snapshot, or null if we don't have it. */
 export async function loadSnapshot(fyLabel: string, periodMonth: number): Promise<FinancialSnapshot | null> {
   try {

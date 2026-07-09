@@ -45,6 +45,16 @@ export function PeriodSelector({
   // Group by financial year so a multi-year register stays readable.
   const years = [...new Set(periods.map((p) => p.fyLabel))];
 
+  // `periods` arrives newest-first (the dropdown wants that). A slider reads
+  // left-to-right as time moving forward, so it needs the reverse.
+  const ordered = [...periods].reverse();
+  const sliderIndex = Math.max(
+    0,
+    ordered.findIndex((p) => p.fyLabel === selected.fyLabel && p.periodMonth === selected.periodMonth),
+  );
+  const oldest = ordered[0];
+  const newest = ordered[ordered.length - 1];
+
   return (
     <div className="no-print flex flex-wrap items-center gap-2">
       <label className="relative flex items-center">
@@ -73,6 +83,35 @@ export function PeriodSelector({
           ))}
         </select>
       </label>
+
+      {/* Slider over the same periods, oldest -> newest. Scrubbing a timeline is
+          faster than hunting a dropdown once a couple of years have accumulated.
+          Both controls write the same URL, so they can't disagree. */}
+      {hasHistory && (
+        <label className="flex items-center gap-2">
+          <span className="sr-only">Scrub period</span>
+          <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
+            {oldest.periodLabel}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={ordered.length - 1}
+            step={1}
+            value={sliderIndex}
+            disabled={pending}
+            onChange={(e) => {
+              const p = ordered[Number(e.target.value)];
+              if (p) go(`${p.fyLabel}|${p.periodMonth}`);
+            }}
+            aria-label={`Period: ${selected.periodLabel}`}
+            className="h-1 w-40 cursor-pointer appearance-none rounded-full bg-elevated accent-gold disabled:opacity-50"
+          />
+          <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
+            {newest.periodLabel}
+          </span>
+        </label>
+      )}
 
       {pending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" strokeWidth={2} />}
 

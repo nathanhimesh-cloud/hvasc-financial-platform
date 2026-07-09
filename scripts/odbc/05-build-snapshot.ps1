@@ -21,7 +21,10 @@
 #>
 
 param(
-  [string]$OutFile = (Join-Path $PSScriptRoot 'snapshot.json')
+  [string]$OutFile = (Join-Path $PSScriptRoot 'snapshot.json'),
+  # Re-send every transaction of the current financial year, ignoring the sync
+  # cursor. Use after rebuilding the database, never routinely.
+  [switch]$FullResync
 )
 
 # DB password comes from the PRACTICAL_PWD env var (set it on APP02 / in the
@@ -318,44 +321,77 @@ foreach ($c in $cumRows) {
 # the cap is hit, older transactions aren't included (flagged in the summary).
 $TRN_CAP = 5000
 $fyStart = ("{0}-07-01" -f ($yr - 1))   # FY starts 1 July of the prior calendar year
-# t.KY is GLTRN's own primary key. We ship it so the dashboard can UPSERT each
-# transaction into Postgres instead of re-inserting it on every sync. That's what
-# lets the ledger accumulate across the year without duplicates.
+
+# INCREMENTAL SYNC. Hope Vale posts ~53 transactions a day, so a financial year is
+# roughly 19,000 of them. Re-sending the year on every sync would mean a ~3 MB
+# payload three times a day, and the old "SELECT FIRST 5000 ... ORDER BY TRNDATE
+# DESC" silently stopped covering the whole year around day 95: everything older
+# than the newest 5,000 rows was never sent again.
+#
+# Instead we ship only what's new since the last SUCCESSFUL push. GLTRN.KY is a
+# monotonic primary key, so the high-water mark is a single number. 06-push.ps1
+# advances the cursor only after the server returns 200 - a failed push leaves it
+# alone, so nothing is ever skipped. The dashboard UPSERTs on ky, so a re-send is
+# harmless. Use -FullResync to rebuild the ledger from the start of the year.
+$cursorFile = Join-Path $PSScriptRoot 'sync-cursor.json'
+$sinceKy = 0
+if ((-not $FullResync) -and (Test-Path $cursorFile)) {
+  try {
+    $cur0 = Get-Content $cursorFile -Raw | ConvertFrom-Json
+    # The cursor is per financial year: a new FY starts from scratch.
+    if ($cur0.fyLabel -eq $fyLabel) { $sinceKy = [int64]$cur0.maxKy }
+  } catch { $sinceKy = 0 }
+}
+if ($FullResync) { Write-Host "FullResync: ignoring the sync cursor." -ForegroundColor Yellow }
+Write-Host ("Transactions since GLTRN.KY > {0}" -f $sinceKy) -ForegroundColor Cyan
+
+# Ascending by KY, so a capped batch is the OLDEST unsent rows and the cursor
+# advances steadily. Descending would strand the tail forever.
 $trnRows = Invoke-Rows @"
 SELECT FIRST $TRN_CAP t.KY, t.GLACCOUNT, m.DESCRIPT AS ACCTNAME, t.TRNDATE,
        t.DESCRIPT AS TRNDESC, t.DEBIT, t.CREDIT, t.REF, m.ACCNTTYPE
 FROM GLTRN t JOIN GLMST m ON m.GLACCOUNT = t.GLACCOUNT
-WHERE t.TRNDATE >= '$fyStart' AND m.RECACTIVE='Y'
-ORDER BY t.TRNDATE DESC
+WHERE t.TRNDATE >= '$fyStart' AND m.RECACTIVE='Y' AND t.KY > $sinceKy
+ORDER BY t.KY ASC
 "@
 
 $transactions = @()
-$dailyMap = @{}
+$maxKy = $sinceKy
 foreach ($t in $trnRows) {
-  $debit  = R2 $t.DEBIT
-  $credit = R2 $t.CREDIT
+  $ky = [int64]$t.KY
+  if ($ky -gt $maxKy) { $maxKy = $ky }
   $d = if ($t.TRNDATE) { ([datetime]$t.TRNDATE).ToString('yyyy-MM-dd') } else { '' }
   $transactions += [ordered]@{
-    ky          = [int64]$t.KY
+    ky          = $ky
     date        = $d
     code        = [string]$t.GLACCOUNT
     account     = ([string]$t.ACCTNAME).Trim()
     description = ([string]$t.TRNDESC).Trim()
     ref         = ([string]$t.REF).Trim()
-    debit       = $debit
-    credit      = $credit
-  }
-  # Daily spend = expense accounts only (ACCNTTYPE 6), net of any credits.
-  if ([int]$t.ACCNTTYPE -eq 6 -and $d) {
-    if (-not $dailyMap.ContainsKey($d)) { $dailyMap[$d] = 0.0 }
-    $dailyMap[$d] = [double]$dailyMap[$d] + ($debit - $credit)
+    debit       = (R2 $t.DEBIT)
+    credit      = (R2 $t.CREDIT)
   }
 }
-$dailySpend = @()
-foreach ($k in ($dailyMap.Keys | Sort-Object)) {
-  $dailySpend += [ordered]@{ date = $k; amount = (R2 $dailyMap[$k]) }
-}
+# More waiting than one batch can carry: the next run picks up where this stopped.
 $trnCapped = ($trnRows.Count -ge $TRN_CAP)
+
+# Daily spend must cover the WHOLE year, so it can't be derived from an
+# incremental batch. Aggregate it in the database instead - one row per day.
+$dailyRows = Invoke-Rows @"
+SELECT t.TRNDATE, SUM(CAST(t.DEBIT AS DOUBLE PRECISION) - CAST(t.CREDIT AS DOUBLE PRECISION)) AS NET
+FROM GLTRN t JOIN GLMST m ON m.GLACCOUNT = t.GLACCOUNT
+WHERE t.TRNDATE >= '$fyStart' AND m.RECACTIVE='Y' AND m.ACCNTTYPE = 6
+GROUP BY t.TRNDATE
+ORDER BY t.TRNDATE
+"@
+$dailySpend = @()
+foreach ($r in $dailyRows) {
+  if (-not $r.TRNDATE) { continue }
+  $dailySpend += [ordered]@{
+    date   = ([datetime]$r.TRNDATE).ToString('yyyy-MM-dd')
+    amount = (R2 $r.NET)
+  }
+}
 
 # -- 6b2. job costing actuals (JCTRN) -----------------------------------------
 # Spend per job code for the current FY. The grant register maps each grant to
@@ -605,6 +641,13 @@ $snapshot = [ordered]@{
     baseline = $(if ($hasRealBudget) { 'fy-budget' } else { 'fy25-actuals' })
     generatedAt = (Get-Date -Format 'yyyy-MM-dd')
     unmappedAccounts = $unmappedAccounts
+    # The transaction batch in this payload is INCREMENTAL: everything with
+    # GLTRN.KY between sinceKy (exclusive) and maxKy (inclusive). 06-push.ps1
+    # writes maxKy to sync-cursor.json only after the server accepts the push.
+    sinceKy = $sinceKy
+    maxKy   = $maxKy
+    transactionsAreIncremental = $true
+    moreTransactionsPending = $trnCapped
     notes = @(
       "Live read-only feed from the General Ledger (GLMST/GLBAL) at period $cur, FY$yr.",
       "Departments = the Council's 3 management departments (Corporate Services / Operations / Social Services) via department-map.json. Spend is operating expenditure; depreciation (`$$deprec) is excluded so the net result ties to the income statement.",
@@ -625,7 +668,10 @@ Write-Host ("  departments : {0}" -f $departments.Count)
 Write-Host ("  accounts    : {0}  (full chart of income/expense accounts, for mapping)" -f $accounts.Count)
 Write-Host ("  grants      : {0}" -f $grants.Count)
 Write-Host ("  revenueLines: {0}" -f $revenueLines.Count)
-Write-Host ("  transactions: {0}{1}" -f $transactions.Count, $(if ($trnCapped) { " (CAPPED at $TRN_CAP - older txns not included)" } else { "" }))
+Write-Host ("  transactions: {0}  (NEW since ky {1}; high-water mark now {2})" -f $transactions.Count, $sinceKy, $maxKy)
+if ($trnCapped) {
+  Write-Host ("      more than $TRN_CAP pending - the next run continues from ky $maxKy") -ForegroundColor Yellow
+}
 Write-Host ("  daily points: {0}" -f $dailySpend.Count)
 Write-Host ("  job codes   : {0}  (spend per job, for grant expenditure)" -f $jobCosts.Count)
 $umCol = if ($unmappedAccounts -gt 0) { 'Yellow' } else { 'Green' }

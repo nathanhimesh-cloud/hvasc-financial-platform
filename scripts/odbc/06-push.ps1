@@ -46,6 +46,46 @@ $curlExe = if (Test-Path $localCurl) { $localCurl }
 
 Write-Output "Pushing $File -> $endpoint"
 
+# The snapshot carries an INCREMENTAL transaction batch: everything with
+# GLTRN.KY in (meta.sinceKy, meta.maxKy]. Advance the cursor ONLY after the
+# server accepts the push. A failed push leaves the cursor where it was, so the
+# next build re-sends the same rows rather than skipping them. The dashboard
+# UPSERTs on ky, so a re-send costs nothing but bandwidth.
+$cursorFile = Join-Path $scriptDir 'sync-cursor.json'
+function Save-SyncCursor([string]$SnapshotPath, $Response) {
+  try {
+    $s = Get-Content $SnapshotPath -Raw | ConvertFrom-Json
+    if ($null -eq $s.meta.maxKy) { return }   # older snapshot, no cursor to keep
+
+    $sent = @($s.transactions).Count
+    $r = $(if ($Response -is [string]) { $Response | ConvertFrom-Json } else { $Response })
+    $ingested = [int]$r.transactionsIngested
+
+    # HTTP 200 is not enough. The route accepts a push even when Postgres is
+    # unreachable (a database hiccup must never lose a sync), and reports
+    # transactionsIngested = 0. Advancing the cursor on that would drop these
+    # rows permanently: the next build would ask for ky > maxKy and never see
+    # them again. Only advance when the ledger confirms it stored them.
+    if ($sent -gt 0 -and $ingested -lt $sent) {
+      Write-Output ("CURSOR HELD: sent $sent transactions, the server stored $ingested.")
+      Write-Output ("             The ledger did not accept them (is DATABASE_URL set on Vercel?).")
+      Write-Output ("             Cursor left at its previous value; the next build re-sends them.")
+      return
+    }
+
+    $payload = [ordered]@{
+      fyLabel  = [string]$s.period.fyLabel
+      maxKy    = [int64]$s.meta.maxKy
+      pushedAt = (Get-Date -Format 's')
+    }
+    ($payload | ConvertTo-Json) | Set-Content -Path $cursorFile -Encoding ASCII
+    Write-Output ("Sync cursor advanced to ky {0} ({1}); {2} transaction(s) stored." -f $payload.maxKy, $payload.fyLabel, $ingested)
+  } catch {
+    Write-Output "WARNING: could not write sync-cursor.json: $($_.Exception.Message)"
+    Write-Output "         The next build will re-send this batch. Harmless (upsert), just slower."
+  }
+}
+
 if ($curlExe) {
   # --data-binary @file sends the exact bytes (no BOM, no newline munging).
   # -o body-file, -w http_code so we can report status; -sS = quiet but show errors.
@@ -64,6 +104,7 @@ if ($curlExe) {
   if ([int]$status -ge 200 -and [int]$status -lt 300) {
     Write-Output "PUSH OK (HTTP $status)."
     Write-Output $respBody
+    Save-SyncCursor $File $respBody
   } else {
     Write-Output "PUSH FAILED: HTTP $status"
     Write-Output ("RESPONSE BODY: " + $respBody)
@@ -79,6 +120,7 @@ else {
     $resp = Invoke-RestMethod -Method Put -Uri $endpoint -ContentType 'application/json' -Headers $headers -Body $body
     Write-Output "PUSH OK."
     Write-Output ($resp | ConvertTo-Json -Depth 6)
+    Save-SyncCursor $File $resp
   } catch {
     $err = $_
     Write-Output "PUSH FAILED: $($err.Exception.Message)"
