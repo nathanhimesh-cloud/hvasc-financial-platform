@@ -1,12 +1,13 @@
 <#
-  05-build-snapshot.ps1  —  READ-ONLY: build FinancialSnapshot JSON from Practical
+  05-build-snapshot.ps1  -  READ-ONLY: build FinancialSnapshot JSON from Practical
   ---------------------------------------------------------------------------
   Assembles the dashboard's FinancialSnapshot (src/data/snapshot.json shape)
   straight from the Civica Practical GL via ODBC. No report exports needed.
 
   Basis (proven in discovery rounds 1-4, validated against the known figures):
     - Classification:  GLMST.ACCNTTYPE  (5 = revenue, 6 = expense)
-    - Function:        GLMST.L1ACCNT -> parent account DESCRIPT (8 GL-native funcs)
+    - Department:      account -> department via department-map.json (3 depts:
+                       Corporate Services / Operations / Social Services)
     - Period balances: GLBAL.BALANCE (cumulative YTD) at the current period MTH
     - Prior year:      GLBAL.LASTYEAR (FY25 actuals = baseline; FY26 budget = 0)
     - Operating spend EXCLUDES depreciation (type 6, ISCONTROL='N') so the net
@@ -27,20 +28,33 @@ param(
 # scheduled task) so no credential is stored in the repo.
 $DSN = "DSN=Practical_Plus;UID=PCSACCESS;PWD=$($env:PRACTICAL_PWD);"
 
-# ── display config: GL function header (L1ACCNT) -> dashboard presentation ────
-$FUNCS = [ordered]@{
-  '1000-0001-0000' = @{ name = 'Administration';               slug = 'administration';              icon = 'landmark';  color = 'gold'   }
-  '5000-0001-0000' = @{ name = 'Housing & Construction';       slug = 'housing-construction';        icon = 'home';      color = 'blue'   }
-  '7000-0001-0000' = @{ name = 'Health & Social Welfare';      slug = 'health-social-welfare';       icon = 'users';     color = 'violet' }
-  '4000-0001-0000' = @{ name = 'Essential Services';           slug = 'essential-services';          icon = 'zap';       color = 'amber'  }
-  '3000-0001-0000' = @{ name = 'Education, Youth & Recreation'; slug = 'education-youth-recreation';  icon = 'trophy';    color = 'teal'   }
-  '8100-0001-0000' = @{ name = 'Economic Development';         slug = 'economic-development';        icon = 'briefcase'; color = 'indigo' }
-  '6000-0001-0000' = @{ name = 'Land & Sea Management';        slug = 'land-sea-management';         icon = 'leaf';      color = 'green'  }
-  '2000-0001-0000' = @{ name = 'CDEP';                         slug = 'cdep';                        icon = 'warehouse'; color = 'red'    }
+# -- departments: the Council's THREE management departments ------------------
+# Corporate Services - Operations - Social Services (confirmed 9 Jul 2026).
+# The account -> department map comes from department-map.json, generated from the
+# FY2026-27 budget document + Practical's Revenue & Expenditure reports.
+# COPY department-map.json into this folder alongside the script.
+$mapPath = Join-Path $PSScriptRoot 'department-map.json'
+if (-not (Test-Path $mapPath)) { throw "department-map.json not found next to this script ($mapPath)." }
+$deptMap = Get-Content $mapPath -Raw | ConvertFrom-Json
+
+# Flatten the JSON objects into hashtables for fast, PS4-safe lookups.
+$ACCT2DEPT = @{}
+foreach ($p in $deptMap.accounts.PSObject.Properties) { $ACCT2DEPT[$p.Name] = $p.Value }
+$DEPTS = [ordered]@{}
+foreach ($d in $deptMap.departments) { $DEPTS[$d.id] = $d }
+
+# GL accounts are "1215-1500-0000"; the map keys on the "1215-1500" prefix.
+function Resolve-Dept([string]$glAccount) {
+  if (-not $glAccount) { return $null }
+  $key = $glAccount.Trim()
+  if ($key.Length -ge 9) { $key = $key.Substring(0, 9) }
+  if ($ACCT2DEPT.ContainsKey($key)) { return $ACCT2DEPT[$key] }
+  return $null
 }
+
 $MONTHS = @('Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun')
 
-# ── ODBC plumbing ────────────────────────────────────────────────────────────
+# -- ODBC plumbing ------------------------------------------------------------
 $conn = New-Object System.Data.Odbc.OdbcConnection($DSN)
 $conn.Open()
 Write-Host "Connected: $($conn.ServerVersion)" -ForegroundColor Green
@@ -71,7 +85,7 @@ function Slugify([string]$s) {
   return ($t.Trim('-'))
 }
 
-# ── 1. period ────────────────────────────────────────────────────────────────
+# -- 1. period ----------------------------------------------------------------
 $cur = [int](Invoke-Scalar 'SELECT MTH FROM GLCON')
 $yr  = [int](Invoke-Scalar 'SELECT YR FROM GLCON')
 if ($cur -lt 1 -or $cur -gt 12) { $cur = 11 }
@@ -83,96 +97,121 @@ $periodLabel = "$($MONTHS[$cur-1]) $calYr"
 $fyLabel     = "FY$($yr-1)-" + ($yr.ToString().Substring(2))   # FY2026-27
 Write-Host "Period: $periodLabel  (month $cur of FY$yr)" -ForegroundColor Cyan
 
-# ── 2. department rollup (operating; excludes depreciation ISCONTROL='N') ─────
-$deptRows = Invoke-Rows @"
-SELECT m.L1ACCNT,
-       SUM(CASE WHEN m.ACCNTTYPE=6 THEN b.BALANCE  ELSE 0 END) AS YTD_EXP,
-       SUM(CASE WHEN m.ACCNTTYPE=5 THEN b.BALANCE  ELSE 0 END) AS YTD_REV,
-       SUM(CASE WHEN m.ACCNTTYPE=6 THEN b.LASTYEAR ELSE 0 END) AS LY_EXP,
-       SUM(CASE WHEN m.ACCNTTYPE=6 THEN b.BUDGET   ELSE 0 END) AS BUD_EXP
+# -- 2. department rollup - 3 departments, via the account->department map -----
+# One row per active income/expense account, resolved to its department in PS.
+# Accounts the map can't resolve are COUNTED (brief A7), never silently dropped.
+$acctRows = Invoke-Rows @"
+SELECT m.GLACCOUNT, m.DESCRIPT, m.ACCNTTYPE, m.ACCNT2, b.BALANCE, b.BUDGET, b.LASTYEAR
 FROM GLBAL b
 JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
 WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5,6)
-GROUP BY m.L1ACCNT
 "@
 
-# GL detail lines per function (top expense accounts; operating only)
-$glRows = Invoke-Rows @"
-SELECT m.L1ACCNT, m.GLACCOUNT, m.DESCRIPT, b.BALANCE
-FROM GLBAL b
-JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
-WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y'
-  AND m.ACCNTTYPE=6 AND b.BALANCE <> 0
-ORDER BY m.L1ACCNT, b.BALANCE DESC
-"@
+# Accumulators keyed by department id. revNonGrant excludes grant/subsidy revenue
+# (ACCNT2 1100-1199) so it isn't double-counted against the "Grants & subsidies" line.
+$agg = @{}
+foreach ($id in $DEPTS.Keys) {
+  $agg[$id] = @{ exp = 0.0; rev = 0.0; revNonGrant = 0.0; budExp = 0.0; lyExp = 0.0; lines = @() }
+}
+$unmappedAccounts = 0
+$unmappedNames = @()
 
-$hasRealBudget = ($deptRows | Measure-Object -Property BUD_EXP -Sum).Sum -ne 0
+foreach ($r in $acctRows) {
+  $code = [string]$r.GLACCOUNT
+  $type = [int]$r.ACCNTTYPE
+  $bal  = R2 $r.BALANCE
+  $bud  = R2 $r.BUDGET
+  $ly   = R2 $r.LASTYEAR
+  $dept = Resolve-Dept $code
+
+  if (-not $dept) {
+    # Only flag accounts that actually carry money - dormant zero accounts are noise.
+    if ($bal -ne 0 -or $bud -ne 0) {
+      $unmappedAccounts++
+      if ($unmappedNames.Count -lt 10) { $unmappedNames += ("{0} {1}" -f $code, ([string]$r.DESCRIPT).Trim()) }
+    }
+    continue
+  }
+
+  if ($type -eq 6) {
+    $agg[$dept].exp    += $bal
+    $agg[$dept].budExp += $bud
+    $agg[$dept].lyExp  += $ly
+    if ($bal -ne 0) {
+      $agg[$dept].lines += [pscustomobject]@{ code = $code; account = ([string]$r.DESCRIPT).Trim(); amount = $bal }
+    }
+  } elseif ($type -eq 5) {
+    $agg[$dept].rev += $bal
+    $a2 = [int]$r.ACCNT2
+    if (-not ($a2 -ge 1100 -and $a2 -le 1199)) { $agg[$dept].revNonGrant += $bal }
+  }
+}
+
+$hasRealBudget = (($DEPTS.Keys | ForEach-Object { $agg[$_].budExp } | Measure-Object -Sum).Sum) -ne 0
+
+# Always emit all three departments - even at $0 actual - so the full budgeted
+# structure is visible early in the financial year rather than an empty list.
 $departments = @()
-foreach ($key in $FUNCS.Keys) {
-  $cfg = $FUNCS[$key]
-  $d   = $deptRows | Where-Object { $_.L1ACCNT -eq $key } | Select-Object -First 1
-  if (-not $d) { continue }
-  $ytdActual = R2 $d.YTD_EXP
-  $revenue   = R2 $d.YTD_REV
-  if ($ytdActual -le 0 -and $revenue -le 0) { continue }
+foreach ($id in $DEPTS.Keys) {
+  $cfg = $DEPTS[$id]
+  $a   = $agg[$id]
+  $ytdActual = R2 $a.exp
+  $revenue   = R2 $a.rev
 
-  $annualBudget = if ($hasRealBudget) { R2 $d.BUD_EXP } else { R2 $d.LY_EXP }
-  if ($annualBudget -le 0) { $annualBudget = R2 ($ytdActual * 12 / $cur) }   # run-rate fallback
+  $annualBudget = if ($hasRealBudget) { R2 $a.budExp } else { R2 $a.lyExp }
+  if ($annualBudget -le 0 -and $ytdActual -gt 0) { $annualBudget = R2 ($ytdActual * 12 / $cur) }  # run-rate fallback
   $ytdBudget = R2 ($annualBudget * $cur / 12)
-  $ratio = if ($ytdBudget -gt 0) { $ytdActual / $ytdBudget } else { 0 }
+  $ratio  = if ($ytdBudget -gt 0) { $ytdActual / $ytdBudget } else { 0 }
   $status = if ($ratio -gt 1.05) { 'over-budget' } elseif ($ratio -gt 1.0) { 'at-risk' } else { 'on-track' }
 
-  $lines = @($glRows | Where-Object { $_.L1ACCNT -eq $key } | Select-Object -First 6)
   $glLines = @()
   $first = $true
-  foreach ($l in $lines) {
-    $amt = R2 $l.BALANCE
-    $line = [ordered]@{ code = [string]$l.GLACCOUNT; account = ([string]$l.DESCRIPT).Trim(); amount = $amt }
-    if ($first -and $amt -gt ($ytdActual * 0.4)) { $line.flagged = $true }
+  foreach ($l in (@($a.lines) | Sort-Object { [double]$_.amount } -Descending | Select-Object -First 6)) {
+    $line = [ordered]@{ code = $l.code; account = $l.account; amount = (R2 $l.amount) }
+    if ($first -and $l.amount -gt ($ytdActual * 0.4)) { $line.flagged = $true }
     $glLines += $line
     $first = $false
   }
 
   $departments += [ordered]@{
-    id          = $cfg.slug
-    slug        = $cfg.slug
-    name        = $cfg.name
-    icon        = $cfg.icon
-    color       = $cfg.color
-    kind        = $(if ($revenue -gt 0) { 'cost-revenue' } else { 'cost' })
+    id           = $cfg.id
+    slug         = $cfg.slug
+    name         = $cfg.name
+    icon         = $cfg.icon
+    color        = $cfg.color
+    kind         = $(if ($revenue -gt 0) { 'cost-revenue' } else { 'cost' })
     annualBudget = $annualBudget
-    ytdActual   = $ytdActual
-    ytdBudget   = $ytdBudget
-    status      = $status
-    glLines     = $glLines
+    ytdActual    = $ytdActual
+    ytdBudget    = $ytdBudget
+    status       = $status
+    glLines      = $glLines
   }
 }
-$departments = @($departments | Sort-Object { $_.ytdActual } -Descending)
 
-# ── 3. council income statement (operating basis; ties to ~$6.67M net) ────────
+# -- 3. council income statement (operating basis; ties to ~$6.67M net) --------
 $income   = R2 (Invoke-Scalar "SELECT SUM(b.BALANCE) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=$cur AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5")
 $expenses = R2 (Invoke-Scalar "SELECT SUM(b.BALANCE) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=$cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE=6")
 $deprec   = R2 (Invoke-Scalar "SELECT SUM(b.BALANCE) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=$cur AND m.RECACTIVE='Y' AND m.ISCONTROL='N' AND m.ACCNTTYPE=6")
 $netResult = R2 ($income - $expenses)
 
-# ── 4. revenue lines: grants&subsidies (ACCNT2 1100-1199) + by-function rest ──
+# -- 4. revenue lines: grants&subsidies (ACCNT2 1100-1199) + by-function rest --
 $grantsRevTotal = R2 (Invoke-Scalar "SELECT SUM(b.BALANCE) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=$cur AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5 AND m.ACCNT2 BETWEEN 1100 AND 1199")
 $revenueLines = @()
 if ($grantsRevTotal -gt 0) {
   $revenueLines += [ordered]@{ id = 'grants-and-subsidies'; label = 'Grants & subsidies'; ytd = $grantsRevTotal }
 }
-# Non-grant revenue grouped by function
-foreach ($key in $FUNCS.Keys) {
-  $cfg = $FUNCS[$key]
-  $rev = R2 (Invoke-Scalar "SELECT SUM(b.BALANCE) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=$cur AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5 AND m.L1ACCNT='$key' AND NOT (m.ACCNT2 BETWEEN 1100 AND 1199)")
+# Non-grant revenue grouped by the 3 departments (from the rollup above)
+foreach ($id in $DEPTS.Keys) {
+  $cfg = $DEPTS[$id]
+  $rev = R2 $agg[$id].revNonGrant
   if ($rev -gt 0) {
-    $revenueLines += [ordered]@{ id = (Slugify ($cfg.name + ' revenue')); label = "$($cfg.name) revenue"; departmentId = $cfg.slug; ytd = $rev }
+    $revenueLines += [ordered]@{ id = (Slugify ($cfg.name + ' revenue')); label = "$($cfg.name) revenue"; departmentId = $cfg.id; ytd = $rev }
   }
 }
 
-# ── 5. grants register (funding received; ACCNT2 1100-1199 revenue accounts) ──
+# -- 5. grants register (funding received; ACCNT2 1100-1199 revenue accounts) --
 $grantRows = Invoke-Rows @"
-SELECT m.GLACCOUNT, m.DESCRIPT, m.L1ACCNT, b.BALANCE
+SELECT m.GLACCOUNT, m.DESCRIPT, b.BALANCE
 FROM GLBAL b
 JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
 WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5
@@ -183,8 +222,8 @@ $grants = @()
 foreach ($g in $grantRows) {
   $total = R2 $g.BALANCE
   if ($total -le 0) { continue }
-  $deptCfg = $FUNCS[[string]$g.L1ACCNT]
-  $deptId  = if ($deptCfg) { $deptCfg.slug } else { 'administration' }
+  $deptId = Resolve-Dept ([string]$g.GLACCOUNT)
+  if (-not $deptId) { $deptId = 'corporate-services' }
   $grants += [ordered]@{
     id          = [string]$g.GLACCOUNT
     name        = ([string]$g.DESCRIPT).Trim()
@@ -192,14 +231,14 @@ foreach ($g in $grantRows) {
     departmentId = $deptId
     total       = $total
     spent       = 0
-    reportDue   = [ordered]@{ label = '—'; level = 'muted' }
-    acquittal   = [ordered]@{ label = '—'; level = 'muted' }
+    reportDue   = [ordered]@{ label = '-'; level = 'muted' }
+    acquittal   = [ordered]@{ label = '-'; level = 'muted' }
     status      = 'not-started'
     statusChip  = [ordered]@{ label = 'FUNDING RECEIVED'; level = 'muted' }
   }
 }
 
-# ── 6. monthly trend + cumulative statements (from per-period balances) ───────
+# -- 6. monthly trend + cumulative statements (from per-period balances) -------
 $movRows = Invoke-Rows @"
 SELECT b.MTH, SUM(b.DEBIT - b.CREDIT) AS MOVE
 FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
@@ -232,7 +271,7 @@ foreach ($c in $cumRows) {
   }
 }
 
-# ── 6b. transactions + daily spend (from GLTRN) ──────────────────────────────
+# -- 6b. transactions + daily spend (from GLTRN) ------------------------------
 # Individual transactions for the current FY, most-recent first, capped so the
 # snapshot stays a reasonable size. Drives the transaction report / drill-down
 # (brief B3) and the daily spend series. Early in the year this is every txn; if
@@ -274,11 +313,36 @@ foreach ($k in ($dailyMap.Keys | Sort-Object)) {
 }
 $trnCapped = ($trnRows.Count -ge $TRN_CAP)
 
-# ── 6c. balance sheet (Statement of Financial Position, live from GLBAL) ──────
+# -- 6b2. job costing actuals (JCTRN) -----------------------------------------
+# Spend per job code for the current FY. The grant register maps each grant to
+# its job code(s), so grant EXPENDITURE is the sum of its jobs' costs. Codes are
+# normalised to the "JOB-SUBJOB" (4-4) prefix the register uses.
+$jcRows = Invoke-Rows @"
+SELECT t.JCACCOUNT, SUM(t.TOTCOST) AS SPEND
+FROM JCTRN t
+WHERE t.TRANDATE >= '$fyStart'
+GROUP BY t.JCACCOUNT
+"@
+$jcMap = @{}
+foreach ($j in $jcRows) {
+  $raw = ([string]$j.JCACCOUNT).Trim()
+  if ($raw.Length -lt 9) { continue }
+  $key = $raw.Substring(0, 9)          # "0305-0410"
+  $amt = R2 $j.SPEND
+  if (-not $jcMap.ContainsKey($key)) { $jcMap[$key] = 0.0 }
+  $jcMap[$key] = [double]$jcMap[$key] + $amt
+}
+$jobCosts = @()
+foreach ($k in ($jcMap.Keys | Sort-Object)) {
+  if ([math]::Abs($jcMap[$k]) -lt 0.005) { continue }
+  $jobCosts += [ordered]@{ code = $k; amount = (R2 $jcMap[$k]) }
+}
+
+# -- 6c. balance sheet (Statement of Financial Position, live from GLBAL) ------
 # Classify by GLMST.ACCNTTYPE: 7=current assets, 8=non-current, 9=current
 # liabilities, 10=non-current, 11=equity. Totals are reliable; the current/non-
 # current LIABILITY split (9 vs 10) and the cash line are the bits to validate
-# against a Balance Sheet you trust. No ABS() in SQL (Firebird 1.5 lacks it) —
+# against a Balance Sheet you trust. No ABS() in SQL (Firebird 1.5 lacks it) -
 # lines are sorted by size in PowerShell.
 $BS_SECTIONS = @(
   @{ key = 'currentAssets';         label = 'Current assets';          types = @(7)  }
@@ -325,7 +389,7 @@ $balanceSheet = [ordered]@{
 }
 $bsGap = R2 ($bsTotalAssets - ($bsTotalLiab + $bsTotalEquity))
 
-# ── 6d. prior year (from GLBAL.LASTYEAR at period 12 = last year's close) ─────
+# -- 6d. prior year (from GLBAL.LASTYEAR at period 12 = last year's close) -----
 # Same live GL, just the prior-year column. Period 12 gives last year's full-year
 # P&L and closing balances. Feeds the "result ties to equity" check + comparatives.
 $pyIncome  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5")
@@ -340,18 +404,11 @@ $priorYear = [ordered]@{
   closingEquity = $pyEquity
 }
 
-# ── 6e. unmapped-accounts count (brief A7) ───────────────────────────────────
-# Active income/expense accounts whose function (L1ACCNT) isn't one we roll up —
-# they'd silently drop out of department totals. Surface the count so it can't
-# drift unnoticed. 0 = every active account is mapped.
-$funcKeys = ($FUNCS.Keys | ForEach-Object { "'$_'" }) -join ','
-$unmappedAccounts = [int](Invoke-Scalar @"
-SELECT COUNT(*) FROM GLMST m
-WHERE m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5,6)
-  AND m.L1ACCNT NOT IN ($funcKeys)
-"@)
+# -- 6e. unmapped-accounts (brief A7) -----------------------------------------
+# Computed during the department rollup in section 2: active income/expense
+# accounts carrying money that department-map.json couldn't resolve. 0 = all mapped.
 
-# ── 7. assemble + write ──────────────────────────────────────────────────────
+# -- 7. assemble + write ------------------------------------------------------
 $snapshot = [ordered]@{
   period = [ordered]@{
     label = $periodLabel; fyLabel = $fyLabel; monthOfYear = $cur; monthsInYear = 12
@@ -369,6 +426,7 @@ $snapshot = [ordered]@{
   monthlyStatements = $monthlyStatements
   dailySpend    = $dailySpend
   transactions  = $transactions
+  jobCosts      = $jobCosts
   balanceSheet  = $balanceSheet
   priorYear     = $priorYear
   meta = [ordered]@{
@@ -378,7 +436,7 @@ $snapshot = [ordered]@{
     unmappedAccounts = $unmappedAccounts
     notes = @(
       "Live read-only feed from the General Ledger (GLMST/GLBAL) at period $cur, FY$yr.",
-      "Departments = GL-native functions (GLMST.L1ACCNT). Spend is operating expenditure; depreciation (`$$deprec) is excluded so the net result ties to the income statement.",
+      "Departments = the Council's 3 management departments (Corporate Services / Operations / Social Services) via department-map.json. Spend is operating expenditure; depreciation (`$$deprec) is excluded so the net result ties to the income statement.",
       "Budget baseline = FY25 actuals (GLBAL.LASTYEAR); FY26 budget not loaded in Practical.",
       "Grants list = grant/subsidy revenue received (funding received). Spend % + deadlines need the council's grants register + job costing."
     )
@@ -389,16 +447,18 @@ $json = $snapshot | ConvertTo-Json -Depth 12
 [System.IO.File]::WriteAllText($OutFile, $json, (New-Object System.Text.UTF8Encoding($false)))
 $conn.Close()
 
-# ── validation summary ───────────────────────────────────────────────────────
+# -- validation summary -------------------------------------------------------
 Write-Host ""
 Write-Host "Wrote $OutFile" -ForegroundColor Green
 Write-Host ("  departments : {0}" -f $departments.Count)
 Write-Host ("  grants      : {0}" -f $grants.Count)
 Write-Host ("  revenueLines: {0}" -f $revenueLines.Count)
-Write-Host ("  transactions: {0}{1}" -f $transactions.Count, $(if ($trnCapped) { " (CAPPED at $TRN_CAP — older txns not included)" } else { "" }))
+Write-Host ("  transactions: {0}{1}" -f $transactions.Count, $(if ($trnCapped) { " (CAPPED at $TRN_CAP - older txns not included)" } else { "" }))
 Write-Host ("  daily points: {0}" -f $dailySpend.Count)
+Write-Host ("  job codes   : {0}  (spend per job, for grant expenditure)" -f $jobCosts.Count)
 $umCol = if ($unmappedAccounts -gt 0) { 'Yellow' } else { 'Green' }
 Write-Host ("  unmapped acc: {0}  (active accts not in a department; 0 = all mapped)" -f $unmappedAccounts) -ForegroundColor $umCol
+foreach ($u in $unmappedNames) { Write-Host ("      ! {0}" -f $u) -ForegroundColor Yellow }
 Write-Host ""
 Write-Host "Balance Sheet (live) - VALIDATE:" -ForegroundColor Cyan
 Write-Host ("  Total Assets       : {0,18:N2}" -f $bsTotalAssets)

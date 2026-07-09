@@ -9,6 +9,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LifeBuoy,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { allDepartmentsNav, dataNav, overviewNav } from "@/lib/nav";
@@ -28,6 +29,8 @@ interface SidebarProps {
   grantsBadge: number;
   /** ISO date of the last successful sync (snapshot.meta.generatedAt). */
   lastSync?: string;
+  /** Logged-in user (null when auth isn't configured). */
+  user?: { username: string; role: string } | null;
   collapsed: boolean;
   onToggle: () => void;
 }
@@ -36,6 +39,7 @@ export function Sidebar({
   departments,
   grantsBadge,
   lastSync,
+  user,
   collapsed,
   onToggle,
 }: SidebarProps) {
@@ -169,7 +173,16 @@ export function Sidebar({
       {/* Help + Profile */}
       <div className="border-t border-sidebar-border p-2.5">
         <HelpLink collapsed={collapsed} />
-        <ProfileMenu collapsed={collapsed} />
+        <ProfileMenu collapsed={collapsed} user={user} />
+        {user && !collapsed && (
+          <a
+            href="/logout"
+            className="mt-1 flex items-center gap-2.5 rounded-md px-2 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
+            Sign out
+          </a>
+        )}
       </div>
     </aside>
   );
@@ -348,9 +361,12 @@ function NavRow({
   );
 }
 
-function ProfileMenu({ collapsed }: { collapsed: boolean }) {
+function ProfileMenu({ collapsed, user }: { collapsed: boolean; user?: { username: string; role: string } | null }) {
   const pathname = usePathname();
   const active = pathname === "/account";
+  const name = user?.username ?? PROFILE.name;
+  const role = user?.role ?? PROFILE.role;
+  const initials = (user?.username ?? PROFILE.initials).slice(0, 2).toUpperCase();
 
   const link = (
     <Link
@@ -363,16 +379,16 @@ function ProfileMenu({ collapsed }: { collapsed: boolean }) {
       )}
     >
       <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-border bg-elevated text-[11px] font-semibold text-foreground">
-        {PROFILE.initials}
+        {initials}
       </span>
       {!collapsed && (
         <>
           <span className="flex min-w-0 flex-1 flex-col text-left">
             <span className="truncate text-[13px] font-medium text-foreground">
-              {PROFILE.name}
+              {name}
             </span>
-            <span className="truncate text-[11px] text-muted-foreground">
-              {PROFILE.role}
+            <span className="truncate text-[11px] capitalize text-muted-foreground">
+              {role}
             </span>
           </span>
           <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />

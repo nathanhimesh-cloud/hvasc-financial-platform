@@ -1,5 +1,5 @@
 <#
-  07-run-feed.ps1  —  the hands-off feed: build then push, with logging
+  07-run-feed.ps1  -  the hands-off feed: build then push, with logging
   ---------------------------------------------------------------------------
   This is what the Windows Scheduled Task runs (as sandsservice on HVASC-APP02).
   It builds the snapshot from Practical and pushes it to the dashboard, writing
@@ -23,7 +23,7 @@ function Log($m) { $line = "$(Get-Date -Format 's')  $m"; $line | Tee-Object -Fi
 
 try {
   Log "=== HVASC feed run starting ==="
-  # 05 now builds the COMPLETE snapshot in one pass — P&L, departments, grants,
+  # 05 now builds the COMPLETE snapshot in one pass - P&L, departments, grants,
   # revenue, monthly + daily trend, transactions, AND the live Balance Sheet.
   Log "Building snapshot from Practical..."
   & (Join-Path $PSScriptRoot '05-build-snapshot.ps1') *>> $log

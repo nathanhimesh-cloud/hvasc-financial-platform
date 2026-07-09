@@ -1,5 +1,5 @@
 <#
-  08-install-task.ps1  —  install the thrice-daily feed as a Windows Scheduled Task
+  08-install-task.ps1  -  install the thrice-daily feed as a Windows Scheduled Task
   ---------------------------------------------------------------------------
   Registers a task on HVASC-APP02 that runs 07-run-feed.ps1 (build + balance
   sheet + push) at three times each day, as the service account, whether or not
@@ -17,7 +17,7 @@
     - the website UPLOAD_PASSWORD          (-> HVASC_UPLOAD_PASSWORD)
     - the service-account password         (to run the task as sandsservice)
 
-  Defaults to 06:00, 12:30 and 18:00 (Hope Vale time / AEST — QLD has no DST).
+  Defaults to 06:00, 12:30 and 18:00 (Hope Vale time / AEST - QLD has no DST).
   Change with  -Times "07:00","12:30","19:00".
 #>
 
@@ -37,7 +37,7 @@ if (-not $ScriptDir) {
   $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 }
 
-# ── 1. store the two secrets as machine env vars (read by 05 and 06) ─────────
+# -- 1. store the two secrets as machine env vars (read by 05 and 06) ---------
 function Set-MachineSecret([string]$Name, [string]$Prompt) {
   $sec = Read-Host -AsSecureString -Prompt $Prompt
   $plain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
@@ -49,7 +49,7 @@ Write-Host "Storing secrets as machine environment variables..." -ForegroundColo
 Set-MachineSecret "PRACTICAL_PWD"         "Read-only Practical DB password (PCSACCESS)"
 Set-MachineSecret "HVASC_UPLOAD_PASSWORD" "Website UPLOAD_PASSWORD (must match Vercel)"
 
-# ── 2. build the task ────────────────────────────────────────────────────────
+# -- 2. build the task --------------------------------------------------------
 $feed = Join-Path $ScriptDir "07-run-feed.ps1"
 if (-not (Test-Path $feed)) { throw "Can't find 07-run-feed.ps1 next to this script ($feed)." }
 
@@ -57,13 +57,13 @@ $action = New-ScheduledTaskAction -Execute "powershell.exe" `
   -Argument "-ExecutionPolicy Bypass -NoProfile -File `"$feed`" -Url `"$Url`"" `
   -WorkingDirectory $ScriptDir
 
-# One daily trigger per time → runs twice a day.
+# One daily trigger per time -> runs twice a day.
 $triggers = @($Times | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ })
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable `
   -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
 
-# ── 3. register it as the service account (prompts for its password) ─────────
+# -- 3. register it as the service account (prompts for its password) ---------
 $cred = Get-Credential -UserName $ServiceAccount `
   -Message "Password for $ServiceAccount (runs the scheduled task)"
 

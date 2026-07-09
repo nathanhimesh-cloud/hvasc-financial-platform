@@ -1,5 +1,5 @@
 <#
-  04-discover.ps1  —  READ-ONLY round 4: function rollup via the L1-L4 hierarchy
+  04-discover.ps1  -  READ-ONLY round 4: function rollup via the L1-L4 hierarchy
   ---------------------------------------------------------------------------
   The FR module (FRFUNCTIONS/FRACCNTLINK) is permission-blocked, and FUNCTDESC/
   FNKY/REPORTGROUP are unusable. BUT GLMST carries an account hierarchy
@@ -98,9 +98,9 @@ GROUP BY m.L4ACCNT, p.DESCRIPT
 ORDER BY 4 DESC
 '@
 
-# 6. The header/structure accounts themselves — do their names include the 9
+# 6. The header/structure accounts themselves - do their names include the 9
 #    functions? (ACCNTTYPE 1/2/3 = header/control accounts, 0 balance.)
-Q '6. Header accounts (ACCNTTYPE 1,2,3) names — look for the 9 function names' @'
+Q '6. Header accounts (ACCNTTYPE 1,2,3) names - look for the 9 function names' @'
 SELECT GLACCOUNT, ACCNTTYPE, DESCRIPT, ISCONTROL, HASITEMS
 FROM GLMST
 WHERE RECACTIVE='Y' AND ACCNTTYPE IN (1,2,3)

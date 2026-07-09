@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import type { DeptNavItem } from "@/components/layout/sidebar";
 import { getSnapshot } from "@/lib/data";
 import { grantKpis } from "@/lib/derive";
+import { getSession, isAuthConfigured } from "@/lib/auth/session";
 import type { PageMetaContext } from "@/lib/nav";
 
 // The dashboard reads the latest uploaded snapshot at request time, so render
@@ -14,6 +16,14 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Gate the whole app behind login — but only once auth is configured
+  // (AUTH_SECRET + DATABASE_URL set), so nothing breaks before setup.
+  const authed = isAuthConfigured();
+  const session = authed ? await getSession() : null;
+  if (authed && !session) redirect("/login");
+  // Still on the default password -> must set their own before using the app.
+  if (session?.mustChangePassword) redirect("/change-password");
+
   const snapshot = await getSnapshot();
 
   const departments: DeptNavItem[] = snapshot.departments.map((d) => ({
@@ -46,6 +56,7 @@ export default async function AppLayout({
       deptNames={deptNames}
       grantsBadge={grants.needingAction}
       lastSync={snapshot.meta?.generatedAt}
+      user={session ? { username: session.username, role: session.role } : null}
       metaCtx={metaCtx}
     >
       {children}

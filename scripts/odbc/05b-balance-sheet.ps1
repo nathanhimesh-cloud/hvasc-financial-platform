@@ -1,13 +1,13 @@
 <#
-  05b-balance-sheet.ps1  —  READ-ONLY: build a live Balance Sheet from Practical
+  05b-balance-sheet.ps1  -  READ-ONLY: build a live Balance Sheet from Practical
   ---------------------------------------------------------------------------
   Reads the GL balances at the current period and assembles a Statement of
   Financial Position (BalanceSheet shape in src/lib/types.ts). Run it AFTER
-  05-build-snapshot.ps1 — it opens the snapshot.json that 05 wrote, injects the
+  05-build-snapshot.ps1 - it opens the snapshot.json that 05 wrote, injects the
   live `balanceSheet`, and writes it back, so 06-push.ps1 ships everything in one
   PUT.
 
-  Classification (from schema discovery — VALIDATE before trusting, see below):
+  Classification (from schema discovery - VALIDATE before trusting, see below):
      GLMST.ACCNTTYPE   7 = current assets
                        8 = non-current assets
                        9 = current liabilities
@@ -15,14 +15,14 @@
                       11 = equity
   Balances: GLBAL.BALANCE (cumulative) at the current period MTH.
 
-  ⚠ VALIDATE ON FIRST RUN. Totals are reliable; the *split* of 9 vs 10 (current
+  ! VALIDATE ON FIRST RUN. Totals are reliable; the *split* of 9 vs 10 (current
   vs non-current liabilities) and the cash-line match are the two things to check
   against a Balance Sheet you trust before enabling this in the scheduled feed.
   The script prints the totals so you can eyeball them:
      Total Assets = Total Liabilities + Total Equity  (must balance)
 
   Presentation caveat: without the FR module unlocked, lines are the raw GL
-  accounts grouped by type — the TOTALS match Practical, the line labels are the
+  accounts grouped by type - the TOTALS match Practical, the line labels are the
   account descriptions rather than Practical's summarised statement lines.
 
   STRICTLY READ-ONLY (SELECT only). Run on HVASC-APP02:
@@ -70,7 +70,7 @@ function Invoke-Scalar([string]$Sql) {
 }
 function R2([object]$x) { if ($null -eq $x) { return 0 } return [math]::Round([double]$x, 2) }
 
-# ── period ────────────────────────────────────────────────────────────────────
+# -- period --------------------------------------------------------------------
 $cur = [int](Invoke-Scalar 'SELECT MTH FROM GLCON')
 $yr  = [int](Invoke-Scalar 'SELECT YR FROM GLCON')
 if ($cur -lt 1 -or $cur -gt 12) { $cur = 12 }
@@ -79,9 +79,9 @@ if ($cur -lt 1 -or $cur -gt 12) { $cur = 12 }
 $asAtCal = if ($cur -le 6) { "$($MONTHS[$cur-1]) $($yr-1)" } else { "$($MONTHS[$cur-1]) $yr" }
 Write-Host "Balance Sheet as at period $cur, FY$yr  ($asAtCal)" -ForegroundColor Cyan
 
-# ── pull account balances for the balance-sheet types ─────────────────────────
+# -- pull account balances for the balance-sheet types -------------------------
 $allTypes = ($SECTIONS | ForEach-Object { $_.types }) -join ','
-# NOTE: no ABS() in the SQL — Firebird 1.5 has no built-in ABS (error -804).
+# NOTE: no ABS() in the SQL - Firebird 1.5 has no built-in ABS (error -804).
 # Sort each section's lines by size in PowerShell instead (below).
 $rows = Invoke-Rows @"
 SELECT m.ACCNTTYPE, m.GLACCOUNT, m.DESCRIPT, b.BALANCE
@@ -131,9 +131,9 @@ $balanceSheet = [ordered]@{
 
 $conn.Close()
 
-# ── validation summary ────────────────────────────────────────────────────────
+# -- validation summary --------------------------------------------------------
 Write-Host ""
-Write-Host "Balance Sheet (live) ── VALIDATE THESE:" -ForegroundColor Cyan
+Write-Host "Balance Sheet (live) -- VALIDATE THESE:" -ForegroundColor Cyan
 Write-Host ("  Total Assets       : {0,18:N2}" -f $totalAssets)
 Write-Host ("  Total Liabilities  : {0,18:N2}" -f $totalLiabilities)
 Write-Host ("  Total Equity       : {0,18:N2}" -f $totalEquity)
@@ -141,10 +141,10 @@ Write-Host ("  Liab + Equity      : {0,18:N2}" -f ($totalLiabilities + $totalEqu
 $gap = [math]::Round($totalAssets - ($totalLiabilities + $totalEquity), 2)
 $col = if ([math]::Abs($gap) -le 1) { 'Green' } else { 'Red' }
 Write-Host ("  BALANCE CHECK gap  : {0,18:N2}  (should be 0)" -f $gap) -ForegroundColor $col
-Write-Host ("  Cash & equivalents : {0,18:N2}  (matched line: {1})" -f $cash, $(if ($cashLine) { $cashLine.label } else { 'NONE — check!' }))
+Write-Host ("  Cash & equivalents : {0,18:N2}  (matched line: {1})" -f $cash, $(if ($cashLine) { $cashLine.label } else { 'NONE - check!' }))
 Write-Host ""
 
-# ── write out ─────────────────────────────────────────────────────────────────
+# -- write out -----------------------------------------------------------------
 if ($StandaloneOnly) {
   $out = Join-Path $PSScriptRoot 'balance-sheet.json'
   [System.IO.File]::WriteAllText($out, ($balanceSheet | ConvertTo-Json -Depth 12), (New-Object System.Text.UTF8Encoding($false)))
@@ -154,5 +154,5 @@ if ($StandaloneOnly) {
   $snap = Get-Content $SnapshotFile -Raw | ConvertFrom-Json
   $snap | Add-Member -NotePropertyName balanceSheet -NotePropertyValue $balanceSheet -Force
   [System.IO.File]::WriteAllText($SnapshotFile, ($snap | ConvertTo-Json -Depth 20), (New-Object System.Text.UTF8Encoding($false)))
-  Write-Host "Injected live balanceSheet into $SnapshotFile — 06-push will ship it." -ForegroundColor Green
+  Write-Host "Injected live balanceSheet into $SnapshotFile - 06-push will ship it." -ForegroundColor Green
 }

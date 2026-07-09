@@ -1,5 +1,5 @@
 <#
-  02-discover.ps1  —  READ-ONLY round 2: confirm the FNKY -> function mapping
+  02-discover.ps1  -  READ-ONLY round 2: confirm the FNKY -> function mapping
   ---------------------------------------------------------------------------
   Round 1 confirmed GLBAL/GLCON semantics but found FUNCTDESC is NOT the 9
   council functions. The real link is GLMST.FNKY -> FRFUNCTIONS. This round
@@ -46,7 +46,7 @@ GROUP BY FNKY
 ORDER BY FNKY
 '@
 
-# B. THE TEST — YTD expense by FNKY. Should reproduce the 9 Note 3a function
+# B. THE TEST - YTD expense by FNKY. Should reproduce the 9 Note 3a function
 #    totals (Governance 8,631,875 / Community Services 3,155,840 / Housing
 #    777,304 / Water 388,109 / Youth&Rec 278,888 / Sewerage 152,305 /
 #    Essential 76,784 / Environment 13,632 / Economic Dev 0).
@@ -60,7 +60,7 @@ GROUP BY m.FNKY
 ORDER BY 3 DESC
 '@
 
-# C. YTD REVENUE by FNKY (revenue is credit-natured → negate BALANCE)
+# C. YTD REVENUE by FNKY (revenue is credit-natured -> negate BALANCE)
 Q 'C. YTD REVENUE by FNKY at MTH=11 (Governance ~4.8M, Community ~3.17M, Housing ~1.63M)' @'
 SELECT m.FNKY, COUNT(*) AS N_ACCTS, -SUM(b.BALANCE) AS YTD_REVENUE
 FROM GLBAL b

@@ -1,5 +1,5 @@
 <#
-  03-discover.ps1  —  READ-ONLY round 3: nail classification + function rollup
+  03-discover.ps1  -  READ-ONLY round 3: nail classification + function rollup
   ---------------------------------------------------------------------------
   Round 2 disproved two assumptions:
     - FNKY is flat (one value for all accounts) -> useless for functions.
@@ -41,7 +41,7 @@ function Q {
     } catch { Write-Host "ERROR: $($_.Exception.Message)`n" -ForegroundColor Red }
 }
 
-# 1. THE CLASSIFICATION TEST — YTD balance by ACCNTTYPE (no ISCONTROL filter).
+# 1. THE CLASSIFICATION TEST - YTD balance by ACCNTTYPE (no ISCONTROL filter).
 #    Expect one type ~ -$25M (revenue), one ~ +$18.3M (expenses). Counts help
 #    identify them (round 1: type 5 = 415 accts, type 6 = 576 accts).
 Q '1. SUM(BALANCE) at MTH=11 by ACCNTTYPE (RECACTIVE=Y, NO iscontrol filter)' @'
@@ -64,7 +64,7 @@ GROUP BY m.ACCNTTYPE, m.ISCONTROL
 ORDER BY m.ACCNTTYPE, m.ISCONTROL
 '@
 
-# 3. REPORTGROUP — candidate function field. How many distinct, what do they look like?
+# 3. REPORTGROUP - candidate function field. How many distinct, what do they look like?
 Q '3. GLMST.REPORTGROUP distinct values + counts (function candidate)' @'
 SELECT REPORTGROUP, COUNT(*) AS N_ACCTS
 FROM GLMST WHERE RECACTIVE = 'Y'
@@ -81,7 +81,7 @@ WHERE b.MTH = 11 AND m.RECACTIVE = 'Y' AND m.ACCNTTYPE = 6
 GROUP BY m.REPORTGROUP ORDER BY 3 DESC
 '@ 60
 
-# 5. Program-segment clustering — expense by ACCNT1 (the leading code segment).
+# 5. Program-segment clustering - expense by ACCNT1 (the leading code segment).
 #    In Note 3a, Governance used programs 1155-1282. If functions map to ACCNT1
 #    bands, this shows the bands.
 Q '5. Expense (ACCNTTYPE=6) by ACCNT1 program at MTH=11 (top 40)' @'
@@ -96,8 +96,8 @@ Q '6. FRACCNTLINK readable? (account -> section/report link)' @'
 SELECT FIRST 8 GLACCOUNT, SECTKY, RPTKY, COLKY, LNKY, TRANTYPE FROM FRACCNTLINK
 '@
 
-# 7. GLMST structure for expense accounts — see which fields carry the rollup.
-Q '7. GLMST structure sample (expense accounts) — hierarchy + grouping fields' @'
+# 7. GLMST structure for expense accounts - see which fields carry the rollup.
+Q '7. GLMST structure sample (expense accounts) - hierarchy + grouping fields' @'
 SELECT FIRST 15 GLACCOUNT, ACCNT1, ACCNT2, REPORTGROUP, MASTERACCNT,
        L1ACCNT, L2ACCNT, ISITEM, ISCONTROL, HASITEMS
 FROM GLMST

@@ -177,6 +177,13 @@ export interface SnapshotMeta {
   notes?: string[];
 }
 
+/** Spend against a single job code (from JCTRN), for the current financial year. */
+export interface JobCost {
+  /** "JOB-SUBJOB" prefix, e.g. "0305-0410". */
+  code: string;
+  amount: number;
+}
+
 /** Prior-year totals, from GLBAL.LASTYEAR — for comparatives and the equity tie-out. */
 export interface PriorYear {
   /** e.g. "FY2025-26". */
@@ -280,6 +287,8 @@ export interface FinancialSnapshot {
   dailySpend?: DailySpendPoint[];
   /** Recent GL transactions (from GLTRN) for the transaction report / drill-down. */
   transactions?: Transaction[];
+  /** Spend per job code (from JCTRN) — grant expenditure is summed from these. */
+  jobCosts?: JobCost[];
   /** Prior-year totals (from GLBAL.LASTYEAR) for comparatives + the equity check. */
   priorYear?: PriorYear;
   /** Optional provenance/caveats (present on live feeds, absent on seed). */

@@ -1,5 +1,5 @@
 <#
-  06-push.ps1  —  push snapshot.json to the dashboard's runtime store
+  06-push.ps1  -  push snapshot.json to the dashboard's runtime store
   ---------------------------------------------------------------------------
   PUTs the snapshot produced by 05-build-snapshot.ps1 to /api/feed/snapshot on
   the live site, which writes it to Vercel Blob. The dashboard then serves it
@@ -32,11 +32,11 @@ if (-not $File) {
 if (-not (Test-Path $File)) { throw "Snapshot file not found: $File. Run 05-build-snapshot.ps1 first." }
 $endpoint = ($Url.TrimEnd('/')) + '/api/feed/snapshot'
 
-# ── Prefer curl.exe if it's here ──────────────────────────────────────────────
+# -- Prefer curl.exe if it's here ----------------------------------------------
 # Windows Server 2012 R2's SChannel can no longer negotiate TLS with Vercel, so
 # .NET's Invoke-RestMethod fails with "Could not create SSL/TLS secure channel".
 # An OpenSSL-based curl.exe carries its own TLS stack and bypasses SChannel.
-# Drop an OpenSSL curl.exe next to this script (verify with `curl.exe -V` — it
+# Drop an OpenSSL curl.exe next to this script (verify with `curl.exe -V` - it
 # must say OpenSSL, NOT Schannel). If it's absent we fall back to .NET.
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $localCurl = Join-Path $scriptDir 'curl.exe'
@@ -58,7 +58,7 @@ if ($curlExe) {
   $respBody = if (Test-Path $respFile) { (Get-Content $respFile -Raw) } else { '' }
 
   if ($exit -ne 0) {
-    Write-Output "PUSH FAILED: curl transport error (exit $exit) — likely TLS. Run '.\curl.exe -V' (needs OpenSSL, not Schannel)."
+    Write-Output "PUSH FAILED: curl transport error (exit $exit) - likely TLS. Run '.\curl.exe -V' (needs OpenSSL, not Schannel)."
     exit 1
   }
   if ([int]$status -ge 200 -and [int]$status -lt 300) {
@@ -71,7 +71,7 @@ if ($curlExe) {
   }
 }
 else {
-  # ── .NET fallback (works where SChannel/TLS is healthy) ─────────────────────
+  # -- .NET fallback (works where SChannel/TLS is healthy) ---------------------
   [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
   $body = [System.IO.File]::ReadAllBytes($File)   # raw bytes, no BOM
   $headers = @{ 'x-upload-password' = $Password }

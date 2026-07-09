@@ -14,10 +14,20 @@ export const SITE_URL = (() => {
   return "http://localhost:3000";
 })();
 
-export const SITE_NAME = "Hope Vale ASC Financial Intelligence Platform";
-export const SITE_SHORT_NAME = "HVASC Finance";
+/**
+ * Platform name. "Vantage" — an executive vantage point over the Council's
+ * finances. Short, professional, ownable, and reusable across SandS's other
+ * council clients ("Vantage by SandS"), shown in-app as "Hope Vale • Vantage".
+ * SandS owns the platform IP (engagement letter cl. 8.1), so a product name we
+ * can carry across engagements is the commercially sensible choice.
+ */
+export const PLATFORM_NAME = "Vantage";
+export const PLATFORM_TAGLINE = "Vantage by SandS";
+
+export const SITE_NAME = `Hope Vale • ${PLATFORM_NAME}`;
+export const SITE_SHORT_NAME = PLATFORM_NAME;
 export const SITE_DESCRIPTION =
-  "Private financial intelligence dashboard for Hope Vale Aboriginal Shire Council. Built and maintained by SandS Australia.";
+  "Vantage — the financial intelligence platform for Hope Vale Aboriginal Shire Council. Built and maintained by SandS Australia.";
 
 /** Brand colours (kept in sync with globals.css). */
 export const BRAND_BG = "#000000";

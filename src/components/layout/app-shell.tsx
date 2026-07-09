@@ -13,6 +13,8 @@ interface AppShellProps {
   grantsBadge: number;
   /** ISO date of the last successful sync (snapshot.meta.generatedAt). */
   lastSync?: string;
+  /** Logged-in user (null when auth isn't configured). */
+  user?: { username: string; role: string } | null;
   metaCtx: PageMetaContext;
   children: React.ReactNode;
 }
@@ -24,6 +26,7 @@ export function AppShell({
   deptNames,
   grantsBadge,
   lastSync,
+  user,
   metaCtx,
   children,
 }: AppShellProps) {
@@ -49,6 +52,7 @@ export function AppShell({
         departments={departments}
         grantsBadge={grantsBadge}
         lastSync={lastSync}
+        user={user}
         collapsed={collapsed}
         onToggle={toggle}
       />
