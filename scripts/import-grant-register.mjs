@@ -126,6 +126,7 @@ const C = {
   revGl: col("general ledger revenue code"),
   expGl: col("expenditure gl"),
   job: col("job cost code"),
+  scope: col("scope/notes"),
   opening: col("balance at 30 june"),
   received: col("actual cash received"),
   opex: col("operational expense"),
@@ -137,7 +138,12 @@ const C = {
   due: col("due date"),
   comm: col("comm"),
   end: col("end"),
+  notes: H.findIndex((h) => /^notes$/i.test(h.trim())),
 };
+
+// The register is a working paper: rows destined for removal at EOFY are marked
+// in Scope/Notes or Notes. Those are NOT active grants and must not inflate totals.
+const CLOSED = /remove from fy27|closed out|inactivate|inactive/i;
 
 const grants = [];
 const failures = [];
@@ -161,11 +167,16 @@ for (const r of rows.slice(hIdx + 1)) {
     .map((p, i) => (p.unresolved ? `${["revenueGl", "expenditureGl", "jobCodes"][i]}: ${p.unresolved}` : null))
     .filter(Boolean);
 
+  const scopeNote = [str(r[C.scope]), C.notes >= 0 ? str(r[C.notes]) : ""].filter(Boolean).join(" — ");
+  const active = !CLOSED.test(scopeNote);
+
   const entry = {
     id: `grant-${r[C.no]}`,
     number: r[C.no],
     name,
     funder,
+    active,
+    scopeNote,
     revenueCodes: rev.matchers,
     expenditureCodes: exp.matchers,
     jobCodes: job.matchers,
@@ -199,11 +210,15 @@ const dest = path.join(process.cwd(), "src", "data", "grant-register.json");
 fs.writeFileSync(dest, JSON.stringify(out, null, 2));
 
 const clean = grants.length - failures.length;
-const withJobs = grants.filter((g) => g.jobCodes.length).length;
+const active = grants.filter((g) => g.active);
+const withJobs = active.filter((g) => g.jobCodes.length).length;
+const money = (n) => "$" + n.toLocaleString("en-AU", { maximumFractionDigits: 0 });
 console.log(`\nGrant register: ${path.basename(SRC)} → src/data/grant-register.json`);
 console.log(`  grants found     : ${grants.length}`);
+console.log(`  ACTIVE           : ${active.length}  (${money(active.reduce((a, g) => a + g.totalFunded, 0))} funded)`);
+console.log(`  closed / removed : ${grants.length - active.length}  (flagged "remove from FY27" etc.)`);
 console.log(`  fully parsed     : ${clean}`);
-console.log(`  with job codes   : ${withJobs}  (needed to compute grant spend)`);
+console.log(`  with job codes   : ${withJobs}  (of the active grants — needed to compute spend)`);
 console.log(`  rows with issues : ${failures.length}`);
 if (failures.length) {
   console.log(`\n--- FIX LIST for the grant officer ---`);

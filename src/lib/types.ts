@@ -289,6 +289,8 @@ export interface FinancialSnapshot {
   transactions?: Transaction[];
   /** Spend per job code (from JCTRN) — grant expenditure is summed from these. */
   jobCosts?: JobCost[];
+  /** Job-wise budget tracking (from JCMST + JCTRN + GLBAL.BUDGET). */
+  jobBudgets?: JobBudgetGroup[];
   /** Prior-year totals (from GLBAL.LASTYEAR) for comparatives + the equity check. */
   priorYear?: PriorYear;
   /** Optional provenance/caveats (present on live feeds, absent on seed). */
@@ -304,4 +306,51 @@ export interface DepartmentDerived extends Department {
   variance: number;
   /** Active grants belonging to this department. */
   grants: Grant[];
+}
+
+/**
+ * One archived (financial year, period) the platform can render. Lives here
+ * rather than in `lib/history.ts` so client components can import the type
+ * without pulling in that module's `server-only` guard.
+ */
+export interface PeriodRef {
+  fyLabel: string;
+  periodMonth: number;
+  periodLabel: string;
+  generatedAt: string | null;
+}
+
+/**
+ * Job-wise budget tracking.
+ *
+ * Practical holds the budget on the GL ACCOUNT, not on the job — in the FY26 job
+ * costing report only 12 of 384 jobs carried an estimate. Its own "Jobs Budget"
+ * report therefore nests jobs under their GL account's budget, and we mirror
+ * that: one group per GL account, with the jobs that post against it.
+ */
+export interface JobBudgetEntry {
+  /** The "JOB-SUBJOB" (4-4) key, as used by the cost ledger and grant register. */
+  code: string;
+  name: string;
+  active: boolean;
+  /** Job-level budget. Usually 0 — the budget sits on the GL account. */
+  budget: number;
+  /** Job-costed spend this financial year (JCTRN). */
+  actual: number;
+  /** Committed but unspent. Hope Vale does not record these — expect 0. */
+  committed: number;
+}
+
+export interface JobBudgetGroup {
+  /** The 12-char GL account, or "unmapped" when the job has none. */
+  glAccount: string;
+  glName: string;
+  departmentId: string | null;
+  /** The GL account's budget — what the jobs beneath it are spending against. */
+  budget: number;
+  /** The GL account's real balance, including spend posted without a job. */
+  glActual: number;
+  /** The part of `glActual` that was job-costed. */
+  jobActual: number;
+  jobs: JobBudgetEntry[];
 }

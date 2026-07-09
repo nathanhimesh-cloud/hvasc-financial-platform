@@ -8,6 +8,8 @@
       "number": 1,
       "name": "Communications & Media Grant",
       "funder": "National Indigenous Austalians Agency",
+      "active": true,
+      "scopeNote": "RIBS",
       "revenueCodes": [
         {
           "type": "single",
@@ -46,6 +48,8 @@
       "number": 2,
       "name": "Naidoc Week Grant",
       "funder": "National Indigenous Austalians Agency",
+      "active": true,
+      "scopeNote": "2026 Event  $5,000 — July 26 Event $5000",
       "revenueCodes": [
         {
           "type": "single",
@@ -83,6 +87,8 @@
       "number": 3,
       "name": "Youth & Social Support Grant",
       "funder": "National Indigenous Austalians Agency",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -127,6 +133,8 @@
       "number": 4,
       "name": "State Libraries",
       "funder": "State Library Queensland",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -166,6 +174,8 @@
       "number": 5,
       "name": "State Libraries Growing IKC's Grant",
       "funder": "State Library Queensland",
+      "active": true,
+      "scopeNote": "Need executed copy Agreement. All funding returned to SLQ to purchase equip on our behalf.  $15k returned for HVASC to purchase Starlink (march26)",
       "revenueCodes": [
         {
           "type": "single",
@@ -207,6 +217,8 @@
       "number": 6,
       "name": "First 5 Forever Grant",
       "funder": "State Library Queensland",
+      "active": true,
+      "scopeNote": "included in  IKC State Library Funding GR#4",
       "revenueCodes": [
         {
           "type": "single",
@@ -246,6 +258,8 @@
       "number": 8,
       "name": "Indigenous Languages Grant",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": false,
+      "scopeNote": "old Grant - remove from FY27 — Remove from FY27 Grant Register. Final Acquittal FY23 due - in progress",
       "revenueCodes": [
         {
           "type": "single",
@@ -273,6 +287,8 @@
       "number": 9,
       "name": "QCSS Disability Support Services CON_15239",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": true,
+      "scopeNote": "Rev for Q4 FY25 $7,672 not accrued in FY26",
       "revenueCodes": [
         {
           "type": "single",
@@ -303,6 +319,8 @@
       "number": 10,
       "name": "QCSS Emergency Relief Funding $10k CON_23577",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": true,
+      "scopeNote": "recurrent to FY30",
       "revenueCodes": [
         {
           "type": "single",
@@ -330,6 +348,8 @@
       "number": 37,
       "name": "QCSS Referall & Linking Grant",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": true,
+      "scopeNote": "one-off Operational — FY26 One-off Operational.  Dir Cert Only - non reportable",
       "revenueCodes": [
         {
           "type": "single",
@@ -357,6 +377,8 @@
       "number": 11,
       "name": "Thriving Communities Mediation Grant",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": false,
+      "scopeNote": "4/6/26 Will be closed out 30.6.26 $0 -pending Dept formal outcome",
       "revenueCodes": [
         {
           "type": "single",
@@ -390,6 +412,8 @@
       "number": 12,
       "name": "Thriving Communities Social Reinvestment Grant (Youth)",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": false,
+      "scopeNote": "$83k Underspend-pending req for DoV — 4/6/26 Will be closed out 30.6.26 $0 -pending Dept formal outcome",
       "revenueCodes": [
         {
           "type": "single",
@@ -423,6 +447,8 @@
       "number": 13,
       "name": "Thriving Communities Local Decision Body Grant (incl INTERIM)",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": true,
+      "scopeNote": "Finalised FY26-remove FY27 — Final additional $25k released June26 - close out at 30/6/26",
       "revenueCodes": [
         {
           "type": "single",
@@ -457,6 +483,8 @@
       "number": 14,
       "name": "CSP Implementation Grant",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": false,
+      "scopeNote": "Finalised FY25 — Finalised FY25. Contract Liab Bal 30/6/25 $0 correct. (01/09/23 to 30/09/24) Remove from FY27 Grant reg.",
       "revenueCodes": [
         {
           "type": "single",
@@ -496,6 +524,8 @@
       "number": 15,
       "name": "Service Enhancement Grant",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": false,
+      "scopeNote": "4/6/26 Will be closed out 30.6.26 $0 -pending Dept formal outcome",
       "revenueCodes": [
         {
           "type": "single",
@@ -535,6 +565,8 @@
       "number": 16,
       "name": "DFV Action Plan Grant Operational",
       "funder": "Department of Treaty, Aboriginal and Torres Strait Islander Partnerships, Communities and the Arts",
+      "active": false,
+      "scopeNote": "Finalised FY25. Contract Liab Bal 30/6/25 incorrect. Should have been $0. Make JCC inactive & remove from Grant Reg FY27",
       "revenueCodes": [
         {
           "type": "single",
@@ -577,6 +609,8 @@
       "number": 17,
       "name": "Animal Management",
       "funder": "Queensland Health",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -604,6 +638,8 @@
       "number": 18,
       "name": "Animal Management FY23/24 Once Off Recurrent",
       "funder": "Queensland Health",
+      "active": false,
+      "scopeNote": "Remove from FY27 — Remove from FY27 Grant Register",
       "revenueCodes": [],
       "expenditureCodes": [
         {
@@ -638,6 +674,8 @@
       "number": 19,
       "name": "Animal Management FY23/24 Once Off Capital",
       "funder": "Queensland Health",
+      "active": false,
+      "scopeNote": "Remove from FY27 — Remove from FY27 Grant Register",
       "revenueCodes": [
         {
           "type": "single",
@@ -665,6 +703,8 @@
       "number": 20,
       "name": "Home and Community Care Program (CHSP)",
       "funder": "Department of Health",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -704,6 +744,8 @@
       "number": 21,
       "name": "Medication Chart (eNRMC) Grant",
       "funder": "Department of Health",
+      "active": true,
+      "scopeNote": "CAP.  Confirmed with KB no expenditure to date. Possible return funding, small facility and item not required",
       "revenueCodes": [
         {
           "type": "single",
@@ -731,6 +773,8 @@
       "number": 22,
       "name": "Aged Care Act Transition Support",
       "funder": "Department of Health",
+      "active": true,
+      "scopeNote": "One-Off",
       "revenueCodes": [
         {
           "type": "single",
@@ -758,6 +802,8 @@
       "number": 23,
       "name": "Aged Care Cape York IEI Grant",
       "funder": "Department of Health",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -793,6 +839,8 @@
       "number": 36,
       "name": "Aged Care Fair Work Commission Wages Boost",
       "funder": "Department of Health",
+      "active": true,
+      "scopeNote": "NEW FY26. No deliverables",
       "revenueCodes": [
         {
           "type": "single",
@@ -825,6 +873,8 @@
       "number": 300,
       "name": "QRA Betterment Alligator Creek Road",
       "funder": "Queensland Reconstruction Authority",
+      "active": false,
+      "scopeNote": "Closed out FY26",
       "revenueCodes": [
         {
           "type": "single",
@@ -857,6 +907,8 @@
       "number": 301,
       "name": "QRA Betterment Cooktown McIvor Road",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -884,6 +936,8 @@
       "number": 302,
       "name": "QRA QRRRF 22-23 Hopevale Aerodrome",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -929,6 +983,8 @@
       "number": 303,
       "name": "QRA QRRRF HV Connection Rd",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -956,6 +1012,8 @@
       "number": 304,
       "name": "NDRRA Emergent Funding 2023",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -983,6 +1041,8 @@
       "number": 305,
       "name": "NDRRA Emergent Funding 2025",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -1010,6 +1070,8 @@
       "number": 306,
       "name": "NDRRA Funding 2024 - Submission 1 Alligator Creek Rd",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0015.2324P.REC. Reduced Scope. Superceded by HVASC0027.2324 — 9/4/26 1. Contract Liab Bal varies to expected per GL-CM to review.   2.Funded Amount Varied (reduced) CEO yet to authorise in MARS, bal funding paid in advance to be reallocated to HVASC0027.2324 Betterment Alligator Ck. No exp in FY25 or FY26 - will be fully expended FY27",
       "revenueCodes": [
         {
           "type": "single",
@@ -1055,6 +1117,8 @@
       "number": 307,
       "name": "NDRRA Funding 2024 - Submission 2 Various Roads DOGIT",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0016.2324P.REC",
       "revenueCodes": [
         {
           "type": "single",
@@ -1100,6 +1164,8 @@
       "number": 308,
       "name": "NDRRA Funding 2024 - Submission 3 Various Town Roads",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0017.2324P.REC — 14/4/26 FY24 exp confirmed by KM as not reallocated or previously claimed. Updated reporting to include FY24 exp to KM for QRA Claim. Inclusion of FY24 exp takes Project over funded amount. Raised matter with PM Kirean Mau 14/4/26. HVASC to recover full expenditure??",
       "revenueCodes": [
         {
           "type": "single",
@@ -1145,6 +1211,8 @@
       "number": 309,
       "name": "NDRRA Funding 2024 - Submission 4 Elim Embankment",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0019.2324P.REC",
       "revenueCodes": [
         {
           "type": "single",
@@ -1190,6 +1258,8 @@
       "number": 310,
       "name": "NDRRA Funding 2024 - Submission 5 Bulls Crossing Bridge",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0021.2324P.REC — Located Varied Agreement dated April 25 $685,483.26. Not Siged.  - did this vary?",
       "revenueCodes": [
         {
           "type": "single",
@@ -1235,6 +1305,8 @@
       "number": 311,
       "name": "NDRRA Funding 2024 - Submission 6 Cooktown McIvor Rd",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0022.2324P.REC",
       "revenueCodes": [
         {
           "type": "single",
@@ -1280,6 +1352,8 @@
       "number": 312,
       "name": "NDRRA Funding 2024 - Submission 7 Spring Hill Section 2",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0023.2324P.REC — 1. $205,403.31 FY26 Expenses in JCC 0205-4190-0010 Project Management need to be transferred to JCC 0205-4190-0200 Expenses. See tab '2026'.  FM to action.",
       "revenueCodes": [
         {
           "type": "single",
@@ -1325,6 +1399,8 @@
       "number": 313,
       "name": "Get Ready Grant",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0029.2526A.GRQ — FY26 Funding Allocation $6,780 will be rolled into FY27.  FY26 Exp tot relates to FY24 GRQ Program",
       "revenueCodes": [
         {
           "type": "single",
@@ -1366,6 +1442,8 @@
       "number": 314,
       "name": "NDRRA Funding 2024 - Submission 8 Betterment Alligator Creek",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0027.2324",
       "revenueCodes": [
         {
           "type": "single",
@@ -1403,6 +1481,8 @@
       "number": 315,
       "name": "NDDRA Funding 2021",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -1448,6 +1528,8 @@
       "number": 316,
       "name": "QRA QRRRF Spring Hill Rd Culverts",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -1485,6 +1567,8 @@
       "number": 317,
       "name": "QRA LGGR Capital Grant - 3 x Mobile Generator Units",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0020.2324P.RRG — HVASC.0020.2324 Total Funded $1,000,000",
       "revenueCodes": [
         {
           "type": "single",
@@ -1522,6 +1606,8 @@
       "number": 318,
       "name": "QRA LGGR Capital Grant - 2 x Vehicle Messaging Boards",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0020.2324P.RRG",
       "revenueCodes": [
         {
           "type": "single",
@@ -1559,6 +1645,8 @@
       "number": 319,
       "name": "QRA LGGR Capital Grant - Emergency Response Trailer",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0020.2324P.RRG",
       "revenueCodes": [
         {
           "type": "single",
@@ -1596,6 +1684,8 @@
       "number": 320,
       "name": "QRA LGGR Capital Grant - Pedestrian Footpath",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0020.2324P.RRG — Kieran Mau Worksheet has $678,216 Funded Tot  - CM to review",
       "revenueCodes": [
         {
           "type": "single",
@@ -1633,6 +1723,8 @@
       "number": 321,
       "name": "QRA LGGR Capital Grant - Everlina Switchboard Renewal",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0020.2324P.RRG — Kieran Eustice",
       "revenueCodes": [
         {
           "type": "single",
@@ -1670,6 +1762,8 @@
       "number": 322,
       "name": "QRA Crucial Access Grant - Aerodrome",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0026.2425S.QMF — 7/5/26 Project Status: Design Done  - find where expenditure allocated as no JCC created",
       "revenueCodes": [
         {
           "type": "single",
@@ -1704,6 +1798,8 @@
       "number": 323,
       "name": "QRA Crucial Access Grant - Everlina Bridge",
       "funder": "Queensland Reconstruction Authority",
+      "active": true,
+      "scopeNote": "HVASC.0025.2425S.QMF — 7/5/26 Project Status: 15% Design Done - find where expenditure allocated as no JCC created",
       "revenueCodes": [
         {
           "type": "single",
@@ -1738,6 +1834,8 @@
       "number": 25,
       "name": "SGFA Grant",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -1765,6 +1863,8 @@
       "number": 228,
       "name": "ICCEDF (Indig Cape Communities Eco Dev Fund)",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "NEW FY27. No deliverables. No reporting — FY27 One-off. No deliverables. No reporting",
       "revenueCodes": [
         {
           "type": "single",
@@ -1792,6 +1892,8 @@
       "number": 229,
       "name": "Scheme Supply Fund P1 2024-2026",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "NEW FY27  Town Planning Scheme — NEW 18/6/26- Pending CEO Execution",
       "revenueCodes": [],
       "expenditureCodes": [],
       "jobCodes": [],
@@ -1818,6 +1920,8 @@
       "number": 200,
       "name": "LGGSP 22-24 Everlina Plaza Grant",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "Council Co-Contribution 40% ($676,722.80)",
       "revenueCodes": [
         {
           "type": "single",
@@ -1852,6 +1956,8 @@
       "number": 201,
       "name": "W4Q 21-24 CAPITAL Projects Grant",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": false,
+      "scopeNote": "Remove from FY27",
       "revenueCodes": [
         {
           "type": "single",
@@ -1889,6 +1995,8 @@
       "number": 202,
       "name": "W4Q 21-24 Recurrent Project Grant",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": false,
+      "scopeNote": "Remove from FY27",
       "revenueCodes": [
         {
           "type": "single",
@@ -1916,6 +2024,8 @@
       "number": 26,
       "name": "Financial Assistance Grant",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -1943,6 +2053,8 @@
       "number": 203,
       "name": "ICCIP 2018 Water Grant",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "Identify & rec this grant",
       "revenueCodes": [
         {
           "type": "single",
@@ -1970,6 +2082,8 @@
       "number": 204,
       "name": "W4Q 24-27 Capital Projects Grant - Footpath",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2007,6 +2121,8 @@
       "number": 205,
       "name": "W4Q 24-27 Capital Projects Grant - Everlina Bridge",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2044,6 +2160,8 @@
       "number": 206,
       "name": "W4Q 24-27 Capital Projects Grant - MPC",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2081,6 +2199,8 @@
       "number": 207,
       "name": "Secure Communities CCTV Camera's",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2118,6 +2238,8 @@
       "number": 208,
       "name": "Secure Communities Precinct Lighting",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2155,6 +2277,8 @@
       "number": 209,
       "name": "Growing Regions Digital Service Centre",
       "funder": "Department of State Development, Infrastructure, Local Government and Planning",
+      "active": true,
+      "scopeNote": "Council Co-Cont 30% $803,868",
       "revenueCodes": [
         {
           "type": "single",
@@ -2192,6 +2316,8 @@
       "number": 27,
       "name": "C&K Kindy Grant",
       "funder": "Department Of Education Queensland",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2228,6 +2354,8 @@
       "number": 28,
       "name": "C&K Kindy Uplift Program Grant",
       "funder": "Department Of Education Queensland",
+      "active": true,
+      "scopeNote": "Repayment of 2025 unspent funding due $122,133.40+gst due to be paid March26",
       "revenueCodes": [],
       "expenditureCodes": [],
       "jobCodes": [],
@@ -2250,6 +2378,8 @@
       "number": 29,
       "name": "First Start Grant",
       "funder": "Department Of Education Queensland",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [],
       "expenditureCodes": [],
       "jobCodes": [],
@@ -2272,6 +2402,8 @@
       "number": 30,
       "name": "Child Care Grant",
       "funder": "Department Of Education Commonwealth",
+      "active": true,
+      "scopeNote": "to be reviewed. Prior year funding repaid FY26 from contract liab per Micah 6/5/26",
       "revenueCodes": [
         {
           "type": "single",
@@ -2299,6 +2431,8 @@
       "number": 31,
       "name": "Child Care Sustainability Capital Grant",
       "funder": "Department Of Education Commonwealth",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [],
       "expenditureCodes": [],
       "jobCodes": [],
@@ -2321,6 +2455,8 @@
       "number": 226,
       "name": "Build Form Design Principles",
       "funder": "Department of Housing & Public Works",
+      "active": true,
+      "scopeNote": "NEW FY26. Engage Consultant to produce report (indij Architect)",
       "revenueCodes": [],
       "expenditureCodes": [
         {
@@ -2355,6 +2491,8 @@
       "number": 223,
       "name": "Remote Capital Program UMB Sch1",
       "funder": "Department of Housing & Public Works",
+      "active": true,
+      "scopeNote": "x2 2BR Self Contained Units",
       "revenueCodes": [
         {
           "type": "single",
@@ -2392,6 +2530,8 @@
       "number": 224,
       "name": "Remote Capital Program UMB Sch2",
       "funder": "Department of Housing & Public Works",
+      "active": true,
+      "scopeNote": "x9 Lot Subdivision — Pending New Operational Bank AC.  Actioned, advised Danielle 5/5/26",
       "revenueCodes": [
         {
           "type": "single",
@@ -2429,6 +2569,8 @@
       "number": 225,
       "name": "Remote Capital Program UMB Sch3",
       "funder": "Department of Housing & Public Works",
+      "active": true,
+      "scopeNote": "x9 Lot Construction (x6 2BR & x3 3BR detached houses) — Construction to commence approx Aug/Sept 26. Pending New Operational Bank AC - actioned, advised Danielle 5/5/26",
       "revenueCodes": [
         {
           "type": "single",
@@ -2466,6 +2608,8 @@
       "number": 210,
       "name": "LCRI Phase 1 - Bulls Crossing Bridge",
       "funder": "Department of Infrastructure, Transport, Regional Development, Communications and the Arts",
+      "active": false,
+      "scopeNote": "Remove from FY27. Inactivate GL/JCC",
       "revenueCodes": [
         {
           "type": "single",
@@ -2498,6 +2642,8 @@
       "number": 211,
       "name": "LCRI Phase 3 - Football Field",
       "funder": "Department of Infrastructure, Transport, Regional Development, Communications and the Arts",
+      "active": false,
+      "scopeNote": "Remove from FY27. Inactivate GL/JCC",
       "revenueCodes": [
         {
           "type": "single",
@@ -2530,6 +2676,8 @@
       "number": 214,
       "name": "Roads to Recovery",
       "funder": "Department of Infrastructure, Transport, Regional Development, Communications and the Arts",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2559,6 +2707,8 @@
       "number": 212,
       "name": "LCRI Phase 4 - Traffic Signage",
       "funder": "Department of Infrastructure, Transport, Regional Development, Communications and the Arts",
+      "active": true,
+      "scopeNote": "PART B",
       "revenueCodes": [
         {
           "type": "single",
@@ -2596,6 +2746,8 @@
       "number": 213,
       "name": "LCRI Phase 4 - Sandy Creek Bridge Apron",
       "funder": "Department of Infrastructure, Transport, Regional Development, Communications and the Arts",
+      "active": true,
+      "scopeNote": "PART A",
       "revenueCodes": [
         {
           "type": "single",
@@ -2633,6 +2785,8 @@
       "number": 32,
       "name": "Emergency Services",
       "funder": "Queensland Fire and Emergency Services",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2660,6 +2814,8 @@
       "number": 215,
       "name": "SES Mobile Light Tower",
       "funder": "Queensland Fire and Emergency Services",
+      "active": true,
+      "scopeNote": "",
       "revenueCodes": [
         {
           "type": "single",
@@ -2692,6 +2848,8 @@
       "number": 216,
       "name": "SES Support Grant",
       "funder": "Queensland Fire and Emergency Services",
+      "active": true,
+      "scopeNote": "identify & reconcile",
       "revenueCodes": [
         {
           "type": "single",
@@ -2719,6 +2877,8 @@
       "number": 227,
       "name": "SES 4wd Vehicle",
       "funder": "Queensland Fire and Emergency Services",
+      "active": true,
+      "scopeNote": "NEW FY2027 — 3/6/26 Pending CEO Signature",
       "revenueCodes": [
         {
           "type": "single",
@@ -2748,6 +2908,8 @@
       "number": 33,
       "name": "Tropical Cyclone Jasper Community Recovery and Resilience Officer",
       "funder": "Department of Families, Seniors, Disability Services and Child Safety",
+      "active": true,
+      "scopeNote": "15/1/26 Q1 & Q2 FY26 Progress Report being actioned by  KB.  Position Advertised - Closes 19/1/26.",
       "revenueCodes": [
         {
           "type": "single",
@@ -2785,6 +2947,8 @@
       "number": 217,
       "name": "ATSI TIDS Grant",
       "funder": "Department of Transport and Main Roads",
+      "active": true,
+      "scopeNote": "Identify any current",
       "revenueCodes": [],
       "expenditureCodes": [],
       "jobCodes": [],
@@ -2809,6 +2973,8 @@
       "number": 218,
       "name": "Walking Network Grant",
       "funder": "Department of Transport and Main Roads",
+      "active": false,
+      "scopeNote": "Closed out FY25. Remove from FY27 — Zwart Consultant. Finalised FY25. Final acquittal lodged & approved 6/5/26.  Tfer JCC exp $195 elsewhere",
       "revenueCodes": [
         {
           "type": "single",
@@ -2846,6 +3012,8 @@
       "number": 219,
       "name": "Rapid LEO Grant (LGAQ acting through Dept Transport & Main Roads",
       "funder": "Department of Transport and Main Roads",
+      "active": false,
+      "scopeNote": "Remove from FY27. Inactivate GL/JCC — Funding FY24 $45k. Grant closed out remove from FY27 Register.  Review GL/JCC -inactivate",
       "revenueCodes": [
         {
           "type": "single",
@@ -2891,6 +3059,8 @@
       "number": 34,
       "name": "Deadly Active Sport & Recreation Grant",
       "funder": "Department of Tourism, Innovation, Sport & Recreation",
+      "active": true,
+      "scopeNote": "Ends 30.6.26 — Program ends 30.6.26. No advice yet if ongoing",
       "revenueCodes": [
         {
           "type": "single",
@@ -2924,6 +3094,8 @@
       "number": 220,
       "name": "MIFF Minor Infrastructure MPC Access Grant",
       "funder": "Department of Tourism, Innovation, Sport & Recreation",
+      "active": true,
+      "scopeNote": "Identify & rec? — Captilalised in Full FY25 $133,183.00",
       "revenueCodes": [
         {
           "type": "single",
@@ -2961,6 +3133,8 @@
       "number": 3,
       "name": "Community Broadcasting Grant",
       "funder": "Miscellaneous - Others",
+      "active": true,
+      "scopeNote": "identify & reconcile",
       "revenueCodes": [
         {
           "type": "single",
@@ -2993,6 +3167,8 @@
       "number": 222,
       "name": "Gambling Community Benefit Fund",
       "funder": "Miscellaneous - Others",
+      "active": false,
+      "scopeNote": "Radio Minibus Hiace — Finalised FY26.  Final Outcome confirmation received 5/5/26.  no underspend required to be repaid.  Remove from FY27",
       "revenueCodes": [
         {
           "type": "single",
@@ -3034,6 +3210,8 @@
       "number": 35,
       "name": "Food Security Planning Grant",
       "funder": "Miscellaneous - Others",
+      "active": true,
+      "scopeNote": "Consultant — Finalised FY26.  UNDERSPEND $13,783.70 + GST to be repaid. Revised Final acquittal lodged 28/5/26 Invoice will be issued by Dept - still pendingat 30/6/26",
       "revenueCodes": [
         {
           "type": "single",

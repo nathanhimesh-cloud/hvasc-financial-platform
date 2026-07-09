@@ -28,6 +28,10 @@ export interface GrantRegisterEntry {
   number: number;
   name: string;
   funder: string;
+  /** False for rows the register flags as closed / "remove from FY27". */
+  active: boolean;
+  /** The register's Scope/Notes text — carries the closure reason. */
+  scopeNote: string;
   revenueCodes: CodeMatcher[];
   expenditureCodes: CodeMatcher[];
   jobCodes: CodeMatcher[];
@@ -75,6 +79,18 @@ export function matchesCode(matchers: CodeMatcher[], account: string): boolean {
   });
 }
 
+/**
+ * Disaster-recovery funding (CFO recommendation C6). Hope Vale carries a large
+ * QRA/NDRRA/DRFA program that behaves nothing like recurrent grant income — it is
+ * lumpy, reimbursement-based, and tied to specific damaged assets. The register
+ * has no flag for it, so we derive one from the funder and the grant name.
+ */
+const DISASTER = /\b(QRA|QRRRF|NDRRA|NDDRA|DRFA|LGGR|disaster|betterment|cyclone|flood|reconstruction)\b/i;
+
+export function isDisasterRecovery(entry: GrantRegisterEntry): boolean {
+  return DISASTER.test(entry.name) || DISASTER.test(entry.funder);
+}
+
 export interface GrantFigures {
   entry: GrantRegisterEntry;
   /** Total the grant is worth (what should ultimately be received AND spent). */
@@ -93,6 +109,8 @@ export interface GrantFigures {
   utilisation: number;
   /** True when the register's codes couldn't be resolved — figures are partial. */
   hasUnresolvedCodes: boolean;
+  /** Derived QRA/NDRRA/DRFA classification (C6). */
+  disasterRecovery: boolean;
 }
 
 /** Compute one grant's figures from the register + the live snapshot. */
@@ -132,17 +150,30 @@ export function grantFigures(entry: GrantRegisterEntry, snapshot: FinancialSnaps
     expenseRemaining: budgetedExpense - expenseToDate,
     utilisation: budgetedExpense > 0 ? expenseToDate / budgetedExpense : 0,
     hasUnresolvedCodes: entry.issues.length > 0,
+    disasterRecovery: isDisasterRecovery(entry),
   };
 }
 
+/** Every grant in the register, active and closed, biggest first. */
 export function allGrantFigures(snapshot: FinancialSnapshot): GrantFigures[] {
   return GRANT_REGISTER.grants
     .map((g) => grantFigures(g, snapshot))
     .sort((a, b) => b.totalGrantIncome - a.totalGrantIncome);
 }
 
+/** One slice of the grant portfolio — used for the operating/capital and disaster splits. */
+export interface GrantSlice {
+  count: number;
+  totalGrantIncome: number;
+  incomeToDate: number;
+  expenseToDate: number;
+  /** Unspent money still held for this slice. */
+  unspent: number;
+}
+
 export interface GrantSummary {
   count: number;
+  closedCount: number;
   totalGrantIncome: number;
   incomeToDate: number;
   incomeRemaining: number;
@@ -150,19 +181,46 @@ export interface GrantSummary {
   expenseToDate: number;
   restrictedUnspent: number;
   needsAttention: number;
+  /** C2 — grants funding day-to-day services vs grants funding assets. */
+  operating: GrantSlice;
+  capital: GrantSlice;
+  /** C6 — the QRA/NDRRA/DRFA disaster-recovery program, carved out. */
+  disaster: GrantSlice;
+  /** Everything that isn't disaster recovery — the "business as usual" grant base. */
+  business: GrantSlice;
 }
 
-/** Dashboard headline: how many grants, what they're worth, income to date. */
-export function grantSummary(figures: GrantFigures[]): GrantSummary {
+function slice(figures: GrantFigures[]): GrantSlice {
   const sum = (pick: (f: GrantFigures) => number) => figures.reduce((a, f) => a + pick(f), 0);
   return {
     count: figures.length,
     totalGrantIncome: sum((f) => f.totalGrantIncome),
     incomeToDate: sum((f) => f.incomeToDate),
+    expenseToDate: sum((f) => f.expenseToDate),
+    unspent: sum((f) => Math.max(f.incomeToDate - f.expenseToDate, 0)),
+  };
+}
+
+/**
+ * Dashboard headline. Counts ACTIVE grants only — the register still carries rows
+ * flagged "remove from FY27 / closed out", and including them overstates every total.
+ */
+export function grantSummary(figures: GrantFigures[]): GrantSummary {
+  const live = figures.filter((f) => f.entry.active);
+  const sum = (pick: (f: GrantFigures) => number) => live.reduce((a, f) => a + pick(f), 0);
+  return {
+    count: live.length,
+    closedCount: figures.length - live.length,
+    totalGrantIncome: sum((f) => f.totalGrantIncome),
+    incomeToDate: sum((f) => f.incomeToDate),
     incomeRemaining: sum((f) => f.incomeRemaining),
     totalBudgetedExpense: sum((f) => f.budgetedExpense),
     expenseToDate: sum((f) => f.expenseToDate),
-    restrictedUnspent: figures.filter((f) => f.entry.restricted).reduce((a, f) => a + Math.max(f.incomeToDate - f.expenseToDate, 0), 0),
-    needsAttention: figures.filter((f) => f.hasUnresolvedCodes).length,
+    restrictedUnspent: live.filter((f) => f.entry.restricted).reduce((a, f) => a + Math.max(f.incomeToDate - f.expenseToDate, 0), 0),
+    needsAttention: live.filter((f) => f.hasUnresolvedCodes).length,
+    operating: slice(live.filter((f) => f.entry.operatingOrCapital === "operating")),
+    capital: slice(live.filter((f) => f.entry.operatingOrCapital === "capital")),
+    disaster: slice(live.filter((f) => f.disasterRecovery)),
+    business: slice(live.filter((f) => !f.disasterRecovery)),
   };
 }

@@ -25,6 +25,10 @@ import {
   PiggyBank,
   Activity,
   AlertTriangle,
+  Lock,
+  LockOpen,
+  LifeBuoy,
+  Hourglass,
   type LucideIcon,
 } from "lucide-react";
 import type { BrandColor, FinancialSnapshot } from "@/lib/types";
@@ -33,15 +37,20 @@ import { assessIntegrity } from "@/lib/integrity";
 import { IntegrityStatusPill } from "@/components/kit/integrity-banner";
 import { formatCompact } from "@/lib/format";
 import { bgColor } from "@/lib/colors";
+import { allGrantFigures, grantSummary } from "@/lib/grants";
+import { cashBreakdown, MIN_MONTHS_COVER } from "@/lib/liquidity";
+import { grantDependencyRag } from "@/lib/rag";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { CountUp } from "@/components/kit/count-up";
 import { OperatingPosition } from "./operating-position";
 import { BudgetBarChart } from "./budget-bar-chart";
 import { AllocationDonut } from "./allocation-donut";
 import { DepartmentTable } from "./department-table";
+import { CashPosition } from "./cash-position";
+import { GrantMix } from "./grant-mix";
 import { cn } from "@/lib/utils";
 
-type Fmt = "compact" | "percent" | "plain";
+type Fmt = "compact" | "percent" | "plain" | "decimal";
 interface Metric {
   key: string;
   label: string;
@@ -65,23 +74,39 @@ const ICONS: Record<string, LucideIcon> = {
   "piggy-bank": PiggyBank,
   activity: Activity,
   "alert-triangle": AlertTriangle,
+  lock: Lock,
+  "lock-open": LockOpen,
+  "life-buoy": LifeBuoy,
+  hourglass: Hourglass,
 };
 
-const WIDGET_IDS = ["operating-position", "budget-chart", "allocation-donut", "department-table"] as const;
+const WIDGET_IDS = [
+  "operating-position",
+  "cash-position",
+  "grant-mix",
+  "budget-chart",
+  "allocation-donut",
+  "department-table",
+] as const;
 const WIDGET_LABELS: Record<string, string> = {
   "operating-position": "Operating Position",
+  "cash-position": "Cash Position & Restrictions",
+  "grant-mix": "Grant Mix — operating/capital & disaster",
   "budget-chart": "Budget vs Actual — by Department",
   "allocation-donut": "Allocation & Revenue Centres",
   "department-table": "Department Summary",
 };
 const WIDGET_SPAN: Record<string, string> = {
   "operating-position": "lg:col-span-12",
+  "cash-position": "lg:col-span-6",
+  "grant-mix": "lg:col-span-6",
   "budget-chart": "lg:col-span-7",
   "allocation-donut": "lg:col-span-5",
   "department-table": "lg:col-span-12",
 };
 const DEFAULT_STATS = ["total-income", "total-expenses", "net-result", "active-grants"];
-const STORE = "hv:dashboard:v3";
+// v4: adds the cash-position / grant-mix widgets, so old saved orders must re-reconcile.
+const STORE = "hv:dashboard:v4";
 
 type Mode = "cumulative" | "monthly";
 interface Config {
@@ -105,6 +130,12 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
   const allDepts = useMemo(() => deriveDepartments(snapshot), [snapshot]);
   const allDeptIds = useMemo(() => allDepts.map((d) => d.id), [allDepts]);
   const integrity = useMemo(() => assessIntegrity(snapshot), [snapshot]);
+
+  // Entity-wide figures: the register and the balance sheet aren't department-scoped,
+  // so these deliberately ignore the department filter.
+  const grantFigs = useMemo(() => allGrantFigures(snapshot), [snapshot]);
+  const grantMix = useMemo(() => grantSummary(grantFigs), [grantFigs]);
+  const cash = useMemo(() => cashBreakdown(snapshot, grantFigs), [snapshot, grantFigs]);
 
   const periods: PeriodPoint[] = useMemo(() => {
     const ms = snapshot.monthlyStatements ?? [];
@@ -191,7 +222,7 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
     { key: "net-result", label: surplus ? "Net Surplus" : "Net Deficit", value: fin.net, format: "compact", color: surplus ? "green" : "red", icon: "wallet", meta: fin.label },
     { key: "active-grants", label: "Active Grants", value: grants.length, format: "plain", color: "gold", icon: "file-text", meta: `${formatCompact(grantTotal)} tracked` },
     { key: "grant-funding", label: "Grant Funding", value: grantTotal, format: "compact", color: "gold", icon: "banknote", meta: `Across ${grants.length} grants` },
-    { key: "grant-dependency", label: "Grant Dependency", value: grantDependency, format: "percent", color: grantDependency > 0.75 ? "amber" : "gold", icon: "percent", meta: "Grants ÷ total revenue" },
+    { key: "grant-dependency", label: "Grant Dependency", value: grantDependency, format: "percent", color: grantDependencyRag(grantDependency) === "amber" ? "amber" : "gold", icon: "percent", meta: "Grants ÷ total revenue" },
     { key: "revenue-centres", label: "Revenue Centres (YTD)", value: revenue, format: "compact", color: "teal", icon: "coins", meta: `${snapshot.revenueLines.length} income lines` },
     { key: "ytd-spend", label: "YTD Spend (by function)", value: ytdSpend, format: "compact", color: "amber", icon: "activity", meta: `${depts.length} departments` },
     { key: "total-budget", label: comparisonLabel === "FY25" ? "FY25 Total Spend" : "Total Budget", value: totalBudget, format: "compact", color: "gold", icon: "wallet", meta: comparisonLabel === "FY25" ? "Prior full year" : "Loaded budget" },
@@ -201,6 +232,14 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
     { key: "departments", label: "Departments", value: depts.length, format: "plain", color: "blue", icon: "building-2", meta: "Cost & revenue centres" },
     { key: "grants-action", label: "Action Required", value: grants.filter(grantNeedsAction).length, format: "plain", color: grants.filter(grantNeedsAction).length > 0 ? "red" : "green", icon: "alert-triangle", meta: "Reports / acquittals due" },
     { key: "over-budget", label: "Over Budget", value: overBudget, format: "plain", color: overBudget > 0 ? "red" : "green", icon: "alert-triangle", meta: `of ${depts.length} departments` },
+    // Liquidity (C1) — bounds, not exact figures, while the register is incomplete.
+    { key: "restricted-cash", label: "Restricted Cash", value: cash.restrictedCash, format: "compact", color: "amber", icon: "lock", meta: cash.exact ? "Tied to grant purpose" : "At least · tied to grants" },
+    { key: "unrestricted-cash", label: "Unrestricted Cash", value: cash.unrestrictedCash, format: "compact", color: "teal", icon: "lock-open", meta: cash.exact ? "Council may direct" : "At most · Council may direct" },
+    { key: "cash-cover", label: "Months of Cover", value: cash.monthsCover ?? 0, format: "decimal", color: cash.belowMinimum ? "red" : "green", icon: "hourglass", meta: `${cash.exact ? "" : "At most · "}min ${MIN_MONTHS_COVER} months` },
+    // Grant mix (C2, C6).
+    { key: "capital-grants", label: "Capital Grants", value: grantMix.capital.totalGrantIncome, format: "compact", color: "blue", icon: "building-2", meta: `${grantMix.capital.count} grants · fund assets` },
+    { key: "operating-grants", label: "Operating Grants", value: grantMix.operating.totalGrantIncome, format: "compact", color: "teal", icon: "coins", meta: `${grantMix.operating.count} grants · fund services` },
+    { key: "disaster-funding", label: "Disaster Recovery", value: grantMix.disaster.totalGrantIncome, format: "compact", color: "amber", icon: "life-buoy", meta: `${grantMix.disaster.count} grants · QRA / NDRRA` },
   ];
   const byKey = new Map(catalog.map((m) => [m.key, m]));
   const shownStats = cfg.stats.map((k) => byKey.get(k)).filter((m): m is Metric => !!m);
@@ -209,6 +248,8 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
   const allocation = depts.map((d) => ({ department: d, share: totalBudget > 0 ? d.annualBudget / totalBudget : 0 }));
   const widgetNode: Record<string, React.ReactNode> = {
     "operating-position": <OperatingPosition totalIncome={fin.income} totalExpenses={fin.expenses} netResult={fin.net} periodLabel={fin.label} />,
+    "cash-position": <CashPosition cash={cash} periodLabel={snapshot.period.label} />,
+    "grant-mix": <GrantMix summary={grantMix} periodLabel={snapshot.period.label} />,
     "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} monthLabel={`Month ${snapshot.period.monthOfYear}`} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
     "allocation-donut": <AllocationDonut allocation={allocation} totalBudget={totalBudget} revenueLines={snapshot.revenueLines} totalRevenue={revenue} budgetEstimated={budgetEstimated} comparisonLabel={comparisonLabel} />,
     "department-table": <DepartmentTable departments={depts} periodLabel={snapshot.period.label} comparisonLabel={comparisonLabel} />,

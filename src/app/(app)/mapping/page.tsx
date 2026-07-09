@@ -1,11 +1,22 @@
+import { notFound } from "next/navigation";
 import { Content } from "@/components/kit/panel";
 import { MappingForm, type AccountRow, type GrantRow, type DeptOption } from "@/components/mapping/mapping-form";
 import { loadRawSnapshotFromFeed } from "@/lib/data/feed";
 import { readOverrides } from "@/lib/feed/overrides";
+import { getSession, isAuthConfigured } from "@/lib/auth/session";
+import { can } from "@/lib/auth/roles";
 
 export const dynamic = "force-dynamic";
 
 export default async function MappingPage() {
+  // Editing account mappings is admin/finance only. Read-only roles (CEO,
+  // department heads) never see this page. Note this only ever changes reporting
+  // metadata — the GL figures themselves stay read-only for every role.
+  if (isAuthConfigured()) {
+    const session = await getSession();
+    if (!can(session?.role, "mapping.edit")) notFound();
+  }
+
   // Work from the pre-override snapshot so we can show the original imported
   // values, then overlay any saved overrides as the current edits.
   const base = await loadRawSnapshotFromFeed();

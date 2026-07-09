@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, AlertTriangle, Lock, Unlock, Download } from "lucide-react";
+import { Search, AlertTriangle, Lock, Unlock, Download, LifeBuoy } from "lucide-react";
 import type { GrantFigures } from "@/lib/grants";
 import { Panel, PanelHeader } from "@/components/kit/panel";
 import { formatCurrency, formatPercent } from "@/lib/format";
+import { grantUtilisationRag, ragText } from "@/lib/rag";
 import { cn } from "@/lib/utils";
+
+type Kind = "all" | "operating" | "capital";
 
 /**
  * Grant register table — the columns Shaun specified: total grant income, income
@@ -18,28 +21,38 @@ import { cn } from "@/lib/utils";
 export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
   const [q, setQ] = useState("");
   const [onlyIssues, setOnlyIssues] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
+  const [kind, setKind] = useState<Kind>("all");
+  const [onlyDisaster, setOnlyDisaster] = useState(false);
+
+  const closedCount = figures.filter((f) => !f.entry.active).length;
+  const disasterCount = figures.filter((f) => f.entry.active && f.disasterRecovery).length;
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return figures.filter((f) => {
+      if (!showClosed && !f.entry.active) return false;
       if (onlyIssues && !f.hasUnresolvedCodes) return false;
+      if (onlyDisaster && !f.disasterRecovery) return false;
+      if (kind !== "all" && f.entry.operatingOrCapital !== kind) return false;
       if (!needle) return true;
       return `${f.entry.name} ${f.entry.funder}`.toLowerCase().includes(needle);
     });
-  }, [figures, q, onlyIssues]);
+  }, [figures, q, onlyIssues, showClosed, kind, onlyDisaster]);
 
   const exportCsv = () => {
     const header = [
       "Grant", "Funder", "Total grant income", "Opening income", "Current income",
       "Income to date", "Income remaining", "Budgeted expense", "Opening expense",
       "Current expense", "Expense to date", "Expense remaining", "% used",
-      "Restricted", "Operating/Capital", "Start", "End", "Report due", "Issues",
+      "Restricted", "Operating/Capital", "Disaster recovery", "Start", "End", "Report due", "Issues",
     ];
     const data = rows.map((f) => [
       f.entry.name, f.entry.funder, f.totalGrantIncome, f.openingIncome, f.currentIncome,
       f.incomeToDate, f.incomeRemaining, f.budgetedExpense, f.openingExpense,
       f.currentExpense, f.expenseToDate, f.expenseRemaining, (f.utilisation * 100).toFixed(1),
       f.entry.restricted ? "Restricted" : "Unrestricted", f.entry.operatingOrCapital,
+      f.disasterRecovery ? "Yes" : "No",
       f.entry.startDate, f.entry.endDate, f.entry.reportDue, f.entry.issues.join("; "),
     ]);
     const csv = [header, ...data]
@@ -68,7 +81,45 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
             />
           </span>
         </label>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Operating vs capital (C2): capital grants leave the Council an asset to maintain. */}
+          <div className="flex h-[38px] items-center rounded-md border border-border bg-elevated/40 p-1">
+            {(["all", "operating", "capital"] as Kind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={cn(
+                  "h-full rounded px-3 text-[12px] font-medium capitalize transition-colors",
+                  kind === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+          {/* Disaster recovery (C6): one-off, reimbursement-based, must not read as base income. */}
+          <button
+            type="button"
+            onClick={() => setOnlyDisaster((v) => !v)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors",
+              onlyDisaster ? "border-amber/40 bg-amber/10 text-amber" : "border-border bg-elevated text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <LifeBuoy className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Disaster recovery ({disasterCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowClosed((v) => !v)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors",
+              showClosed ? "border-gold/40 bg-gold-dim text-gold-light" : "border-border bg-elevated text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {showClosed ? "Hide" : "Show"} closed ({closedCount})
+          </button>
           <button
             type="button"
             onClick={() => setOnlyIssues((v) => !v)}
@@ -124,6 +175,17 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
                         <span className="text-[11px] text-muted-foreground">
                           {f.entry.funder || "—"} · {f.entry.operatingOrCapital}
                         </span>
+                        {f.disasterRecovery && (
+                          <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded-full border border-amber/30 bg-amber/10 px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.06em] text-amber">
+                            <LifeBuoy className="h-2.5 w-2.5" strokeWidth={2} />
+                            disaster recovery
+                          </span>
+                        )}
+                        {!f.entry.active && (
+                          <span className="mt-0.5 inline-flex w-fit items-center rounded-full border border-border bg-elevated px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
+                            closed — excluded from totals
+                          </span>
+                        )}
                         {f.hasUnresolvedCodes && (
                           <span className="mt-0.5 inline-flex items-center gap-1 font-mono text-[10px] text-amber">
                             <AlertTriangle className="h-3 w-3" strokeWidth={2} />
@@ -144,7 +206,7 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
                     <span
                       className={cn(
                         "font-mono text-[12px] font-semibold tabular-nums",
-                        f.utilisation > 1.001 ? "text-red" : f.utilisation > 0.9 ? "text-amber" : "text-green",
+                        ragText[grantUtilisationRag(f.utilisation)],
                       )}
                     >
                       {f.budgetedExpense > 0 ? formatPercent(f.utilisation) : "—"}

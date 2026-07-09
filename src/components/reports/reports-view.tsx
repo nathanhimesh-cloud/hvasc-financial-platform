@@ -21,7 +21,7 @@ import { IntegrityBanner } from "@/components/kit/integrity-banner";
 import { DataStamp } from "@/components/kit/data-stamp";
 import { PrintButton } from "@/components/kit/print-button";
 import { BudgetVsActual } from "./budget-vs-actual";
-import { TransactionsView } from "./transactions-view";
+import { TransactionsView, type TransactionFilters } from "./transactions-view";
 import { bgDim, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
 import {
@@ -31,6 +31,7 @@ import {
   formatSignedCompact,
   financialYearOf,
 } from "@/lib/format";
+import { budgetRag, ragText } from "@/lib/rag";
 import { cn } from "@/lib/utils";
 
 export interface ReportPeriod {
@@ -70,7 +71,9 @@ export function ReportsView({
   source,
   budgetData,
   transactions,
+  transactionTotal,
   dailySpend,
+  ledger,
 }: {
   fyLabel: string;
   monthOfYear: number;
@@ -86,7 +89,16 @@ export function ReportsView({
   source?: string;
   budgetData?: BudgetReportData;
   transactions: Transaction[];
+  /** Total rows in the ledger for this FY (may exceed the page we loaded). */
+  transactionTotal?: number;
   dailySpend: DailySpendPoint[];
+  /** Present when the Postgres ledger filtered these rows server-side (B1). */
+  ledger?: {
+    serverFiltered: boolean;
+    filters: TransactionFilters;
+    totals?: { debit: number; credit: number };
+    preservedParams: Record<string, string>;
+  };
 }) {
   const latestIdx = periods.length ? periods[periods.length - 1].idx : monthOfYear;
   const [statement, setStatement] = useState<Statement>("pnl");
@@ -183,7 +195,8 @@ export function ReportsView({
         <StatementTab active={statement === "budget"} onClick={() => setStatement("budget")} icon={Table} label="Budget vs Actual" soon={!budgetData} />
         <StatementTab active={statement === "balance"} onClick={() => setStatement("balance")} icon={Scale} label="Balance Sheet" soon={!balanceSheet} />
         <StatementTab active={statement === "cashflow"} onClick={() => setStatement("cashflow")} icon={Banknote} label="Cashflow" soon={!cashFlow} />
-        <StatementTab active={statement === "transactions"} onClick={() => setStatement("transactions")} icon={Receipt} label="Transactions" soon={!transactions.length} />
+        {/* With the ledger on, an empty result may just mean the filter matched nothing. */}
+        <StatementTab active={statement === "transactions"} onClick={() => setStatement("transactions")} icon={Receipt} label="Transactions" soon={!transactions.length && !ledger?.serverFiltered} />
       </div>
 
       {statement === "budget" ? (
@@ -193,7 +206,16 @@ export function ReportsView({
       ) : statement === "cashflow" ? (
         cashFlow ? <CashFlowView cf={cashFlow} fyLabel={fyLabel} /> : <ComingSoon statement="cashflow" />
       ) : statement === "transactions" ? (
-        <TransactionsView transactions={transactions} dailySpend={dailySpend} />
+        <TransactionsView
+          transactions={transactions}
+          transactionTotal={transactionTotal}
+          dailySpend={dailySpend}
+          fyLabel={fyLabel}
+          serverFiltered={ledger?.serverFiltered}
+          filters={ledger?.filters}
+          ledgerTotals={ledger?.totals}
+          preservedParams={ledger?.preservedParams}
+        />
       ) : (
         <>
           {/* Filter bar */}
@@ -350,7 +372,7 @@ export function ReportsView({
                       <Num muted>{formatCurrency(d.comparison)}</Num>
                       <Num tone={d.variance >= 0 ? "pos" : "neg"}>{formatSignedCompact(d.variance)}</Num>
                       <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3 text-right">
-                        <span className={cn("font-mono text-[13px] font-bold tabular-nums", d.pct > 1.05 ? "text-red" : d.pct > 1 ? "text-amber" : "text-green")}>
+                        <span className={cn("font-mono text-[13px] font-bold tabular-nums", ragText[budgetRag(d.pct)])}>
                           {formatPercent(d.pct)}
                         </span>
                       </td>

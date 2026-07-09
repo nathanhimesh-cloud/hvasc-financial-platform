@@ -2,6 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { FinancialSnapshot } from "@/lib/types";
+import { budgetStatus } from "@/lib/rag";
 
 /**
  * Mapping overrides — user-curated corrections applied ON TOP of the parsed
@@ -82,8 +83,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 
 /** Re-derive a department's RAG status after its YTD total changes. */
 function statusFor(ytdActual: number, ytdBudget: number): FinancialSnapshot["departments"][number]["status"] {
-  const ratio = ytdBudget > 0 ? ytdActual / ytdBudget : 0;
-  return ratio > 1.05 ? "over-budget" : ratio > 1.0 ? "at-risk" : "on-track";
+  return budgetStatus(ytdBudget > 0 ? ytdActual / ytdBudget : 0);
 }
 
 /**

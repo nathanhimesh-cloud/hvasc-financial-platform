@@ -4,8 +4,11 @@ import {
   LayoutGrid,
   FileText,
   Tags,
+  ShieldCheck,
+  Briefcase,
   type LucideIcon,
 } from "lucide-react";
+import { can } from "@/lib/auth/roles";
 
 /** Navigation + per-route page header configuration. */
 
@@ -19,6 +22,7 @@ export interface NavLink {
 export const overviewNav: NavLink[] = [
   { href: "/", label: "CFO Dashboard", icon: LayoutDashboard },
   { href: "/grants", label: "Grant Tracker", icon: Landmark },
+  { href: "/jobs", label: "Job Budgets", icon: Briefcase },
   { href: "/reports", label: "Detailed Reports", icon: FileText },
 ];
 
@@ -31,6 +35,18 @@ export const overviewNav: NavLink[] = [
 export const dataNav: NavLink[] = [
   { href: "/mapping", label: "Account Mapping", icon: Tags },
 ];
+
+/**
+ * The "Data" links this role may see. Read-only roles (CEO, department heads)
+ * get none — the pages are gated server-side too, this just avoids showing a
+ * link that would 404. Admins additionally get the audit log.
+ */
+export function dataNavFor(role: string | undefined): NavLink[] {
+  const links: NavLink[] = [];
+  if (can(role, "mapping.edit")) links.push({ href: "/mapping", label: "Account Mapping", icon: Tags });
+  if (can(role, "audit.view")) links.push({ href: "/audit", label: "Audit Log", icon: ShieldCheck });
+  return links;
+}
 
 /** First item in the Departments section — the manager grid. */
 export const allDepartmentsNav: NavLink = {
@@ -87,6 +103,9 @@ export function getPageMeta(
       title: "Grant Tracker",
       subtitle: `${ctx?.grantCount ?? 0} grants${action}`,
     };
+  }
+  if (pathname === "/jobs") {
+    return { title: "Job Budgets", subtitle: "Budget vs actual by job" };
   }
   if (pathname === "/departments") {
     return { title: "Manager View", subtitle: `${ctx?.deptCount ?? "All"} departments` };

@@ -74,6 +74,20 @@ export async function getSnapshot(): Promise<FinancialSnapshot> {
 }
 
 /**
+ * A specific archived period ("FY2025-26", 11), from the Postgres snapshot
+ * history. Falls back to the live snapshot when that period isn't stored (or
+ * when history isn't configured), so callers always get something to render.
+ */
+export async function getSnapshotForPeriod(
+  fyLabel: string,
+  periodMonth: number,
+): Promise<FinancialSnapshot> {
+  const { loadSnapshot } = await import("@/lib/history");
+  const stored = await loadSnapshot(fyLabel, periodMonth);
+  return stored ?? (await getSnapshot());
+}
+
+/**
  * Kept for API compatibility with the write routes. Per-request memoization is
  * handled by React `cache()`; cross-request invalidation is handled by
  * `revalidateTag("snapshot")`, which the write routes call. No-op here.

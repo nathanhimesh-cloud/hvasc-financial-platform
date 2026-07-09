@@ -2,15 +2,16 @@ import { notFound } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { Content, Panel, PanelHeader } from "@/components/kit/panel";
 import { getSession, isAuthConfigured } from "@/lib/auth/session";
+import { can } from "@/lib/auth/roles";
 import { listAudit } from "@/lib/auth/db";
 
 export const dynamic = "force-dynamic";
 
-/** Audit trail — visible to admins only (brief B9). */
+/** Audit trail — requires the `audit.view` capability (admins only). */
 export default async function AuditPage() {
   const session = await getSession();
-  // Hide the route's existence from non-admins.
-  if (!isAuthConfigured() || session?.role !== "admin") notFound();
+  // Hide the route's existence from anyone without the capability.
+  if (!isAuthConfigured() || !can(session?.role, "audit.view")) notFound();
 
   const rows = await listAudit(200);
 

@@ -13,6 +13,21 @@
 --     node scripts/hash-password.mjs "<their password>"
 -- then INSERT a row like the admin one below. New users get must_change_password = true,
 -- so they are forced to set their own password on first login.
+--
+-- ROLES (see src/lib/auth/roles.ts):
+--   admin          SandS support - everything, incl. the audit log and user access
+--   finance        CFO / Finance - all reports + account-mapping admin
+--   ceo            Executive view (read-only)
+--   manager        Department head (read-only)
+--   grant-manager  Grants - may edit grant metadata, never GL figures
+--
+-- Financial actuals are read-only from the General Ledger for EVERY role.
+-- Only reporting metadata (names, department assignment, grant milestones) is editable.
+--
+-- To give Micah his own admin account (per the 9 Jul review), generate a hash and run:
+--     INSERT INTO users (username, password_hash, role, must_change_password)
+--     VALUES ('micah', '<hash from hash-password.mjs>', 'admin', TRUE)
+--     ON CONFLICT (username) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS users (
   id                   SERIAL PRIMARY KEY,

@@ -2,6 +2,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import type { FinancialSnapshot } from "@/lib/types";
 import { writeRuntimeSnapshot, storeKind } from "@/lib/feed/store";
 import { clearSnapshotCache } from "@/lib/data";
+import { saveSnapshot } from "@/lib/history";
+import { saveTransactions, type IncomingTransaction } from "@/lib/ledger";
 
 /**
  * Direct snapshot push — for the ODBC live feed.
@@ -70,15 +72,29 @@ export async function PUT(request: Request) {
     );
   }
 
+  // Transactions go into their own Postgres table (upserted on GLTRN.KY) rather
+  // than riding inside the snapshot forever — by June that payload would be
+  // megabytes and every sync would re-send the whole year. Only strip them from
+  // the snapshot once they're safely stored, so nothing can be lost.
+  const incoming = (snapshot.transactions ?? []) as IncomingTransaction[];
+  const ingested = await saveTransactions(snapshot.period?.fyLabel ?? "", incoming);
+  const persisted: FinancialSnapshot =
+    ingested > 0 ? { ...snapshot, transactions: [] } : snapshot;
+
   let location: string;
   try {
-    location = await writeRuntimeSnapshot(snapshot);
+    location = await writeRuntimeSnapshot(persisted);
   } catch (err) {
     return Response.json(
       { ok: false, error: `Couldn't save snapshot: ${(err as Error).message}` },
       { status: 500 },
     );
   }
+
+  // Archive this period to Postgres so history accumulates. The Blob store only
+  // ever holds the latest snapshot; without this, each sync destroys the last one.
+  // Best-effort: a history failure must never fail the push.
+  const archived = await saveSnapshot(persisted);
 
   clearSnapshotCache();
   revalidateTag("snapshot", "max");
@@ -89,11 +105,15 @@ export async function PUT(request: Request) {
     ok: true,
     store: storeKind(),
     location,
+    archived,
+    transactionsIngested: ingested,
     summary: {
       period: snapshot.period?.label,
       departments: snapshot.departments.length,
       grants: snapshot.grants.length,
       revenueLines: snapshot.revenueLines.length,
+      transactions: incoming.length,
+      jobCosts: snapshot.jobCosts?.length ?? 0,
       totalYtdSpend: totalSpend,
       source: snapshot.meta?.source,
     },

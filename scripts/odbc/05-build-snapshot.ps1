@@ -59,6 +59,9 @@ $conn = New-Object System.Data.Odbc.OdbcConnection($DSN)
 $conn.Open()
 Write-Host "Connected: $($conn.ServerVersion)" -ForegroundColor Green
 
+$script:BadCells = 0
+$script:BadCellNames = @()
+
 function Invoke-Rows([string]$Sql) {
   $cmd = $conn.CreateCommand(); $cmd.CommandText = $Sql
   $r = $cmd.ExecuteReader()
@@ -66,7 +69,20 @@ function Invoke-Rows([string]$Sql) {
   while ($r.Read()) {
     $o = [ordered]@{}
     for ($i = 0; $i -lt $r.FieldCount; $i++) {
-      $v = $r.GetValue($i)
+      # Practical holds a few malformed values (bad dates, numerics stored as
+      # text) that the ODBC driver refuses to convert. GetValue then THROWS. The
+      # old code left the previous column's value in $v and wrote that into this
+      # column - silent, undetectable corruption. Reset per cell, fall back to
+      # the raw string, and only then give up with $null. Count what we lose.
+      $v = $null
+      try {
+        $v = $r.GetValue($i)
+      } catch {
+        try { $v = $r.GetString($i) } catch { $v = $null }
+        $script:BadCells++
+        $nm = $r.GetName($i)
+        if ($script:BadCellNames -notcontains $nm) { $script:BadCellNames += $nm }
+      }
       $o[$r.GetName($i)] = ($(if ($v -is [DBNull]) { $null } else { $v }))
     }
     $rows += [pscustomobject]$o
@@ -79,7 +95,18 @@ function Invoke-Scalar([string]$Sql) {
   $v = $cmd.ExecuteScalar()
   if ($v -is [DBNull] -or $null -eq $v) { return 0 } else { return [double]$v }
 }
-function R2([object]$x) { if ($null -eq $x) { return 0 } return [math]::Round([double]$x, 2) }
+# Round to cents. Non-numeric input yields 0 rather than throwing: some Practical
+# columns that look like amounts are actually Y/N flags (JCMST.JOBBUDGET is one),
+# and one such column must not be able to kill the whole nightly build.
+function R2([object]$x) {
+  if ($null -eq $x -or $x -is [DBNull]) { return 0 }
+  if ($x -is [string]) {
+    $d = 0.0
+    if ([double]::TryParse($x, [ref]$d)) { return [math]::Round($d, 2) }
+    return 0
+  }
+  return [math]::Round([double]$x, 2)
+}
 function Slugify([string]$s) {
   $t = $s.ToLower() -replace '&','and' -replace '[^a-z0-9]+','-'
   return ($t.Trim('-'))
@@ -278,8 +305,11 @@ foreach ($c in $cumRows) {
 # the cap is hit, older transactions aren't included (flagged in the summary).
 $TRN_CAP = 5000
 $fyStart = ("{0}-07-01" -f ($yr - 1))   # FY starts 1 July of the prior calendar year
+# t.KY is GLTRN's own primary key. We ship it so the dashboard can UPSERT each
+# transaction into Postgres instead of re-inserting it on every sync. That's what
+# lets the ledger accumulate across the year without duplicates.
 $trnRows = Invoke-Rows @"
-SELECT FIRST $TRN_CAP t.GLACCOUNT, m.DESCRIPT AS ACCTNAME, t.TRNDATE,
+SELECT FIRST $TRN_CAP t.KY, t.GLACCOUNT, m.DESCRIPT AS ACCTNAME, t.TRNDATE,
        t.DESCRIPT AS TRNDESC, t.DEBIT, t.CREDIT, t.REF, m.ACCNTTYPE
 FROM GLTRN t JOIN GLMST m ON m.GLACCOUNT = t.GLACCOUNT
 WHERE t.TRNDATE >= '$fyStart' AND m.RECACTIVE='Y'
@@ -293,6 +323,7 @@ foreach ($t in $trnRows) {
   $credit = R2 $t.CREDIT
   $d = if ($t.TRNDATE) { ([datetime]$t.TRNDATE).ToString('yyyy-MM-dd') } else { '' }
   $transactions += [ordered]@{
+    ky          = [int64]$t.KY
     date        = $d
     code        = [string]$t.GLACCOUNT
     account     = ([string]$t.ACCTNAME).Trim()
@@ -317,25 +348,150 @@ $trnCapped = ($trnRows.Count -ge $TRN_CAP)
 # Spend per job code for the current FY. The grant register maps each grant to
 # its job code(s), so grant EXPENDITURE is the sum of its jobs' costs. Codes are
 # normalised to the "JOB-SUBJOB" (4-4) prefix the register uses.
+# TOTCOST is a scaled NUMERIC. SUM() of it overflows what the Firebird ODBC
+# driver will convert, and GetValue throws on a handful of the larger jobs -
+# which then read as $0 and silently understate both this report AND the grant
+# expenditure derived from it. Casting to DOUBLE PRECISION in SQL avoids it.
 $jcRows = Invoke-Rows @"
-SELECT t.JCACCOUNT, SUM(t.TOTCOST) AS SPEND
+SELECT t.JCACCOUNT, SUM(CAST(t.TOTCOST AS DOUBLE PRECISION)) AS SPEND
 FROM JCTRN t
 WHERE t.TRANDATE >= '$fyStart'
 GROUP BY t.JCACCOUNT
 "@
 $jcMap = @{}
+$jcNullSpend = 0
 foreach ($j in $jcRows) {
   $raw = ([string]$j.JCACCOUNT).Trim()
   if ($raw.Length -lt 9) { continue }
   $key = $raw.Substring(0, 9)          # "0305-0410"
+  # A null here is a job whose spend we could NOT read - not a job that spent $0.
+  if ($null -eq $j.SPEND) { $jcNullSpend++ }
   $amt = R2 $j.SPEND
   if (-not $jcMap.ContainsKey($key)) { $jcMap[$key] = 0.0 }
   $jcMap[$key] = [double]$jcMap[$key] + $amt
+}
+if ($jcNullSpend -gt 0) {
+  Write-Host ("WARNING: {0} job code(s) had an unreadable SPEND and count as 0. Grant expenditure is understated." -f $jcNullSpend) -ForegroundColor Red
 }
 $jobCosts = @()
 foreach ($k in ($jcMap.Keys | Sort-Object)) {
   if ([math]::Abs($jcMap[$k]) -lt 0.005) { continue }
   $jobCosts += [ordered]@{ code = $k; amount = (R2 $jcMap[$k]) }
+}
+
+# -- 6b3. job register + job-wise budget tracking (JCMST) ----------------------
+# Practical holds the BUDGET on the GL account, not on the job: in the FY26 job
+# costing report only 12 of 384 jobs carried an estimate, and the FY27 "Jobs
+# Budget" report nests jobs under their GL account's budget. So we mirror that
+# report - GL account budget vs the actuals of the jobs beneath it.
+#
+# JCMST's columns vary between Practical builds, so probe them first. A missing
+# optional column degrades the report; it must never break the nightly build.
+$jcmstCols = @{}
+foreach ($c in (Invoke-Rows @'
+SELECT RDB$FIELD_NAME AS FLD FROM RDB$RELATION_FIELDS WHERE RDB$RELATION_NAME = 'JCMST'
+'@)) {
+  $n = ([string]$c.FLD).Trim().ToUpper()
+  if ($n) { $jcmstCols[$n] = $true }
+}
+function Test-JcCol([string]$n) { return $jcmstCols.ContainsKey($n.ToUpper()) }
+
+$jobBudgets = @()
+$jobsUnmappedToGl = 0
+if (-not (Test-JcCol 'JCACCOUNT')) {
+  Write-Host "JCMST has no JCACCOUNT column - skipping the job budget report." -ForegroundColor Yellow
+} else {
+  # NOTE: JCMST.JOBBUDGET is a Y/N FLAG ("is this job budgeted?"), not an amount.
+  # The money lives in the estimate columns, which line up with the "Estimates"
+  # block of Practical's Total Job Costs report:
+  #     ESTIMATE = Original    NEWEST = Current    NEXTEST = Next Year
+  $sel = @('JCACCOUNT')
+  foreach ($opt in @('JCDESC', 'RACTIVE', 'PYGLACC', 'ESTIMATE', 'NEWEST', 'COMTOT')) {
+    if (Test-JcCol $opt) { $sel += $opt }
+  }
+  Write-Host ("JCMST columns used: " + ($sel -join ', ')) -ForegroundColor Cyan
+  $jobRows = Invoke-Rows ("SELECT " + ($sel -join ', ') + " FROM JCMST")
+
+  # Aggregate JCMST to the 4-4 key that the cost ledger and grant register both
+  # use. Several sub-jobs share one key, so sum their budgets rather than
+  # attaching the key's whole actual to each of them (which would double-count).
+  $jobMap = @{}
+  foreach ($j in $jobRows) {
+    $raw = ([string]$j.JCACCOUNT).Trim()
+    if ($raw.Length -lt 9) { continue }
+    $key = $raw.Substring(0, 9)
+    if (-not $jobMap.ContainsKey($key)) {
+      $jobMap[$key] = @{ code = $key; name = ''; gl = ''; active = $false; budget = 0.0; committed = 0.0 }
+    }
+    $e = $jobMap[$key]
+    # Prefer the "-0000" parent row's description and GL account.
+    $isParent = ($raw.Length -ge 14 -and $raw.Substring(10, 4) -eq '0000')
+    $desc = $(if (Test-JcCol 'JCDESC') { ([string]$j.JCDESC).Trim() } else { '' })
+    if ($desc -and ((-not $e.name) -or $isParent)) { $e.name = $desc }
+    if (Test-JcCol 'PYGLACC') {
+      $g = ([string]$j.PYGLACC).Trim()
+      if ($g -and ((-not $e.gl) -or $isParent)) { $e.gl = $g }
+    }
+    if ((Test-JcCol 'RACTIVE') -and (([string]$j.RACTIVE).Trim().ToUpper() -eq 'Y')) { $e.active = $true }
+    # Prefer the CURRENT estimate (NEWEST); fall back to the ORIGINAL (ESTIMATE).
+    $bud = 0
+    if (Test-JcCol 'NEWEST')   { $bud = R2 $j.NEWEST }
+    if ($bud -eq 0 -and (Test-JcCol 'ESTIMATE')) { $bud = R2 $j.ESTIMATE }
+    $e.budget = [double]$e.budget + $bud
+    if (Test-JcCol 'COMTOT')   { $e.committed = [double]$e.committed + (R2 $j.COMTOT) }
+  }
+
+  # GL account -> name / budget / actual, for the accounts the jobs post against.
+  $glInfo = @{}
+  foreach ($r in $acctRows) {
+    $glInfo[([string]$r.GLACCOUNT).Trim()] = @{
+      name = ([string]$r.DESCRIPT).Trim(); budget = (R2 $r.BUDGET); actual = (R2 $r.BALANCE)
+    }
+  }
+
+  # Group the jobs under their GL account.
+  $byGl = @{}
+  foreach ($key in ($jobMap.Keys | Sort-Object)) {
+    $e = $jobMap[$key]
+    $actual = $(if ($jcMap.ContainsKey($key)) { R2 $jcMap[$key] } else { 0 })
+    # JCMST carries ~4,100 job rows, most of them long-dormant shells. Practical's
+    # own report lists only jobs with activity, so keep a job when it has spend or
+    # a budget. The RACTIVE flag alone isn't enough - thousands are flagged active
+    # with nothing against them, and they'd bloat the snapshot for no information.
+    if ($actual -eq 0 -and $e.budget -eq 0) { continue }
+
+    $gl = [string]$e.gl
+    if (-not $gl) { $jobsUnmappedToGl++; $gl = 'unmapped' }
+    if (-not $byGl.ContainsKey($gl)) { $byGl[$gl] = @() }
+    $byGl[$gl] += [ordered]@{
+      code = $e.code; name = $e.name; active = $e.active
+      budget = (R2 $e.budget); actual = $actual; committed = (R2 $e.committed)
+    }
+  }
+
+  foreach ($gl in ($byGl.Keys | Sort-Object)) {
+    $jobs = @($byGl[$gl])
+    $info = $(if ($glInfo.ContainsKey($gl)) { $glInfo[$gl] } else { $null })
+    $jobActual = 0.0
+    foreach ($j in $jobs) { $jobActual = $jobActual + [double]$j.actual }
+    $jobBudgets += [ordered]@{
+      glAccount    = $gl
+      glName       = $(if ($info) { $info.name } else { '' })
+      departmentId = $(if ($gl -ne 'unmapped') { Resolve-Dept $gl } else { $null })
+      # The budget lives on the GL account. `glActual` is the account's real
+      # balance; `jobActual` is only the part that was job-costed. They differ
+      # when spend posts straight to the account without a job.
+      budget    = $(if ($info) { $info.budget } else { 0 })
+      glActual  = $(if ($info) { $info.actual } else { 0 })
+      jobActual = (R2 $jobActual)
+      jobs      = $jobs
+    }
+  }
+  $keptJobs = 0
+  foreach ($g in $jobBudgets) { $keptJobs += @($g.jobs).Count }
+  $withBudget = @($jobBudgets | Where-Object { [double]$_.budget -gt 0 }).Count
+  Write-Host ("Job budget report: {0} GL accounts ({1} with a budget), {2} jobs kept of {3} in JCMST, {4} with no GL account." -f `
+    $jobBudgets.Count, $withBudget, $keptJobs, $jobMap.Count, $jobsUnmappedToGl) -ForegroundColor Cyan
 }
 
 # -- 6c. balance sheet (Statement of Financial Position, live from GLBAL) ------
@@ -427,6 +583,7 @@ $snapshot = [ordered]@{
   dailySpend    = $dailySpend
   transactions  = $transactions
   jobCosts      = $jobCosts
+  jobBudgets    = $jobBudgets
   balanceSheet  = $balanceSheet
   priorYear     = $priorYear
   meta = [ordered]@{
@@ -459,6 +616,10 @@ Write-Host ("  job codes   : {0}  (spend per job, for grant expenditure)" -f $jo
 $umCol = if ($unmappedAccounts -gt 0) { 'Yellow' } else { 'Green' }
 Write-Host ("  unmapped acc: {0}  (active accts not in a department; 0 = all mapped)" -f $unmappedAccounts) -ForegroundColor $umCol
 foreach ($u in $unmappedNames) { Write-Host ("      ! {0}" -f $u) -ForegroundColor Yellow }
+if ($script:BadCells -gt 0) {
+  Write-Host ("  unreadable cells: {0} in column(s): {1}" -f $script:BadCells, ($script:BadCellNames -join ', ')) -ForegroundColor Yellow
+  Write-Host "      (value could not be converted by the ODBC driver; stored as null/text, never as another column's value)" -ForegroundColor DarkGray
+}
 Write-Host ""
 Write-Host "Balance Sheet (live) - VALIDATE:" -ForegroundColor Cyan
 Write-Host ("  Total Assets       : {0,18:N2}" -f $bsTotalAssets)
@@ -472,11 +633,16 @@ Write-Host ("  Income        : {0,18:N2}   (FULL prior year - not the mid-year f
 Write-Host ("  Expenses      : {0,18:N2}   (FULL prior year, operating basis)" -f $pyExpense)
 Write-Host ("  Closing equity: {0,18:N2}   (should ~= this year's opening equity)" -f $pyEquity)
 Write-Host ""
-Write-Host "Income statement (operating basis):" -ForegroundColor Cyan
-Write-Host ("  Income   : {0,18:N2}   (known ~25,013,723)" -f $income)
-Write-Host ("  Expenses : {0,18:N2}   (known ~18,343,558)" -f $expenses)
-Write-Host ("  Net      : {0,18:N2}   (known ~ 6,670,164)" -f $netResult)
+Write-Host ("Income statement (operating basis) - YEAR TO DATE, month $cur of 12:") -ForegroundColor Cyan
+Write-Host ("  Income   : {0,18:N2}" -f $income)
+Write-Host ("  Expenses : {0,18:N2}" -f $expenses)
+Write-Host ("  Net      : {0,18:N2}" -f $netResult)
 Write-Host ("  Deprec.  : {0,18:N2}   (excluded from operating)" -f $deprec)
+if ($cur -le 2) {
+  Write-Host "  (Month $cur of the financial year - small figures here are expected, not a fault.)" -ForegroundColor DarkGray
+}
+# Reference anchors from FY2025-26, for sanity-checking a FULL year's build.
+Write-Host "  FY2025-26 full year, for reference: income ~25,013,723  expenses ~18,343,558  net ~6,670,164" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Department spend (operating):" -ForegroundColor Cyan
 $deptTotal = 0

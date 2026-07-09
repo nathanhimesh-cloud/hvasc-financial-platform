@@ -8,7 +8,7 @@ import {
   formatSignedCompact,
 } from "@/lib/format";
 
-type Fmt = "compact" | "currency" | "percent" | "signed" | "plain";
+type Fmt = "compact" | "currency" | "percent" | "signed" | "plain" | "decimal";
 
 function render(n: number, f: Fmt): string {
   switch (f) {
@@ -20,6 +20,10 @@ function render(n: number, f: Fmt): string {
       return formatPercent(n);
     case "signed":
       return formatSignedCompact(n);
+    // Rounding a threshold measure (e.g. 2.6 months of cover against a 3-month
+    // minimum) would print "3" beside a breach warning. Keep one decimal.
+    case "decimal":
+      return n.toFixed(1);
     default:
       return Math.round(n).toLocaleString();
   }

@@ -12,7 +12,7 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react";
-import { allDepartmentsNav, dataNav, overviewNav } from "@/lib/nav";
+import { allDepartmentsNav, dataNav, dataNavFor, overviewNav } from "@/lib/nav";
 import { getDeptIcon } from "@/lib/icons";
 import { PROFILE } from "@/lib/profile";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -44,6 +44,10 @@ export function Sidebar({
   onToggle,
 }: SidebarProps) {
   const pathname = usePathname();
+
+  // With auth on, the "Data" links depend on the user's role. With auth off there
+  // is no user, so show the default set rather than hiding everything.
+  const dataLinks = user ? dataNavFor(user.role) : dataNav;
 
   // The Departments list is long, so let it collapse. Persist the choice, and
   // always reveal it while you're on a department route.
@@ -126,18 +130,22 @@ export function Sidebar({
           ))}
         </NavGroup>
 
-        <NavGroup label="Data" collapsed={collapsed}>
-          {dataNav.map((item) => (
-            <NavRow
-              key={item.href}
-              href={item.href}
-              label={item.label}
-              icon={item.icon}
-              active={pathname === item.href || pathname.startsWith(item.href + "/")}
-              collapsed={collapsed}
-            />
-          ))}
-        </NavGroup>
+        {/* Role-aware: signed-in users see only what their role permits. When auth
+            isn't configured there's no role, so fall back to the default links. */}
+        {dataLinks.length > 0 && (
+          <NavGroup label="Data" collapsed={collapsed}>
+            {dataLinks.map((item) => (
+              <NavRow
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                active={pathname === item.href || pathname.startsWith(item.href + "/")}
+                collapsed={collapsed}
+              />
+            ))}
+          </NavGroup>
+        )}
 
         <NavGroup
           label="Departments"

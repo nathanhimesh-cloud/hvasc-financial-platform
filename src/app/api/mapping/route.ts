@@ -1,6 +1,9 @@
 import { revalidatePath } from "next/cache";
 import { writeOverrides, type MappingOverrides } from "@/lib/feed/overrides";
 import { clearSnapshotCache } from "@/lib/data";
+import { getSession, isAuthConfigured } from "@/lib/auth/session";
+import { can } from "@/lib/auth/roles";
+import { logAudit } from "@/lib/auth/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +26,13 @@ function clean(overrides: MappingOverrides): MappingOverrides {
 }
 
 export async function POST(request: Request) {
+  // Guard the route itself, not just the page — otherwise a read-only user could
+  // POST here directly. Requires the `mapping.edit` capability when auth is on.
+  const session = isAuthConfigured() ? await getSession() : null;
+  if (isAuthConfigured() && !can(session?.role, "mapping.edit")) {
+    return Response.json({ ok: false, error: "Not permitted." }, { status: 403 });
+  }
+
   // Same shared-secret protection as the upload route, if configured.
   const required = process.env.UPLOAD_PASSWORD;
 
@@ -57,5 +67,9 @@ export async function POST(request: Request) {
 
   const accounts = Object.keys(overrides.accounts ?? {}).length;
   const grants = Object.keys(overrides.grants ?? {}).length;
+
+  // Every metadata edit is recorded (B9). Best-effort; never fails the save.
+  await logAudit(session, "mapping.updated", `${accounts} account(s), ${grants} grant(s)`);
+
   return Response.json({ ok: true, location, counts: { accounts, grants } });
 }

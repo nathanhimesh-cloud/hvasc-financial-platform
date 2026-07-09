@@ -1,16 +1,23 @@
 import { Landmark, Banknote, Send, AlertTriangle, Lock } from "lucide-react";
-import { getSnapshot } from "@/lib/data";
+import { resolvePeriodView, type SearchParams } from "@/lib/periods";
+import { PeriodSelector } from "@/components/kit/period-selector";
 import { allGrantFigures, grantSummary, GRANT_REGISTER } from "@/lib/grants";
 import { formatCompact, formatPercent } from "@/lib/format";
 import { Content } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { PrintButton } from "@/components/kit/print-button";
 import { GrantRegisterTable } from "@/components/grants/grant-register-table";
+import { GrantMix } from "@/components/dashboard/grant-mix";
 
 export const dynamic = "force-dynamic";
 
-export default async function GrantsPage() {
-  const snapshot = await getSnapshot();
+export default async function GrantsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const view = await resolvePeriodView(await searchParams);
+  const snapshot = view.snapshot;
   const figures = allGrantFigures(snapshot);
   const s = grantSummary(figures);
   const utilisation = s.totalBudgetedExpense > 0 ? s.expenseToDate / s.totalBudgetedExpense : 0;
@@ -22,6 +29,15 @@ export default async function GrantsPage() {
           Register: {GRANT_REGISTER.source} · imported {GRANT_REGISTER.importedAt}
         </p>
         <PrintButton />
+      </div>
+
+      <div className="mb-4">
+        <PeriodSelector
+          periods={view.periods}
+          selected={view.selected}
+          isLatest={view.isLatest}
+          hasHistory={view.hasHistory}
+        />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -54,6 +70,10 @@ export default async function GrantsPage() {
           value={s.needsAttention > 0 ? s.needsAttention : formatCompact(s.restrictedUnspent)}
           meta={s.needsAttention > 0 ? "Register rows unresolved" : "Unspent restricted grant cash"}
         />
+      </div>
+
+      <div className="mb-6">
+        <GrantMix summary={s} periodLabel={snapshot.period.label} />
       </div>
 
       <GrantRegisterTable figures={figures} />
