@@ -291,6 +291,8 @@ export interface FinancialSnapshot {
   jobCosts?: JobCost[];
   /** Job-wise budget tracking (from JCMST + JCTRN + GLBAL.BUDGET). */
   jobBudgets?: JobBudgetGroup[];
+  /** Full chart of income/expense accounts, for the Account Mapping page. */
+  accounts?: AccountRef[];
   /** Prior-year totals (from GLBAL.LASTYEAR) for comparatives + the equity check. */
   priorYear?: PriorYear;
   /** Optional provenance/caveats (present on live feeds, absent on seed). */
@@ -353,4 +355,20 @@ export interface JobBudgetGroup {
   /** The part of `glActual` that was job-costed. */
   jobActual: number;
   jobs: JobBudgetEntry[];
+}
+
+/**
+ * A GL income/expense account, mapped or not. Shipped in full so the Account
+ * Mapping page can list every account it might reassign — early in a financial
+ * year almost none of them carry a balance, and a page that only shows accounts
+ * with money looks empty when it isn't.
+ */
+export interface AccountRef {
+  code: string;
+  name: string;
+  kind: "revenue" | "expense";
+  /** null when department-map.json can't resolve it (brief A7). */
+  departmentId: string | null;
+  balance: number;
+  budget: number;
 }

@@ -34,7 +34,8 @@ import {
 import type { BrandColor, FinancialSnapshot } from "@/lib/types";
 import { deriveDepartments, grantNeedsAction } from "@/lib/derive";
 import { assessIntegrity } from "@/lib/integrity";
-import { IntegrityStatusPill } from "@/components/kit/integrity-banner";
+import { dashboardIssues } from "@/lib/data-quality";
+import { DataQualityBadge } from "@/components/kit/data-quality-badge";
 import { formatCompact } from "@/lib/format";
 import { bgColor } from "@/lib/colors";
 import { allGrantFigures, grantSummary } from "@/lib/grants";
@@ -136,6 +137,9 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
   const grantFigs = useMemo(() => allGrantFigures(snapshot), [snapshot]);
   const grantMix = useMemo(() => grantSummary(grantFigs), [grantFigs]);
   const cash = useMemo(() => cashBreakdown(snapshot, grantFigs), [snapshot, grantFigs]);
+
+  // Every caveat on this page, gathered into the one indicator in the toolbar.
+  const issues = useMemo(() => dashboardIssues(snapshot, cash, integrity), [snapshot, cash, integrity]);
 
   const periods: PeriodPoint[] = useMemo(() => {
     const ms = snapshot.monthlyStatements ?? [];
@@ -284,7 +288,7 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
     <div>
       {/* Toolbar */}
       <div className="mb-4 flex items-center gap-3">
-        <IntegrityStatusPill report={integrity} />
+        <DataQualityBadge issues={issues} />
         {filtered && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold-dim px-2.5 py-0.5 font-mono text-[10px] text-gold-light">
             <Filter className="h-3 w-3" strokeWidth={2} />

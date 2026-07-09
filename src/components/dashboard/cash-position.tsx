@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
  * Register is missing opening balances / job codes for some restricted grants.
  */
 export function CashPosition({ cash, periodLabel }: { cash: CashBreakdown; periodLabel: string }) {
-  const { totalCash, restrictedCash, unrestrictedCash, monthsCover, monthlyOpex, exact, unmeasured } = cash;
+  const { totalCash, restrictedCash, unrestrictedCash, monthsCover, monthlyOpex, exact } = cash;
   const restrictedShare = totalCash > 0 ? Math.min(Math.max(restrictedCash / totalCash, 0), 1) : 0;
   const unrestrictedShare = 1 - restrictedShare;
 
@@ -98,22 +98,15 @@ export function CashPosition({ cash, periodLabel }: { cash: CashBreakdown; perio
           />
         </div>
 
+        {/* A breach of the liquidity minimum is a finding, not a caveat — it stays
+            on the panel. The explanation of WHY these are bounds lives in the
+            page's data-quality indicator; the "at least / at most" markers above
+            keep the figures honest for a reader who never opens it. */}
         {cash.belowMinimum && (
           <Note tone="bad" icon={TriangleAlert}>
             Unrestricted cash covers less than the {MIN_MONTHS_COVER}-month minimum
             {monthsCover !== null && ` (${monthsCover.toFixed(1)} months)`}. This holds even on the
-            optimistic reading below.
-          </Note>
-        )}
-
-        {!exact && (
-          <Note tone="info" icon={Info}>
-            <span className="text-foreground">These are bounds, not exact figures.</span> The Grant
-            Register has no opening balance for {unmeasured.missingOpeningBalance} restricted grant
-            {unmeasured.missingOpeningBalance === 1 ? "" : "s"} and no job code for{" "}
-            {unmeasured.missingJobCodes}, so unmeasured restrictions make restricted cash a floor —
-            and unrestricted cash and months of cover a ceiling. Resolves once the Council supplies
-            opening balances at 30 Jun 26 and the remaining job codes.
+            optimistic reading.
           </Note>
         )}
 

@@ -6,6 +6,8 @@ import { PeriodSelector } from "@/components/kit/period-selector";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { jobBudgetGroups, jobBudgetSummary } from "@/lib/job-budgets";
 import { JobBudgetTable } from "@/components/jobs/job-budget-table";
+import { DataQualityBadge } from "@/components/kit/data-quality-badge";
+import { jobIssues } from "@/lib/data-quality";
 import { formatCompact, formatPercent } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +21,15 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   return (
     <Content>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <PeriodSelector
-          periods={view.periods}
-          selected={view.selected}
-          isLatest={view.isLatest}
-          hasHistory={view.hasHistory}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <PeriodSelector
+            periods={view.periods}
+            selected={view.selected}
+            isLatest={view.isLatest}
+            hasHistory={view.hasHistory}
+          />
+          {groups.length > 0 && <DataQualityBadge issues={jobIssues(s)} />}
+        </div>
         <PrintButton />
       </div>
 
@@ -63,30 +68,6 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               meta="Spend posted without a job"
             />
           </div>
-
-          {/* Two limitations the Council should see rather than discover later. */}
-          {(s.noBudget > 0 || s.unmappedJobs > 0 || !s.hasCommitments) && (
-            <Panel className="mb-6 flex flex-col gap-1.5 text-[12px] leading-relaxed text-muted-foreground">
-              {s.noBudget > 0 && (
-                <p>
-                  <span className="text-amber">{s.noBudget} GL account{s.noBudget === 1 ? "" : "s"}</span> carry
-                  spend but no budget in Practical, so they can&apos;t be tracked against one.
-                </p>
-              )}
-              {s.unmappedJobs > 0 && (
-                <p>
-                  <span className="text-amber">{s.unmappedJobs} job{s.unmappedJobs === 1 ? "" : "s"}</span> have no
-                  GL account on the job register and are grouped under &quot;Jobs with no GL account&quot;.
-                </p>
-              )}
-              {!s.hasCommitments && (
-                <p>
-                  Practical records <span className="text-foreground">no commitments</span> against jobs (the
-                  Committed column is empty on every job), so committed-but-unspent figures can&apos;t be shown.
-                </p>
-              )}
-            </Panel>
-          )}
 
           <JobBudgetTable groups={groups} />
         </>

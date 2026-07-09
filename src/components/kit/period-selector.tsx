@@ -32,9 +32,9 @@ export function PeriodSelector({
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
 
-  // Nothing to choose between — don't imply history the platform doesn't have.
-  if (!hasHistory) return null;
-
+  // History accumulates one period per sync. With a single stored period the
+  // control still renders — disabled, and saying why — because a selector that
+  // vanishes reads as a missing feature rather than an empty archive.
   const value = `${selected.fyLabel}|${selected.periodMonth}`;
 
   const go = (next: string) => {
@@ -56,7 +56,8 @@ export function PeriodSelector({
           aria-label="Financial year and period"
           value={value}
           onChange={(e) => go(e.target.value)}
-          disabled={pending}
+          disabled={pending || !hasHistory}
+          title={hasHistory ? undefined : "Only one period has been synced so far"}
           className="h-9 rounded-md border border-border bg-elevated pl-8 pr-8 text-[13px] font-medium text-foreground outline-none transition-colors focus:border-gold/40 disabled:opacity-60"
         >
           {years.map((fy) => (
@@ -84,6 +85,12 @@ export function PeriodSelector({
         >
           <History className="h-3 w-3" strokeWidth={2} />
           Archived period — not the latest
+        </span>
+      )}
+
+      {!hasHistory && (
+        <span className="font-mono text-[10px] text-muted-foreground">
+          one period synced so far
         </span>
       )}
 

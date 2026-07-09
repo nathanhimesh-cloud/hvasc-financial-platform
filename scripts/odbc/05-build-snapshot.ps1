@@ -142,6 +142,10 @@ foreach ($id in $DEPTS.Keys) {
 }
 $unmappedAccounts = 0
 $unmappedNames = @()
+# The full chart of income/expense accounts, mapped or not. The Account Mapping
+# page needs every account it might reassign - not just the handful that happen
+# to carry a balance this month, which early in a financial year is almost none.
+$accounts = @()
 
 foreach ($r in $acctRows) {
   $code = [string]$r.GLACCOUNT
@@ -150,6 +154,15 @@ foreach ($r in $acctRows) {
   $bud  = R2 $r.BUDGET
   $ly   = R2 $r.LASTYEAR
   $dept = Resolve-Dept $code
+
+  $accounts += [ordered]@{
+    code         = $code
+    name         = ([string]$r.DESCRIPT).Trim()
+    kind         = $(if ($type -eq 5) { 'revenue' } else { 'expense' })
+    departmentId = $dept
+    balance      = $bal
+    budget       = $bud
+  }
 
   if (-not $dept) {
     # Only flag accounts that actually carry money - dormant zero accounts are noise.
@@ -575,6 +588,7 @@ $snapshot = [ordered]@{
     trendEstimated = $false
   }
   departments   = $departments
+  accounts      = $accounts
   grants        = $grants
   revenueLines  = $revenueLines
   monthlySpend  = $monthlySpend
@@ -608,6 +622,7 @@ $conn.Close()
 Write-Host ""
 Write-Host "Wrote $OutFile" -ForegroundColor Green
 Write-Host ("  departments : {0}" -f $departments.Count)
+Write-Host ("  accounts    : {0}  (full chart of income/expense accounts, for mapping)" -f $accounts.Count)
 Write-Host ("  grants      : {0}" -f $grants.Count)
 Write-Host ("  revenueLines: {0}" -f $revenueLines.Count)
 Write-Host ("  transactions: {0}{1}" -f $transactions.Count, $(if ($trnCapped) { " (CAPPED at $TRN_CAP - older txns not included)" } else { "" }))

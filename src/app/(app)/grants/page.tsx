@@ -8,6 +8,8 @@ import { KpiCard } from "@/components/kit/kpi-card";
 import { PrintButton } from "@/components/kit/print-button";
 import { GrantRegisterTable } from "@/components/grants/grant-register-table";
 import { GrantMix } from "@/components/dashboard/grant-mix";
+import { DataQualityBadge } from "@/components/kit/data-quality-badge";
+import { grantIssues } from "@/lib/data-quality";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +33,14 @@ export default async function GrantsPage({
         <PrintButton />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <PeriodSelector
           periods={view.periods}
           selected={view.selected}
           isLatest={view.isLatest}
           hasHistory={view.hasHistory}
         />
+        <DataQualityBadge issues={grantIssues(s)} />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
