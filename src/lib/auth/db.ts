@@ -1,5 +1,6 @@
 import "server-only";
 import { neon } from "@neondatabase/serverless";
+import { databaseUrl } from "./session";
 import type { SessionUser } from "./session";
 
 /**
@@ -12,7 +13,7 @@ export interface DbUser extends SessionUser {
 }
 
 function sqlClient() {
-  const url = process.env.DATABASE_URL;
+  const url = databaseUrl();
   if (!url) return null;
   return neon(url);
 }

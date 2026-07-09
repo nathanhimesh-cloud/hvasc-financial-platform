@@ -19,8 +19,24 @@ export interface SessionUser {
   mustChangePassword?: boolean;
 }
 
+/**
+ * The Neon/Vercel integration names the connection string differently depending
+ * on how it's installed (and on any "custom prefix" chosen). Accept the common
+ * ones so setup can't silently fail on a naming mismatch.
+ */
+export function databaseUrl(): string | null {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.STORAGE_URL ||
+    process.env.DATABASE_URL_UNPOOLED ||
+    null
+  );
+}
+
+/** Auth turns on only once BOTH a database and a signing secret are present. */
 export function isAuthConfigured(): boolean {
-  return !!process.env.AUTH_SECRET && !!process.env.DATABASE_URL;
+  return !!process.env.AUTH_SECRET && !!databaseUrl();
 }
 
 function sign(payload: object, secret: string): string {
