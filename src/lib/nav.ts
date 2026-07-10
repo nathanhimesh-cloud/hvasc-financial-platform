@@ -6,6 +6,7 @@ import {
   Tags,
   ShieldCheck,
   Briefcase,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { can } from "@/lib/auth/roles";
@@ -33,6 +34,7 @@ export const overviewNav: NavLink[] = [
  * exists but is unlinked.
  */
 export const dataNav: NavLink[] = [
+  { href: "/status", label: "Data Status", icon: Activity },
   { href: "/mapping", label: "Account Mapping", icon: Tags },
 ];
 
@@ -42,7 +44,9 @@ export const dataNav: NavLink[] = [
  * link that would 404. Admins additionally get the audit log.
  */
 export function dataNavFor(role: string | undefined): NavLink[] {
-  const links: NavLink[] = [];
+  // Data provenance is visible to everyone: any reader should be able to check
+  // whether the figures in front of them are current, and where they came from.
+  const links: NavLink[] = [{ href: "/status", label: "Data Status", icon: Activity }];
   if (can(role, "mapping.edit")) links.push({ href: "/mapping", label: "Account Mapping", icon: Tags });
   if (can(role, "audit.view")) links.push({ href: "/audit", label: "Audit Log", icon: ShieldCheck });
   return links;
@@ -103,6 +107,9 @@ export function getPageMeta(
       title: "Grant Tracker",
       subtitle: `${ctx?.grantCount ?? 0} grants${action}`,
     };
+  }
+  if (pathname === "/status") {
+    return { title: "Data Status", subtitle: "Provenance & sync history" };
   }
   if (pathname === "/jobs") {
     return { title: "Job Budgets", subtitle: "Budget vs actual by job" };

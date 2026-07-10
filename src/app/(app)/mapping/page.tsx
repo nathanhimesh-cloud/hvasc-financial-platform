@@ -9,6 +9,9 @@ import { GRANT_REGISTER } from "@/lib/grants";
 import { resolveDepartment } from "@/lib/departments";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
 import type { DataIssue } from "@/lib/data-quality";
+import { ReferenceUpload } from "@/components/kit/reference-upload";
+import { referenceMeta } from "@/lib/reference";
+import baseMap from "@/data/department-map.json";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +28,7 @@ export default async function MappingPage() {
   // values, then overlay any saved overrides as the current edits.
   const base = await loadRawSnapshotFromFeed();
   const overrides = await readOverrides();
+  const mapMeta = (await referenceMeta())["department-map"];
   const accOv = overrides.accounts ?? {};
   const grantOv = overrides.grants ?? {};
 
@@ -127,6 +131,20 @@ export default async function MappingPage() {
           {accounts.length} accounts · {grants.length} grants
         </span>
       </div>
+
+      <div className="mb-6">
+        <ReferenceUpload
+          kind="department-map"
+          title="Department Map"
+          description="Decides which department each GL account's spend belongs to. Uploading a new map re-classifies every figure on the dashboard, so it's validated first: every account must use a 1234-5678 code and point at a department that exists. A rejected file changes nothing, and the version it replaces is kept."
+          currentLabel={
+            mapMeta
+              ? `${mapMeta.itemCount} accounts · uploaded ${new Date(mapMeta.uploadedAt).toLocaleDateString("en-AU")}${mapMeta.uploadedBy ? ` by ${mapMeta.uploadedBy}` : ""}`
+              : `${Object.keys(baseMap.accounts).length} accounts · bundled with the app`
+          }
+        />
+      </div>
+
       <MappingForm
         departments={departments}
         accounts={accounts}

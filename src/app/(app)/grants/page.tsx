@@ -10,6 +10,8 @@ import { GrantRegisterTable } from "@/components/grants/grant-register-table";
 import { GrantMix } from "@/components/dashboard/grant-mix";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
 import { grantIssues } from "@/lib/data-quality";
+import { ReferenceUpload } from "@/components/kit/reference-upload";
+import { referenceMeta } from "@/lib/reference";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ export default async function GrantsPage({
 }) {
   const view = await resolvePeriodView(await searchParams);
   const snapshot = view.snapshot;
+  const regMeta = (await referenceMeta())["grant-register"];
   const figures = allGrantFigures(snapshot);
   const s = grantSummary(figures);
   const utilisation = s.totalBudgetedExpense > 0 ? s.expenseToDate / s.totalBudgetedExpense : 0;
@@ -77,6 +80,19 @@ export default async function GrantsPage({
 
       <div className="mb-6">
         <GrantMix summary={s} periodLabel={snapshot.period.label} />
+      </div>
+
+      <div className="mb-6">
+        <ReferenceUpload
+          kind="grant-register"
+          title="Grant Register"
+          description="The Council's register, converted to JSON by scripts/import-grant-register.mjs. It sets each grant's value and the GL/job codes that carry its income and spend. Validated before it replaces anything: ids must be unique, totals numeric, code lists present. A rejected file changes nothing, and the version it replaces is kept."
+          currentLabel={
+            regMeta
+              ? `${regMeta.itemCount} grants · uploaded ${new Date(regMeta.uploadedAt).toLocaleDateString("en-AU")}${regMeta.uploadedBy ? ` by ${regMeta.uploadedBy}` : ""}`
+              : `${GRANT_REGISTER.grants.length} grants · ${GRANT_REGISTER.source}`
+          }
+        />
       </div>
 
       <GrantRegisterTable figures={figures} />

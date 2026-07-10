@@ -348,8 +348,10 @@ export interface JobBudgetGroup {
   glAccount: string;
   glName: string;
   departmentId: string | null;
-  /** The GL account's budget — what the jobs beneath it are spending against. */
+  /** The GL account's ANNUAL budget (GLBAL.BUDGET at period 12). */
   budget: number;
+  /** Budget cumulative to the current period. Judge actual against THIS. */
+  budgetYtd: number;
   /** The GL account's real balance, including spend posted without a job. */
   glActual: number;
   /** The part of `glActual` that was job-costed. */
@@ -370,5 +372,8 @@ export interface AccountRef {
   /** null when department-map.json can't resolve it (brief A7). */
   departmentId: string | null;
   balance: number;
+  /** Annual budget (GLBAL.BUDGET at period 12). */
   budget: number;
+  /** Budget cumulative to the current period. */
+  budgetYtd?: number;
 }

@@ -4,6 +4,7 @@ import { writeRuntimeSnapshot, storeKind } from "@/lib/feed/store";
 import { clearSnapshotCache } from "@/lib/data";
 import { saveSnapshot } from "@/lib/history";
 import { saveTransactions, type IncomingTransaction } from "@/lib/ledger";
+import { recordSync } from "@/lib/sync-log";
 
 /**
  * Direct snapshot push — for the ODBC live feed.
@@ -35,6 +36,29 @@ function looksLikeSnapshot(v: unknown): v is FinancialSnapshot {
     Array.isArray(s.grants) &&
     Array.isArray(s.revenueLines)
   );
+}
+
+/**
+ * Reject a snapshot that is structurally valid but carries no data.
+ *
+ * A failed ODBC connection once produced exactly that: `fyLabel: null`, month
+ * 11, every figure zero. It passes `looksLikeSnapshot` and would overwrite the
+ * Blob — replacing a working dashboard with an empty one. The build script now
+ * refuses to write such a file, but the server must not depend on the client
+ * being well-behaved.
+ */
+function emptyPayloadReason(s: FinancialSnapshot): string | null {
+  const fy = s.period?.fyLabel;
+  if (!fy || !/^FY\d{4}-\d{2}$/.test(fy)) return `period.fyLabel is ${JSON.stringify(fy)}`;
+  const month = s.period?.monthOfYear;
+  if (!month || month < 1 || month > 12) return `period.monthOfYear is ${JSON.stringify(month)}`;
+
+  const bs = s.balanceSheet;
+  const noBalanceSheet = !bs || ((bs.totalAssets ?? 0) === 0 && (bs.totalLiabilities ?? 0) === 0);
+  const noAccounts = !s.accounts?.length && !s.departments.some((d) => d.glLines?.length);
+  if (noBalanceSheet && noAccounts) return "no balance sheet and no GL accounts — the source read returned nothing";
+
+  return null;
 }
 
 export async function PUT(request: Request) {
@@ -72,6 +96,14 @@ export async function PUT(request: Request) {
     );
   }
 
+  const empty = emptyPayloadReason(snapshot);
+  if (empty) {
+    return Response.json(
+      { ok: false, error: `Refusing to store an empty snapshot: ${empty}. The live data is unchanged.` },
+      { status: 422 },
+    );
+  }
+
   // Transactions go into their own Postgres table (upserted on GLTRN.KY) rather
   // than riding inside the snapshot forever — by June that payload would be
   // megabytes and every sync would re-send the whole year. Only strip them from
@@ -95,6 +127,23 @@ export async function PUT(request: Request) {
   // ever holds the latest snapshot; without this, each sync destroys the last one.
   // Best-effort: a history failure must never fail the push.
   const archived = await saveSnapshot(persisted);
+
+  // One row per push. This is what "last updated" reads, and what tells you
+  // whether the ledger accepted the batch — the push script holds its cursor
+  // back when it didn't.
+  const meta = snapshot.meta as { generatedAtUtc?: string; maxKy?: number; source?: string } | undefined;
+  await recordSync({
+    generatedAt: meta?.generatedAtUtc ?? null,
+    fyLabel: snapshot.period?.fyLabel ?? null,
+    periodMonth: snapshot.period?.monthOfYear ?? null,
+    periodLabel: snapshot.period?.label ?? null,
+    txnsSent: incoming.length,
+    txnsIngested: ingested,
+    archived,
+    store: storeKind(),
+    maxKy: meta?.maxKy ?? null,
+    source: meta?.source ?? null,
+  });
 
   clearSnapshotCache();
   revalidateTag("snapshot", "max");

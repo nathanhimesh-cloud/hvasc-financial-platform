@@ -152,7 +152,16 @@ export function jobIssues(summary: JobBudgetSummary): DataIssue[] {
       owner: "Council",
     });
   }
-  if (summary.totalUnjobbed !== 0) {
+  if (summary.nonOperatingGroups > 0) {
+    issues.push({
+      id: "jobs-non-operating",
+      level: "info",
+      title: `${plural(summary.nonOperatingGroups, "job group")} posting outside the expense chart`,
+      detail:
+        "Capital jobs post to asset accounts, which carry no operating budget or balance. Their spend is shown as Capital / Non-Operating rather than compared against a budget that doesn't exist.",
+    });
+  }
+  if (summary.totalUnjobbed > 0) {
     issues.push({
       id: "jobs-unjobbed",
       level: "info",

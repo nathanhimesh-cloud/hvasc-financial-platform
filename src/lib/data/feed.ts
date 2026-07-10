@@ -2,7 +2,7 @@ import "server-only";
 import type { FinancialSnapshot } from "@/lib/types";
 import { readRuntimeSnapshot } from "@/lib/feed/store";
 import { readOverrides, applyOverrides } from "@/lib/feed/overrides";
-import { loadSnapshotFromDb } from "./db-source";
+import { loadSnapshotFromDb, setSnapshotOrigin } from "./db-source";
 import bundled from "@/data/snapshot.json";
 
 /**
@@ -38,10 +38,20 @@ export async function loadSnapshotFromFeed(): Promise<FinancialSnapshot> {
  */
 export async function loadRawSnapshotFromFeed(): Promise<FinancialSnapshot> {
   // Database first. Never let a database problem take the dashboard down — fall
-  // through to Blob, which every push writes to as well.
+  // through to Blob, which every push writes to as well. The origin is recorded
+  // so the UI can state where the figures came from instead of implying it.
   const fromDb = await loadSnapshotFromDb();
-  if (fromDb) return fromDb;
+  if (fromDb) {
+    setSnapshotOrigin("postgres");
+    return fromDb;
+  }
 
   const runtime = await readRuntimeSnapshot();
-  return runtime ?? (bundled as unknown as FinancialSnapshot);
+  if (runtime) {
+    setSnapshotOrigin("blob");
+    return runtime;
+  }
+
+  setSnapshotOrigin("bundled");
+  return bundled as unknown as FinancialSnapshot;
 }

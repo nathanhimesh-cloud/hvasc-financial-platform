@@ -33,6 +33,21 @@ let cached: { at: number; snapshot: FinancialSnapshot } | null = null;
 /** In-flight read, so a burst of concurrent renders issues one query, not N. */
 let inflight: Promise<FinancialSnapshot | null> | null = null;
 
+/**
+ * Where the snapshot the app is currently serving actually came from. Recorded
+ * on every read so the UI can show it rather than asking anyone to trust it.
+ */
+export type SnapshotOrigin = "postgres" | "blob" | "bundled";
+let origin: SnapshotOrigin = "bundled";
+
+export function snapshotOrigin(): SnapshotOrigin {
+  return origin;
+}
+
+export function setSnapshotOrigin(o: SnapshotOrigin): void {
+  origin = o;
+}
+
 export function isDbSourceEnabled(): boolean {
   return isHistoryEnabled();
 }

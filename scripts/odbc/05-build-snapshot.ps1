@@ -27,9 +27,51 @@ param(
   [switch]$FullResync
 )
 
-# DB password comes from the PRACTICAL_PWD env var (set it on APP02 / in the
-# scheduled task) so no credential is stored in the repo.
-$DSN = "DSN=Practical_Plus;UID=PCSACCESS;PWD=$($env:PRACTICAL_PWD);"
+# The DSN "Practical_Plus" carries its own Firebird login. Supplying a password
+# only OVERRIDES that working login, and a wrong one left in PRACTICAL_PWD
+# silently produced a snapshot full of zeros.
+#
+# Try each connection form in turn. The second - UID with an EMPTY password - is
+# what the scheduled task has used unattended for months, so it stays in the list
+# even though the first form usually works. Never assume one shape always holds.
+#
+# Note the failure modes are different, and worth reading:
+#   08004 "user name and password are not defined"  -> auth: wrong credentials
+#   08004 "Unable to complete network request"      -> the Firebird SERVICE is
+#                                                      down or unreachable. No
+#                                                      credential will fix that.
+function Open-Practical {
+  $attempts = @(
+    @{ label = "the DSN's own login";       cs = 'DSN=Practical_Plus;' }
+    @{ label = 'UID with empty password';   cs = 'DSN=Practical_Plus;UID=PCSACCESS;PWD=;' }
+  )
+  if ($env:PRACTICAL_PWD) {
+    # Concatenated, never interpolated: the password may contain $ & ( \ characters.
+    $attempts += @{ label = 'UID with PRACTICAL_PWD'
+                    cs = 'DSN=Practical_Plus;UID=PCSACCESS;PWD=' + $env:PRACTICAL_PWD + ';' }
+  }
+
+  $lastErr = $null
+  foreach ($a in $attempts) {
+    try {
+      $c = New-Object System.Data.Odbc.OdbcConnection($a.cs)
+      $c.Open()
+      Write-Host ("Connected via {0}." -f $a.label) -ForegroundColor Green
+      return $c
+    } catch {
+      $lastErr = $_.Exception.Message
+      Write-Host ("  {0}: refused - {1}" -f $a.label, $lastErr) -ForegroundColor DarkGray
+    }
+  }
+
+  if ($lastErr -match 'network request|Unable to complete') {
+    throw ("Cannot reach the Firebird server on hvasc-app02. This is NOT a credential " +
+           "problem - check the Firebird service is running:`n" +
+           "    Get-Service | Where-Object { `$_.Name -like '*firebird*' -or `$_.DisplayName -like '*Firebird*' }`n" +
+           "Last error: $lastErr")
+  }
+  throw "Could not connect to Practical. Last error: $lastErr"
+}
 
 # -- departments: the Council's THREE management departments ------------------
 # Corporate Services - Operations - Social Services (confirmed 9 Jul 2026).
@@ -58,9 +100,12 @@ function Resolve-Dept([string]$glAccount) {
 $MONTHS = @('Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun')
 
 # -- ODBC plumbing ------------------------------------------------------------
-$conn = New-Object System.Data.Odbc.OdbcConnection($DSN)
-$conn.Open()
-Write-Host "Connected: $($conn.ServerVersion)" -ForegroundColor Green
+# Stop on the first error. Without this a failed Open() only printed a warning,
+# every query then returned nothing, and the script cheerfully wrote a snapshot
+# of zeros - which, pushed, would have wiped the live dashboard.
+$ErrorActionPreference = 'Stop'
+$conn = Open-Practical
+Write-Host "Server: $($conn.ServerVersion)" -ForegroundColor Green
 
 $script:BadCells = 0
 $script:BadCellNames = @()
@@ -130,8 +175,19 @@ Write-Host "Period: $periodLabel  (month $cur of FY$yr)" -ForegroundColor Cyan
 # -- 2. department rollup - 3 departments, via the account->department map -----
 # One row per active income/expense account, resolved to its department in PS.
 # Accounts the map can't resolve are COUNTED (brief A7), never silently dropped.
+# GLBAL.BUDGET is the budget CUMULATIVE TO THAT PERIOD, straight-lined across the
+# year - proven by 10-probe-budget-and-history.ps1:
+#     MTH 1  = 2,242,558   (annual / 12)
+#     MTH 6  = 13,455,348  (annual * 6/12)
+#     MTH 12 = 26,910,717  (the annual budget)
+# So the ANNUAL budget is BUDGET at period 12, and the YTD budget is BUDGET at the
+# current period. The old code read the current period's value, called it annual,
+# and then prorated it a second time - understating both figures.
 $acctRows = Invoke-Rows @"
-SELECT m.GLACCOUNT, m.DESCRIPT, m.ACCNTTYPE, m.ACCNT2, b.BALANCE, b.BUDGET, b.LASTYEAR
+SELECT m.GLACCOUNT, m.DESCRIPT, m.ACCNTTYPE, m.ACCNT2,
+       b.BALANCE, b.BUDGET AS BUDYTD, b.LASTYEAR,
+       (SELECT b12.BUDGET FROM GLBAL b12
+         WHERE b12.GLACCOUNT = b.GLACCOUNT AND b12.MTH = 12) AS BUDANN
 FROM GLBAL b
 JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
 WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5,6)
@@ -141,7 +197,7 @@ WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5
 # (ACCNT2 1100-1199) so it isn't double-counted against the "Grants & subsidies" line.
 $agg = @{}
 foreach ($id in $DEPTS.Keys) {
-  $agg[$id] = @{ exp = 0.0; rev = 0.0; revNonGrant = 0.0; budExp = 0.0; lyExp = 0.0; lines = @() }
+  $agg[$id] = @{ exp = 0.0; rev = 0.0; revNonGrant = 0.0; budExpAnn = 0.0; budExpYtd = 0.0; lyExp = 0.0; lines = @() }
 }
 $unmappedAccounts = 0
 $unmappedNames = @()
@@ -151,12 +207,13 @@ $unmappedNames = @()
 $accounts = @()
 
 foreach ($r in $acctRows) {
-  $code = [string]$r.GLACCOUNT
-  $type = [int]$r.ACCNTTYPE
-  $bal  = R2 $r.BALANCE
-  $bud  = R2 $r.BUDGET
-  $ly   = R2 $r.LASTYEAR
-  $dept = Resolve-Dept $code
+  $code   = [string]$r.GLACCOUNT
+  $type   = [int]$r.ACCNTTYPE
+  $bal    = R2 $r.BALANCE
+  $budYtd = R2 $r.BUDYTD    # budget cumulative to the current period
+  $budAnn = R2 $r.BUDANN    # budget cumulative to period 12 = the annual budget
+  $ly     = R2 $r.LASTYEAR
+  $dept   = Resolve-Dept $code
 
   $accounts += [ordered]@{
     code         = $code
@@ -164,12 +221,13 @@ foreach ($r in $acctRows) {
     kind         = $(if ($type -eq 5) { 'revenue' } else { 'expense' })
     departmentId = $dept
     balance      = $bal
-    budget       = $bud
+    budget       = $budAnn
+    budgetYtd    = $budYtd
   }
 
   if (-not $dept) {
     # Only flag accounts that actually carry money - dormant zero accounts are noise.
-    if ($bal -ne 0 -or $bud -ne 0) {
+    if ($bal -ne 0 -or $budAnn -ne 0) {
       $unmappedAccounts++
       if ($unmappedNames.Count -lt 10) { $unmappedNames += ("{0} {1}" -f $code, ([string]$r.DESCRIPT).Trim()) }
     }
@@ -177,9 +235,10 @@ foreach ($r in $acctRows) {
   }
 
   if ($type -eq 6) {
-    $agg[$dept].exp    += $bal
-    $agg[$dept].budExp += $bud
-    $agg[$dept].lyExp  += $ly
+    $agg[$dept].exp       += $bal
+    $agg[$dept].budExpAnn += $budAnn
+    $agg[$dept].budExpYtd += $budYtd
+    $agg[$dept].lyExp     += $ly
     if ($bal -ne 0) {
       $agg[$dept].lines += [pscustomobject]@{ code = $code; account = ([string]$r.DESCRIPT).Trim(); amount = $bal }
     }
@@ -190,7 +249,7 @@ foreach ($r in $acctRows) {
   }
 }
 
-$hasRealBudget = (($DEPTS.Keys | ForEach-Object { $agg[$_].budExp } | Measure-Object -Sum).Sum) -ne 0
+$hasRealBudget = (($DEPTS.Keys | ForEach-Object { $agg[$_].budExpAnn } | Measure-Object -Sum).Sum) -ne 0
 
 # Always emit all three departments - even at $0 actual - so the full budgeted
 # structure is visible early in the financial year rather than an empty list.
@@ -201,9 +260,15 @@ foreach ($id in $DEPTS.Keys) {
   $ytdActual = R2 $a.exp
   $revenue   = R2 $a.rev
 
-  $annualBudget = if ($hasRealBudget) { R2 $a.budExp } else { R2 $a.lyExp }
-  if ($annualBudget -le 0 -and $ytdActual -gt 0) { $annualBudget = R2 ($ytdActual * 12 / $cur) }  # run-rate fallback
-  $ytdBudget = R2 ($annualBudget * $cur / 12)
+  # Both figures come straight from GLBAL: annual = period 12, YTD = current period.
+  # Never derive one from the other - Practical already phases the budget, and
+  # prorating an already-cumulative figure is what produced the old wrong numbers.
+  $annualBudget = if ($hasRealBudget) { R2 $a.budExpAnn } else { R2 $a.lyExp }
+  $ytdBudget    = if ($hasRealBudget) { R2 $a.budExpYtd } else { R2 ($annualBudget * $cur / 12) }
+  if ($annualBudget -le 0 -and $ytdActual -gt 0) {
+    $annualBudget = R2 ($ytdActual * 12 / $cur)      # run-rate fallback
+    $ytdBudget    = R2 ($annualBudget * $cur / 12)
+  }
   $ratio  = if ($ytdBudget -gt 0) { $ytdActual / $ytdBudget } else { 0 }
   $status = if ($ratio -gt 1.05) { 'over-budget' } elseif ($ratio -gt 1.0) { 'at-risk' } else { 'on-track' }
 
@@ -321,6 +386,7 @@ foreach ($c in $cumRows) {
 # the cap is hit, older transactions aren't included (flagged in the summary).
 $TRN_CAP = 5000
 $fyStart = ("{0}-07-01" -f ($yr - 1))   # FY starts 1 July of the prior calendar year
+$fyEnd   = ("{0}-06-30" -f $yr)         # ...and ends 30 June of the FY-ending year
 
 # INCREMENTAL SYNC. Hope Vale posts ~53 transactions a day, so a financial year is
 # roughly 19,000 of them. Re-sending the year on every sync would mean a ~3 MB
@@ -351,7 +417,8 @@ $trnRows = Invoke-Rows @"
 SELECT FIRST $TRN_CAP t.KY, t.GLACCOUNT, m.DESCRIPT AS ACCTNAME, t.TRNDATE,
        t.DESCRIPT AS TRNDESC, t.DEBIT, t.CREDIT, t.REF, m.ACCNTTYPE
 FROM GLTRN t JOIN GLMST m ON m.GLACCOUNT = t.GLACCOUNT
-WHERE t.TRNDATE >= '$fyStart' AND m.RECACTIVE='Y' AND t.KY > $sinceKy
+WHERE t.TRNDATE >= '$fyStart' AND t.TRNDATE <= '$fyEnd'
+  AND m.RECACTIVE='Y' AND t.KY > $sinceKy
 ORDER BY t.KY ASC
 "@
 
@@ -380,7 +447,8 @@ $trnCapped = ($trnRows.Count -ge $TRN_CAP)
 $dailyRows = Invoke-Rows @"
 SELECT t.TRNDATE, SUM(CAST(t.DEBIT AS DOUBLE PRECISION) - CAST(t.CREDIT AS DOUBLE PRECISION)) AS NET
 FROM GLTRN t JOIN GLMST m ON m.GLACCOUNT = t.GLACCOUNT
-WHERE t.TRNDATE >= '$fyStart' AND m.RECACTIVE='Y' AND m.ACCNTTYPE = 6
+WHERE t.TRNDATE >= '$fyStart' AND t.TRNDATE <= '$fyEnd'
+  AND m.RECACTIVE='Y' AND m.ACCNTTYPE = 6
 GROUP BY t.TRNDATE
 ORDER BY t.TRNDATE
 "@
@@ -401,10 +469,17 @@ foreach ($r in $dailyRows) {
 # driver will convert, and GetValue throws on a handful of the larger jobs -
 # which then read as $0 and silently understate both this report AND the grant
 # expenditure derived from it. Casting to DOUBLE PRECISION in SQL avoids it.
+# JCTRN spans many years AND holds corrupt dates - the probe found rows dated
+# 15/08/1120 and 10/04/2045. A ">= fyStart" filter alone lets the 2045 rows into
+# the current year's spend. Bound BOTH ends of the financial year.
+$jcOutOfRange = [int](Invoke-Scalar "SELECT COUNT(*) FROM JCTRN WHERE TRANDATE > '$fyEnd' OR TRANDATE < '1990-01-01'")
+if ($jcOutOfRange -gt 0) {
+  Write-Host ("NOTE: {0} JCTRN row(s) carry impossible dates (before 1990 or after $fyEnd) and are excluded." -f $jcOutOfRange) -ForegroundColor Yellow
+}
 $jcRows = Invoke-Rows @"
 SELECT t.JCACCOUNT, SUM(CAST(t.TOTCOST AS DOUBLE PRECISION)) AS SPEND
 FROM JCTRN t
-WHERE t.TRANDATE >= '$fyStart'
+WHERE t.TRANDATE >= '$fyStart' AND t.TRANDATE <= '$fyEnd'
 GROUP BY t.JCACCOUNT
 "@
 $jcMap = @{}
@@ -494,7 +569,10 @@ if (-not (Test-JcCol 'JCACCOUNT')) {
   $glInfo = @{}
   foreach ($r in $acctRows) {
     $glInfo[([string]$r.GLACCOUNT).Trim()] = @{
-      name = ([string]$r.DESCRIPT).Trim(); budget = (R2 $r.BUDGET); actual = (R2 $r.BALANCE)
+      name      = ([string]$r.DESCRIPT).Trim()
+      budget    = (R2 $r.BUDANN)   # annual
+      budgetYtd = (R2 $r.BUDYTD)   # to the current period - what actual should be judged against
+      actual    = (R2 $r.BALANCE)
     }
   }
 
@@ -531,6 +609,7 @@ if (-not (Test-JcCol 'JCACCOUNT')) {
       # balance; `jobActual` is only the part that was job-costed. They differ
       # when spend posts straight to the account without a job.
       budget    = $(if ($info) { $info.budget } else { 0 })
+      budgetYtd = $(if ($info) { $info.budgetYtd } else { 0 })
       glActual  = $(if ($info) { $info.actual } else { 0 })
       jobActual = (R2 $jobActual)
       jobs      = $jobs
@@ -639,7 +718,10 @@ $snapshot = [ordered]@{
   meta = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"
     baseline = $(if ($hasRealBudget) { 'fy-budget' } else { 'fy25-actuals' })
+    # Date AND time. Three syncs a day means "9 Jul" is not enough to tell whether
+    # you're looking at this morning's figures or this evening's.
     generatedAt = (Get-Date -Format 'yyyy-MM-dd')
+    generatedAtUtc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     unmappedAccounts = $unmappedAccounts
     # The transaction batch in this payload is INCREMENTAL: everything with
     # GLTRN.KY between sinceKy (exclusive) and maxKy (inclusive). 06-push.ps1
@@ -655,6 +737,28 @@ $snapshot = [ordered]@{
       "Grants list = grant/subsidy revenue received (funding received). Spend % + deadlines need the council's grants register + job costing."
     )
   }
+}
+
+# -- refuse to write a snapshot that says nothing ------------------------------
+# A failed connection or a bad query used to yield an all-zero snapshot with a
+# null fyLabel. Pushed, that overwrites the live dashboard with nothing. Sanity
+# checks are cheap; an empty dashboard in front of the CFO is not.
+$fatal = @()
+if (-not $fyLabel -or $fyLabel -notmatch '^FY\d{4}-\d{2}$') { $fatal += "period.fyLabel is '$fyLabel'" }
+if ($cur -lt 1 -or $cur -gt 12)                             { $fatal += "period month is $cur" }
+if ($accounts.Count -eq 0)                                  { $fatal += "no GL accounts were read" }
+if ($bsTotalAssets -eq 0 -and $bsTotalLiab -eq 0)            { $fatal += "balance sheet is entirely zero" }
+if ($fatal.Count) {
+  Write-Host ""
+  Write-Host "REFUSING TO WRITE $OutFile - the snapshot is empty or malformed:" -ForegroundColor Red
+  foreach ($f in $fatal) { Write-Host "  - $f" -ForegroundColor Red }
+  Write-Host ""
+  Write-Host "  This almost always means the database connection failed." -ForegroundColor Yellow
+  Write-Host "  If PRACTICAL_PWD is set to a wrong password it OVERRIDES the DSN's own" -ForegroundColor Yellow
+  Write-Host "  working login. Clear it and re-run:" -ForegroundColor Yellow
+  Write-Host "      Remove-Item Env:\PRACTICAL_PWD -ErrorAction SilentlyContinue" -ForegroundColor Yellow
+  $conn.Close()
+  exit 1
 }
 
 $json = $snapshot | ConvertTo-Json -Depth 12
@@ -705,8 +809,15 @@ if ($cur -le 2) {
 # Reference anchors from FY2025-26, for sanity-checking a FULL year's build.
 Write-Host "  FY2025-26 full year, for reference: income ~25,013,723  expenses ~18,343,558  net ~6,670,164" -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "Department spend (operating):" -ForegroundColor Cyan
-$deptTotal = 0
-foreach ($d in $departments) { Write-Host ("  {0,-30} {1,16:N2}" -f $d.name, $d.ytdActual); $deptTotal += [double]$d.ytdActual }
-Write-Host ("  {0,-30} {1,16:N2}" -f 'TOTAL', $deptTotal)
+Write-Host "Department spend (operating) - actual vs budget TO DATE:" -ForegroundColor Cyan
+Write-Host ("  {0,-24} {1,15} {2,15} {3,15}" -f 'Department', 'YTD actual', 'YTD budget', 'Annual budget')
+$deptTotal = 0; $ytdBudTotal = 0; $annBudTotal = 0
+foreach ($d in $departments) {
+  Write-Host ("  {0,-24} {1,15:N2} {2,15:N2} {3,15:N2}" -f $d.name, $d.ytdActual, $d.ytdBudget, $d.annualBudget)
+  $deptTotal += [double]$d.ytdActual; $ytdBudTotal += [double]$d.ytdBudget; $annBudTotal += [double]$d.annualBudget
+}
+Write-Host ("  {0,-24} {1,15:N2} {2,15:N2} {3,15:N2}" -f 'TOTAL', $deptTotal, $ytdBudTotal, $annBudTotal)
+Write-Host ""
+Write-Host "  VALIDATE the annual budget against the Council's adopted FY27 operating budget." -ForegroundColor Yellow
+Write-Host "  (GLBAL.BUDGET is cumulative-to-period: period 12 = annual, current period = YTD.)" -ForegroundColor DarkGray
 Write-Host "`nDone." -ForegroundColor Green

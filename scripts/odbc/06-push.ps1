@@ -44,6 +44,18 @@ $curlExe = if (Test-Path $localCurl) { $localCurl }
            elseif (Get-Command curl.exe -ErrorAction SilentlyContinue) { 'curl.exe' }
            else { $null }
 
+# An OpenSSL-built curl carries no Windows certificate store, so it needs a CA
+# bundle to verify Vercel's certificate. The curl.se builds ship one next to the
+# exe. Point at it explicitly rather than relying on a compiled-in default path
+# that won't exist on this machine - otherwise the scheduled run fails at 06:00
+# with "SSL certificate problem" and nobody sees it until the data goes stale.
+$caBundle = Join-Path $scriptDir 'curl-ca-bundle.crt'
+$curlArgs = @()
+if ($curlExe -and (Test-Path $caBundle)) {
+  $curlArgs += @('--cacert', $caBundle)
+  Write-Output "Using CA bundle: $caBundle"
+}
+
 Write-Output "Pushing $File -> $endpoint"
 
 # The snapshot carries an INCREMENTAL transaction batch: everything with
@@ -90,7 +102,7 @@ if ($curlExe) {
   # --data-binary @file sends the exact bytes (no BOM, no newline munging).
   # -o body-file, -w http_code so we can report status; -sS = quiet but show errors.
   $respFile = Join-Path $scriptDir 'push-response.json'
-  $status = & $curlExe -sS -o $respFile -w '%{http_code}' -X PUT $endpoint `
+  $status = & $curlExe @curlArgs -sS -o $respFile -w '%{http_code}' -X PUT $endpoint `
               -H "x-upload-password: $Password" `
               -H 'Content-Type: application/json' `
               --data-binary "@$File"

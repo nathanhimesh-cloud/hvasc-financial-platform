@@ -24,7 +24,8 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
     const needle = q.trim().toLowerCase();
     return groups.filter((g) => {
       if (dept !== "all" && g.departmentId !== dept) return false;
-      if (onlyOver && !(g.hasBudget && g.glActual > g.budget)) return false;
+      // Over budget means over the budget TO DATE, not the year's total.
+      if (onlyOver && !(g.hasBudgetYtd && g.glActual > g.budgetYtd)) return false;
       if (!needle) return true;
       const hay = `${g.glAccount} ${g.glName} ${g.jobs.map((j) => `${j.code} ${j.name}`).join(" ")}`;
       return hay.toLowerCase().includes(needle);
@@ -41,17 +42,20 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
 
   const exportCsv = () => {
     const header = [
-      "GL account", "GL name", "Department", "Budget", "GL actual", "Job actual",
-      "Not job-costed", "Variance", "% used", "Job code", "Job name", "Job actual",
+      "GL account", "GL name", "Department", "Annual budget", "Budget to date", "GL actual",
+      "Job actual", "Not job-costed", "Capital/non-operating", "Variance to date",
+      "% of budget to date", "% of annual budget", "Job code", "Job name", "Job actual",
     ];
     const lines: (string | number)[][] = [];
     for (const g of rows) {
       lines.push([
-        g.glAccount, g.glName, g.departmentId ?? "", g.budget, g.glActual, g.jobActual,
-        g.unjobbed, g.variance, g.hasBudget ? (g.utilisation * 100).toFixed(1) : "", "", "", "",
+        g.glAccount, g.glName, g.departmentId ?? "", g.budget, g.budgetYtd, g.glActual,
+        g.jobActual, g.unjobbed, g.nonOperatingSpend, g.variance,
+        g.hasBudgetYtd ? (g.utilisationYtd * 100).toFixed(1) : "",
+        g.hasBudget ? (g.utilisation * 100).toFixed(1) : "", "", "", "",
       ]);
       for (const j of g.jobs) {
-        lines.push([g.glAccount, g.glName, g.departmentId ?? "", "", "", "", "", "", "", j.code, j.name, j.actual]);
+        lines.push([g.glAccount, g.glName, g.departmentId ?? "", "", "", "", "", "", "", "", "", "", j.code, j.name, j.actual]);
       }
     }
     const csv = [header, ...lines]
@@ -122,11 +126,12 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
           <p className="py-10 text-center text-[13px] text-muted-foreground">No accounts match these filters.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse">
+            <table className="w-full min-w-[1080px] border-collapse">
               <thead>
                 <tr>
                   <Th className="text-left">GL account</Th>
-                  <Th>Budget</Th>
+                  <Th>Annual budget</Th>
+                  <Th>Budget to date</Th>
                   <Th>Actual</Th>
                   <Th>of which job-costed</Th>
                   <Th>Variance</Th>
@@ -180,6 +185,7 @@ function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolea
           </div>
         </td>
         <Money v={g.budget} strong dash={!g.hasBudget} />
+        <Money v={g.budgetYtd} muted dash={!g.hasBudgetYtd} />
         <Money v={g.glActual} />
         <Money v={g.jobActual} muted />
         <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right">
@@ -187,10 +193,15 @@ function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolea
             {g.hasBudget ? formatSignedCompact(g.variance) : "—"}
           </span>
         </td>
+        {/* RAG against the budget TO DATE. Against the annual figure nothing is
+            ever over budget until December, which would make the flag useless. */}
         <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right">
-          {g.hasBudget ? (
-            <span className={cn("font-mono text-[12px] font-semibold tabular-nums", ragText[budgetRag(g.utilisation)])}>
-              {formatPercent(g.utilisation)}
+          {g.hasBudgetYtd ? (
+            <span
+              className={cn("font-mono text-[12px] font-semibold tabular-nums", ragText[budgetRag(g.utilisationYtd)])}
+              title={`${formatPercent(g.utilisation)} of the annual budget`}
+            >
+              {formatPercent(g.utilisationYtd)}
             </span>
           ) : (
             <span className="font-mono text-[11px] text-muted-foreground" title="No budget on this account">
@@ -216,6 +227,7 @@ function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolea
               </span>
             </td>
             <Money v={j.budget} muted dash={j.budget === 0} small />
+            <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2" />
             <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2" />
             <Money v={j.actual} small />
             <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2" colSpan={3} />

@@ -199,6 +199,23 @@ for (const r of rows.slice(hIdx + 1)) {
   if (problems.length) failures.push({ number: entry.number, name, problems });
 }
 
+// The register's "No." column is not unique — Youth & Social Support and
+// Community Broadcasting are both numbered 3. Ids keyed on it collide, and a
+// mapping override saved against one grant would silently apply to the other.
+// Suffix the later occurrences and say so, rather than letting two grants share
+// an identity.
+const idSeen = new Map();
+const collisions = [];
+for (const g of grants) {
+  const n = (idSeen.get(g.id) ?? 0) + 1;
+  idSeen.set(g.id, n);
+  if (n > 1) {
+    const original = g.id;
+    g.id = `${original}-${n}`;
+    collisions.push(`${original} → ${g.id}  (${g.name})`);
+  }
+}
+
 // ── write + report ───────────────────────────────────────────────────────────
 const out = {
   source: path.basename(SRC),
@@ -208,6 +225,11 @@ const out = {
 };
 const dest = path.join(process.cwd(), "src", "data", "grant-register.json");
 fs.writeFileSync(dest, JSON.stringify(out, null, 2));
+
+if (collisions.length) {
+  console.log(`\nDuplicate grant numbers in the register (${collisions.length}) — ids made unique:`);
+  for (const c of collisions) console.log(`  ${c}`);
+}
 
 const clean = grants.length - failures.length;
 const active = grants.filter((g) => g.active);

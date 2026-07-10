@@ -20,28 +20,55 @@ import type { FinancialSnapshot, JobBudgetGroup } from "@/lib/types";
  */
 
 export interface JobBudgetView extends JobBudgetGroup {
-  /** Budget less the account's real spend. Negative = over budget. */
+  /** YTD budget less the account's real spend. Negative = over budget to date. */
   variance: number;
-  /** glActual ÷ budget. 0 when there is no budget to measure against. */
+  /** glActual ÷ ANNUAL budget — progress through the year's money. */
   utilisation: number;
-  /** Spend on this account that carried no job code. */
+  /** glActual ÷ YTD budget — the figure that says "over budget" or not. */
+  utilisationYtd: number;
+  /** True when a YTD budget exists to judge against. */
+  hasBudgetYtd: boolean;
+  /**
+   * Spend on this account that carried no job code. Only meaningful when the
+   * account is in the operating chart AND its balance covers the job spend —
+   * see `glKnown` and `nonOperating`.
+   */
   unjobbed: number;
   /** True when the account has a budget we can measure against. */
   hasBudget: boolean;
+  /**
+   * True when the job's GL account appears in the operating chart of accounts
+   * (income/expense). Capital jobs post to asset accounts, which never appear
+   * there, so budget and glActual are both 0 and comparing them is nonsense.
+   */
+  glKnown: boolean;
+  /**
+   * Job spend that never reached an operating expense account — capital work in
+   * progress, or a job whose GL account is outside the income/expense chart.
+   * Reported separately rather than netted against "not job-costed".
+   */
+  nonOperatingSpend: number;
 }
 
 export interface JobBudgetSummary {
   groups: number;
   jobs: number;
+  /** Annual budget across all groups. */
   totalBudget: number;
+  /** Budget to date — what actual should be compared with. */
+  totalBudgetYtd: number;
   totalGlActual: number;
   totalJobActual: number;
-  /** Spend with no job code attached, across every account. */
+  /** Spend with no job code attached. Never negative. */
   totalUnjobbed: number;
+  /** Job spend that never reached an operating expense account (capital, mostly). */
+  totalNonOperating: number;
   /** Accounts whose spend exceeds their budget. */
   overBudget: number;
   /** Accounts carrying spend but no budget — can't be tracked. */
   noBudget: number;
+  /** Groups whose GL account isn't in the operating chart of accounts. */
+  nonOperatingGroups: number;
   /** Jobs that couldn't be matched to a GL account. */
   unmappedJobs: number;
   /** True when Practical records commitments (it currently doesn't). */
@@ -58,13 +85,36 @@ export function jobBudgetGroups(snapshot: FinancialSnapshot): JobBudgetView[] {
     .map((g) => {
       const jobs = Array.isArray(g.jobs) ? g.jobs : g.jobs ? [g.jobs] : [];
       const hasBudget = g.budget > 0;
+
+      // Judge spend against the budget TO DATE, not the whole year's. Nine days
+      // into a year, every account looks gloriously under its annual budget.
+      // Older snapshots have no budgetYtd; straight-line it rather than falling
+      // back to the annual figure, which would flag nothing as over budget.
+      const budgetYtd = g.budgetYtd ?? 0;
+
+      // The feed only knows budgets and balances for INCOME/EXPENSE accounts.
+      // A group with job spend but neither a budget nor a balance is a job
+      // posting somewhere outside that chart — almost always capital work.
+      const glKnown = g.glAccount !== "unmapped" && (g.budget !== 0 || g.glActual !== 0);
+
+      // Job costs can exceed an operating account's balance (capital portions
+      // post to assets). Subtracting them would produce a negative "not
+      // job-costed" figure, which is meaningless. Split the two ideas apart.
+      const unjobbed = glKnown ? Math.max(g.glActual - g.jobActual, 0) : 0;
+      const nonOperatingSpend = glKnown ? Math.max(g.jobActual - g.glActual, 0) : g.jobActual;
+
       return {
         ...g,
         jobs,
-        variance: g.budget - g.glActual,
+        budgetYtd,
+        variance: budgetYtd - g.glActual,
         utilisation: hasBudget ? g.glActual / g.budget : 0,
-        unjobbed: g.glActual - g.jobActual,
+        utilisationYtd: budgetYtd > 0 ? g.glActual / budgetYtd : 0,
+        unjobbed,
         hasBudget,
+        hasBudgetYtd: budgetYtd > 0,
+        glKnown,
+        nonOperatingSpend,
       };
     })
     .sort((a, b) => b.budget - a.budget || b.glActual - a.glActual);
@@ -79,8 +129,13 @@ export function jobBudgetSummary(groups: JobBudgetView[]): JobBudgetSummary {
     totalGlActual: sum((g) => g.glActual),
     totalJobActual: sum((g) => g.jobActual),
     totalUnjobbed: sum((g) => g.unjobbed),
-    overBudget: groups.filter((g) => g.hasBudget && g.glActual > g.budget).length,
+    totalNonOperating: sum((g) => g.nonOperatingSpend),
+    totalBudgetYtd: sum((g) => g.budgetYtd),
+    // Over budget means over the budget TO DATE. Against the annual figure,
+    // nothing is ever over budget until December.
+    overBudget: groups.filter((g) => g.hasBudgetYtd && g.glActual > g.budgetYtd).length,
     noBudget: groups.filter((g) => !g.hasBudget && g.glActual !== 0).length,
+    nonOperatingGroups: groups.filter((g) => !g.glKnown && g.glAccount !== "unmapped").length,
     unmappedJobs: groups.find((g) => g.glAccount === "unmapped")?.jobs.length ?? 0,
     hasCommitments: groups.some((g) => g.jobs.some((j) => j.committed !== 0)),
   };
