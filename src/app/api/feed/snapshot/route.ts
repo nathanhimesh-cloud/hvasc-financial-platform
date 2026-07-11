@@ -77,6 +77,16 @@ export async function PUT(request: Request) {
     wrapped && typeof wrapped === "object" && "snapshot" in wrapped;
   const snapshot = hasWrapper ? wrapped.snapshot : body;
 
+  /**
+   * Archive-only: store this period in `snapshots` and nowhere else.
+   *
+   * Backfilling FY2025-26 pushes twelve historical periods. Each is a valid
+   * snapshot, and each would otherwise overwrite the Blob and become "the latest
+   * data" — leaving the dashboard showing June 2026 until the next live sync.
+   * With this flag the period joins the archive and the live view is untouched.
+   */
+  const archiveOnly = new URL(request.url).searchParams.get("mode") === "archive";
+
   if (required) {
     const given =
       request.headers.get("x-upload-password") ??
@@ -113,14 +123,17 @@ export async function PUT(request: Request) {
   const persisted: FinancialSnapshot =
     ingested > 0 ? { ...snapshot, transactions: [] } : snapshot;
 
-  let location: string;
-  try {
-    location = await writeRuntimeSnapshot(persisted);
-  } catch (err) {
-    return Response.json(
-      { ok: false, error: `Couldn't save snapshot: ${(err as Error).message}` },
-      { status: 500 },
-    );
+  // A backfilled period must never become "the latest data".
+  let location = "(archive only — runtime store untouched)";
+  if (!archiveOnly) {
+    try {
+      location = await writeRuntimeSnapshot(persisted);
+    } catch (err) {
+      return Response.json(
+        { ok: false, error: `Couldn't save snapshot: ${(err as Error).message}` },
+        { status: 500 },
+      );
+    }
   }
 
   // Archive this period to Postgres so history accumulates. The Blob store only
@@ -152,7 +165,8 @@ export async function PUT(request: Request) {
   const totalSpend = snapshot.departments.reduce((a, d) => a + (d.ytdActual ?? 0), 0);
   return Response.json({
     ok: true,
-    store: storeKind(),
+    store: archiveOnly ? "archive-only" : storeKind(),
+    archiveOnly,
     location,
     archived,
     transactionsIngested: ingested,

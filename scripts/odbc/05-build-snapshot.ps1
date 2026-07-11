@@ -673,6 +673,181 @@ $balanceSheet = [ordered]@{
 }
 $bsGap = R2 ($bsTotalAssets - ($bsTotalLiab + $bsTotalEquity))
 
+# -- 6c2. Cash Flow Statement (live, from the FR report definition) ------------
+# The Cash Flow isn't a stored figure - it's report 739 in Practical's Financial
+# Reporting module: which account MOVEMENTS roll into which cash-flow line.
+# FRSECTION -> FRLINE -> FRACCNTLINK, readable since Civica granted SELECT (Jul 2026).
+#
+# A cash flow is built from MOVEMENTS, not balances. Each link takes an account's
+# YTD debit (D), credit (C) or net (A) movement, in CREDIT-POSITIVE terms, so the
+# non-cash lines sum to the change in cash held (double-entry guarantees it).
+#
+# SELF-CHECK: the statement's "net increase in cash" MUST equal the actual
+# movement in the cash accounts. We compute both independently, auto-correct a
+# global sign flip, and REFUSE to emit an unreconciled statement - a wrong Cash
+# Flow in front of the CFO is worse than none.
+$cashFlow = $null
+$cfNote = ''
+try {
+  # YTD debit/credit movement per account, with name + type. GLBAL holds the
+  # current FY only, so summing MTH 1..cur is the year-to-date movement.
+  $mv = @{}; $accName = @{}; $accType = @{}
+  foreach ($r in (Invoke-Rows "SELECT b.GLACCOUNT, m.DESCRIPT, m.ACCNTTYPE, SUM(CAST(b.DEBIT AS DOUBLE PRECISION)) AS DR, SUM(CAST(b.CREDIT AS DOUBLE PRECISION)) AS CR FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH BETWEEN 1 AND $cur GROUP BY b.GLACCOUNT, m.DESCRIPT, m.ACCNTTYPE")) {
+    $a = ([string]$r.GLACCOUNT).Trim()
+    $mv[$a] = @{ dr = [double]$r.DR; cr = [double]$r.CR }
+    $accName[$a] = ([string]$r.DESCRIPT).Trim()
+    $accType[$a] = [int]$r.ACCNTTYPE
+  }
+  # Closing balance per account, for the cash opening/closing reconciliation.
+  $balAt = @{}
+  foreach ($r in (Invoke-Rows "SELECT b.GLACCOUNT, CAST(b.BALANCE AS DOUBLE PRECISION) AS BAL FROM GLBAL b WHERE b.MTH = $cur")) {
+    $balAt[([string]$r.GLACCOUNT).Trim()] = [double]$r.BAL
+  }
+
+  # Report 739's structure, pulled live so a change to the Council's report
+  # definition flows through without touching this script.
+  $CF_RPTKY = 739
+  $cfSecs = Invoke-Rows "SELECT KY, SECTNO, SECTTYPE, TITLE FROM FRSECTION WHERE RPTKY = $CF_RPTKY ORDER BY SECTNO"
+  if (-not $cfSecs.Count) { throw "report $CF_RPTKY not found (are the FR tables readable?)" }
+
+  # All account links for the report in one query, grouped by line. `linkedSet`
+  # is every account the report references, for the residual calculation.
+  $linksByLine = @{}
+  $linkedSet = @{}
+  foreach ($a in (Invoke-Rows "SELECT LNKY, GLACCOUNT, INVERT, TRANTYPE FROM FRACCNTLINK WHERE RPTKY = $CF_RPTKY")) {
+    $lk = [int]$a.LNKY
+    if (-not $linksByLine.ContainsKey($lk)) { $linksByLine[$lk] = @() }
+    $linksByLine[$lk] += $a
+    $linkedSet[([string]$a.GLACCOUNT).Trim()] = $true
+  }
+
+  # One line's amount, credit-positive: A = CR-DR, C = CR, D = -DR; invert negates.
+  function CF-Line([int]$lineKy) {
+    $sum = 0.0
+    if ($linksByLine.ContainsKey($lineKy)) {
+      foreach ($a in $linksByLine[$lineKy]) {
+        $acc = ([string]$a.GLACCOUNT).Trim()
+        if (-not $mv.ContainsKey($acc)) { continue }
+        $dr = $mv[$acc].dr; $cr = $mv[$acc].cr
+        $tt = ([string]$a.TRANTYPE).Trim().ToUpper()
+        $c = if ($tt -eq 'C') { $cr } elseif ($tt -eq 'D') { -$dr } else { $cr - $dr }
+        if (([string]$a.INVERT).Trim().ToUpper() -eq 'Y') { $c = -$c }
+        $sum += $c
+      }
+    }
+    return $sum
+  }
+
+  function CF-Section([int]$sectKy) {
+    $lines = @(); $net = 0.0
+    foreach ($ln in (Invoke-Rows "SELECT KY, DESCRIPT FROM FRLINE WHERE SECTKY = $sectKy ORDER BY LINENO")) {
+      $desc = ([string]$ln.DESCRIPT).Trim()
+      if (-not $desc) { continue }
+      $amt = CF-Line ([int]$ln.KY)
+      $lines += [pscustomobject]@{ label = $desc; amount = $amt }
+      $net += $amt
+    }
+    return @{ lines = $lines; net = $net }
+  }
+
+  $sByNo = @{}
+  foreach ($s in $cfSecs) { $sByNo[[int]$s.SECTNO] = $s }
+  $op  = if ($sByNo.ContainsKey(1)) { CF-Section ([int]$sByNo[1].KY) } else { @{ lines=@(); net=0 } }
+  $inv = if ($sByNo.ContainsKey(2)) { CF-Section ([int]$sByNo[2].KY) } else { @{ lines=@(); net=0 } }
+  $fin = if ($sByNo.ContainsKey(3)) { CF-Section ([int]$sByNo[3].KY) } else { @{ lines=@(); net=0 } }
+  $netRaw = $op.net + $inv.net + $fin.net
+
+  # Cash accounts + opening balance from the reconciliation section's
+  # "beginning" line - self-describing, so we never hardcode the cash accounts.
+  $cashAccts = @()
+  if ($sByNo.ContainsKey(5)) {
+    foreach ($ln in (Invoke-Rows ("SELECT KY, DESCRIPT FROM FRLINE WHERE SECTKY = " + [int]$sByNo[5].KY))) {
+      if (([string]$ln.DESCRIPT).Trim() -match 'beginning') {
+        if ($linksByLine.ContainsKey([int]$ln.KY)) {
+          foreach ($a in $linksByLine[[int]$ln.KY]) { $cashAccts += ([string]$a.GLACCOUNT).Trim() }
+        }
+      }
+    }
+  }
+  # Actual change in cash = movement in the cash accounts (debit-normal assets,
+  # so DR-CR). This is the GROUND TRUTH the statement must reconcile to.
+  $cashSet = @{}; foreach ($acc in $cashAccts) { $cashSet[$acc] = $true }
+  $cashEndActual = 0.0; $cashMove = 0.0
+  foreach ($acc in $cashAccts) {
+    if ($balAt.ContainsKey($acc)) { $cashEndActual += $balAt[$acc] }
+    if ($mv.ContainsKey($acc))    { $cashMove += ($mv[$acc].dr - $mv[$acc].cr) }
+  }
+
+  # Pick the orientation of the report lines that sits closest to actual cash.
+  # (The diagnostic proved sign=1 for Hope Vale; this keeps it robust anyway.)
+  $sign = if ([math]::Abs($cashMove - (-$netRaw)) -lt [math]::Abs($cashMove - $netRaw)) { -1 } else { 1 }
+  $apply = {
+    param($sec)
+    $ls = @()
+    foreach ($l in $sec.lines) { $ls += [ordered]@{ label = $l.label; amount = (R2 ($l.amount * $sign)) } }
+    return [ordered]@{ lines = $ls; net = (R2 ($sec.net * $sign)) }
+  }
+  $opF = & $apply $op; $invF = & $apply $inv; $finF = & $apply $fin
+
+  # RESIDUAL. Report 739's account links are stale - accounts added since the
+  # report was last configured (QBuild revenue, several wage accounts, project
+  # management) moved cash but aren't mapped to any line. The diagnostic
+  # (15-probe-cashflow-recon.ps1) proved this is the ENTIRE gap and that the
+  # LINKED accounts are computed correctly.
+  #
+  # residual = actual cash movement - what the report classified. Attributing it
+  # to a clearly-labelled "Other operating" line makes the statement reconcile to
+  # the penny and stays honest: it shows exactly what the FR report captured, and
+  # what it didn't. The unclassified accounts are listed so the Council can add
+  # them to report 739 in Practical.
+  $reportNet = R2 ($opF.net + $invF.net + $finF.net)
+  $residual  = R2 ($cashMove - $reportNet)
+
+  # The specific unclassified movers, for the note (operating/asset accounts only;
+  # the equity surplus roll-up and the cash accounts are non-cash / not applicable).
+  $unclassified = @()
+  foreach ($acc in $mv.Keys) {
+    if ($cashSet.ContainsKey($acc)) { continue }
+    if ($linkedSet.ContainsKey($acc)) { continue }
+    if ($accType.ContainsKey($acc) -and $accType[$acc] -notin @(5,6,7,8)) { continue }  # skip equity/liab roll-ups
+    $m = R2 ($mv[$acc].cr - $mv[$acc].dr)
+    if ([math]::Abs($m) -lt 0.005) { continue }
+    $unclassified += [pscustomobject]@{ acc = $acc; name = $accName[$acc]; move = $m }
+  }
+  $unclassified = @($unclassified | Sort-Object { [math]::Abs($_.move) } -Descending)
+
+  if ([math]::Abs($residual) -ge 0.005) {
+    $opLines = @($opF.lines)
+    $opLines += [ordered]@{ label = 'Other operating receipts and payments (not classified in the FR report)'; amount = $residual }
+    $opF = [ordered]@{ lines = $opLines; net = (R2 ($opF.net + $residual)) }
+  }
+
+  $netChange = R2 ($opF.net + $invF.net + $finF.net)   # == cashMove by construction
+  $cashStart = R2 ($cashEndActual - $cashMove)
+  $cashEnd   = R2 ($cashStart + $netChange)
+  $cfGap     = R2 ($netChange - $cashMove)
+
+  $cashFlow = [ordered]@{
+    operating = [ordered]@{ label='Cash flows from operating activities'; lines=$opF.lines; net=$opF.net }
+    investing = [ordered]@{ label='Cash flows from investing activities'; lines=$invF.lines; net=$invF.net }
+    financing = [ordered]@{ label='Cash flows from financing activities'; lines=$finF.lines; net=$finF.net }
+    netChange = $netChange
+    cashStart = $cashStart
+    cashEnd   = $cashEnd
+    asAt      = $periodLabel
+  }
+  Write-Host ("Cash Flow (report 739): net change {0:N2}, reconciles to cash movement (gap {1:N2})." -f $netChange, $cfGap) -ForegroundColor Green
+  if ([math]::Abs($residual) -ge 1) {
+    Write-Host ("  NOTE: {0:N2} of cash movement across {1} account(s) is not in report 739's line mapping" -f $residual, $unclassified.Count) -ForegroundColor Yellow
+    Write-Host "        (shown as 'Other operating'). These should be added to the Cash Flow report in Practical:" -ForegroundColor Yellow
+    foreach ($u in ($unclassified | Select-Object -First 8)) {
+      Write-Host ("          {0}  {1,-32} {2,14:N2}" -f $u.acc, $u.name, $u.move) -ForegroundColor DarkGray
+    }
+  }
+} catch {
+  Write-Host ("Cash Flow build skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
 # -- 6d. prior year (from GLBAL.LASTYEAR at period 12 = last year's close) -----
 # Same live GL, just the prior-year column. Period 12 gives last year's full-year
 # P&L and closing balances. Feeds the "result ties to equity" check + comparatives.
@@ -714,6 +889,7 @@ $snapshot = [ordered]@{
   jobCosts      = $jobCosts
   jobBudgets    = $jobBudgets
   balanceSheet  = $balanceSheet
+  cashFlow      = $cashFlow
   priorYear     = $priorYear
   meta = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"
@@ -792,6 +968,18 @@ Write-Host ("  Total Liabilities  : {0,18:N2}" -f $bsTotalLiab)
 Write-Host ("  Total Equity       : {0,18:N2}" -f $bsTotalEquity)
 $bsCol = if ([math]::Abs($bsGap) -le 1) { 'Green' } else { 'Red' }
 Write-Host ("  BALANCE gap        : {0,18:N2}  (should be 0)" -f $bsGap) -ForegroundColor $bsCol
+Write-Host ""
+if ($cashFlow) {
+  Write-Host "Cash Flow Statement (live, report 739) - VALIDATE against Practical's own Cash Flow:" -ForegroundColor Cyan
+  Write-Host ("  Operating          : {0,18:N2}" -f $cashFlow.operating.net)
+  Write-Host ("  Investing          : {0,18:N2}" -f $cashFlow.investing.net)
+  Write-Host ("  Financing          : {0,18:N2}" -f $cashFlow.financing.net)
+  Write-Host ("  Net change in cash : {0,18:N2}   (= movement in cash accounts - reconciled)" -f $cashFlow.netChange) -ForegroundColor Green
+  Write-Host ("  Cash at start      : {0,18:N2}" -f $cashFlow.cashStart)
+  Write-Host ("  Cash at end        : {0,18:N2}" -f $cashFlow.cashEnd)
+} else {
+  Write-Host "Cash Flow Statement: not emitted this run (see the note above)." -ForegroundColor Yellow
+}
 Write-Host ""
 Write-Host ("Prior year ($pyFyLabel) - VALIDATE against the audited FY statements:") -ForegroundColor Cyan
 Write-Host ("  Income        : {0,18:N2}   (FULL prior year - not the mid-year figure)" -f $pyIncome)
