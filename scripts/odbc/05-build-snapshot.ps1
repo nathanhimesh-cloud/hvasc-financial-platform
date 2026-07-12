@@ -1522,8 +1522,27 @@ $priorYear = [ordered]@{
 # takes a MAX(date), or an open-ended range, silently inherits them. We bound both
 # ends explicitly.
 $BILL_CAP  = 2000   # per side. Compressed, 2000+2000 is ~1 MB - well inside the 4.5 MB limit.
-$billFrom  = ("{0}-07-01" -f ($yr - 2))                  # two full years of history
+$OPEN_CAP  = 3000   # unpaid rows are re-sent IN FULL every run, so this cap must not bite.
+$billFrom  = ("{0}-07-01" -f ($yr - 2))                  # two years of history, for the report
 $billTo    = (Get-Date).AddDays(1).ToString('yyyy-MM-dd') # nothing from the future
+
+# TWO QUERIES PER SIDE, AND THE REASON MATTERS.
+#
+#   A. EVERY STILL-UNPAID ROW, at any age, re-sent in full on every run.
+#   B. Recent history (two years), sent incrementally via the KY cursor.
+#
+# The first version had only (B), and it was wrong in a way NO amount of re-running
+# would have fixed. The dashboard's ageing panel reads DRMST -- the debtor master's
+# balance buckets -- and reports $1.92M owed, of which 65% is more than 90 days old.
+# Some of that debt is older than the two-year window, so an invoice list built only
+# from (B) could never sum to the same total. Two pages of the same platform would
+# have disagreed about what the Council is owed, permanently, and the invoice page
+# would have been the quiet liar.
+#
+# Query (A) fixes it at the root: an invoice is included because it is UNPAID, not
+# because it is recent. It re-sends the same rows every run, which costs nothing --
+# they are few, and the upsert makes a repeat free -- and buys exact agreement with
+# the ageing report on the very first sync.
 
 $billCursorFile = Join-Path $PSScriptRoot 'billing-cursor.json'
 $sinceArKy = 0
@@ -1548,6 +1567,26 @@ Write-Host ("  DRTRAN.KY > {0} | CRTRN.KY > {1}" -f $sinceArKy, $sinceApKy) -For
 $invoices = @()
 $maxArKy = $sinceArKy
 try {
+  # (A) Every invoice still carrying money, at ANY age. No cursor, no lower date
+  # bound -- it belongs here because it is UNPAID, not because it is recent.
+  $arOpen = Invoke-Rows @"
+SELECT FIRST $OPEN_CAP t.KY, t.DEBTOR, m.NAME AS DRNAME, t.REFERENCE, t.TRANTYPE,
+       t.TRANDATE, t.DUEDATE, t.SUMMARY, t.ORDERNO,
+       CAST(t.ORIGINALDR AS DOUBLE PRECISION) AS ODR,
+       CAST(t.ORIGINALCR AS DOUBLE PRECISION) AS OCR,
+       CAST(t.CURRENTDR  AS DOUBLE PRECISION) AS CDR,
+       CAST(t.CURRENTCR  AS DOUBLE PRECISION) AS CCR
+FROM DRTRAN t LEFT JOIN DRMST m ON m.DEBTOR = t.DEBTOR
+WHERE (t.CURRENTDR <> 0 OR t.CURRENTCR <> 0)
+  AND t.TRANDATE <= '$billTo'
+ORDER BY t.KY ASC
+"@
+  if ($arOpen.Count -ge $OPEN_CAP) {
+    Write-Host "  WARNING: hit the open-invoice cap ($OPEN_CAP). Raise OPEN_CAP." -ForegroundColor Red
+    Write-Host "           Until you do, the invoice total will NOT reconcile to the ageing report." -ForegroundColor Red
+  }
+
+  # (B) Recent history, incremental. Context for the report; not needed to reconcile.
   $arRows = Invoke-Rows @"
 SELECT FIRST $BILL_CAP t.KY, t.DEBTOR, m.NAME AS DRNAME, t.REFERENCE, t.TRANTYPE,
        t.TRANDATE, t.DUEDATE, t.SUMMARY, t.ORDERNO,
@@ -1562,6 +1601,9 @@ ORDER BY t.KY ASC
 "@
   foreach ($r in $arRows) {
     $ky = [int64]$r.KY
+    # ONLY the incremental batch moves the cursor. The open-invoice query has no
+    # cursor, and its rows can carry high KYs -- letting them advance the mark would
+    # skip history that was never sent.
     if ($ky -gt $maxArKy) { $maxArKy = $ky }
     $invoices += [ordered]@{
       ky          = $ky
@@ -1577,7 +1619,30 @@ ORDER BY t.KY ASC
       outstanding = (R2 ((R2 $r.CDR) - (R2 $r.CCR)))
     }
   }
-  Write-Host ("  invoices:       {0} new" -f $invoices.Count) -ForegroundColor Green
+  # Fold in the open invoices, skipping any the incremental batch already carried.
+  $seenAr = @{}
+  foreach ($x in $invoices) { $seenAr[[string]$x.ky] = $true }
+  $openAdded = 0
+  foreach ($r in $arOpen) {
+    $k = [string]([int64]$r.KY)
+    if ($seenAr.ContainsKey($k)) { continue }
+    $seenAr[$k] = $true
+    $openAdded++
+    $invoices += [ordered]@{
+      ky          = [int64]$r.KY
+      debtor      = ([string]$r.DEBTOR).Trim()
+      debtorName  = ([string]$r.DRNAME).Trim()
+      reference   = ([string]$r.REFERENCE).Trim()
+      tranType    = ([string]$r.TRANTYPE).Trim()
+      date        = $(if ($r.TRANDATE) { ([datetime]$r.TRANDATE).ToString('yyyy-MM-dd') } else { '' })
+      dueDate     = $(if ($r.DUEDATE)  { ([datetime]$r.DUEDATE).ToString('yyyy-MM-dd') }  else { '' })
+      summary     = ([string]$r.SUMMARY).Trim()
+      orderNo     = ([string]$r.ORDERNO).Trim()
+      invoiced    = (R2 ((R2 $r.ODR) - (R2 $r.OCR)))
+      outstanding = (R2 ((R2 $r.CDR) - (R2 $r.CCR)))
+    }
+  }
+  Write-Host ("  invoices:       {0} sent ({1} still unpaid, any age)" -f $invoices.Count, $openAdded) -ForegroundColor Green
 } catch {
   Write-Host ("  invoices: FAILED - " + $_.Exception.Message.Split("`n")[0]) -ForegroundColor Red
 }
@@ -1590,6 +1655,28 @@ ORDER BY t.KY ASC
 $supplierBills = @()
 $maxApKy = $sinceApKy
 try {
+  # (A) Every supplier invoice not yet paid and not cancelled, at ANY age.
+  # PAID and CANC are excluded here on purpose: a cancelled cheque is not a debt,
+  # and Practical carries 1,634 of them. Treating 'not paid' as 'still owed' would
+  # put every one of them on the page as money the Council still has to find.
+  $apOpen = Invoke-Rows @"
+SELECT FIRST $OPEN_CAP t.KY, t.CREDITOR, m.NAME AS CRNAME, t.REFERENCE, t.TRNT,
+       t.TRNDATE, t.DUEDATE, t.PAYDATE, t.SUMMARY, t.ORDERNO, t.CHQNO, t.HOLDPAYMENT,
+       CAST(t.DEBIT AS DOUBLE PRECISION) AS DR,
+       CAST(t.CREDIT AS DOUBLE PRECISION) AS CR,
+       CAST(t.GSTRECOVERABLE AS DOUBLE PRECISION) AS GST
+FROM CRTRN t LEFT JOIN CRMST m ON m.CREDITOR = t.CREDITOR
+WHERE t.TRNT = 'I'
+  AND t.PAYDATE IS NULL
+  AND (t.HOLDPAYMENT IS NULL OR (t.HOLDPAYMENT <> 'PAID' AND t.HOLDPAYMENT <> 'CANC'))
+  AND t.TRNDATE <= '$billTo'
+ORDER BY t.KY ASC
+"@
+  if ($apOpen.Count -ge $OPEN_CAP) {
+    Write-Host "  WARNING: hit the open-bill cap ($OPEN_CAP). Raise OPEN_CAP." -ForegroundColor Red
+  }
+
+  # (B) Recent history, incremental.
   $apRows = Invoke-Rows @"
 SELECT FIRST $BILL_CAP t.KY, t.CREDITOR, m.NAME AS CRNAME, t.REFERENCE, t.TRNT,
        t.TRNDATE, t.DUEDATE, t.PAYDATE, t.SUMMARY, t.ORDERNO, t.CHQNO, t.HOLDPAYMENT,
@@ -1603,6 +1690,7 @@ ORDER BY t.KY ASC
 "@
   foreach ($r in $apRows) {
     $ky = [int64]$r.KY
+    # Only (B) moves the cursor -- see the note on the invoice side.
     if ($ky -gt $maxApKy) { $maxApKy = $ky }
     $supplierBills += [ordered]@{
       ky           = $ky
@@ -1622,7 +1710,34 @@ ORDER BY t.KY ASC
       gst          = (R2 $r.GST)
     }
   }
-  Write-Host ("  supplier bills: {0} new" -f $supplierBills.Count) -ForegroundColor Green
+  # Fold in the open bills, skipping any the incremental batch already carried.
+  $seenAp = @{}
+  foreach ($x in $supplierBills) { $seenAp[[string]$x.ky] = $true }
+  $apOpenAdded = 0
+  foreach ($r in $apOpen) {
+    $k = [string]([int64]$r.KY)
+    if ($seenAp.ContainsKey($k)) { continue }
+    $seenAp[$k] = $true
+    $apOpenAdded++
+    $supplierBills += [ordered]@{
+      ky           = [int64]$r.KY
+      creditor     = ([string]$r.CREDITOR).Trim()
+      creditorName = ([string]$r.CRNAME).Trim()
+      reference    = ([string]$r.REFERENCE).Trim()
+      trnt         = ([string]$r.TRNT).Trim()
+      date         = $(if ($r.TRNDATE) { ([datetime]$r.TRNDATE).ToString('yyyy-MM-dd') } else { '' })
+      dueDate      = $(if ($r.DUEDATE) { ([datetime]$r.DUEDATE).ToString('yyyy-MM-dd') } else { '' })
+      payDate      = $(if ($r.PAYDATE) { ([datetime]$r.PAYDATE).ToString('yyyy-MM-dd') } else { '' })
+      summary      = ([string]$r.SUMMARY).Trim()
+      orderNo      = ([string]$r.ORDERNO).Trim()
+      chequeNo     = ([string]$r.CHQNO).Trim()
+      status       = ([string]$r.HOLDPAYMENT).Trim()
+      debit        = (R2 $r.DR)
+      credit       = (R2 $r.CR)
+      gst          = (R2 $r.GST)
+    }
+  }
+  Write-Host ("  supplier bills: {0} sent ({1} still unpaid, any age)" -f $supplierBills.Count, $apOpenAdded) -ForegroundColor Green
 } catch {
   Write-Host ("  supplier bills: FAILED - " + $_.Exception.Message.Split("`n")[0]) -ForegroundColor Red
 }
