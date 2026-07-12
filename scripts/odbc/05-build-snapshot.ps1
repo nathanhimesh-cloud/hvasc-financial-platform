@@ -848,6 +848,64 @@ try {
   Write-Host ("Cash Flow build skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
 }
 
+# -- 6c3. statutory ratio inputs (operating vs capital, from FR reports) -------
+# The Queensland sustainability ratios need OPERATING revenue/expenses separated
+# from CAPITAL - and Practical already defines that split in its own FR reports:
+#     report 743 = "Operating income:"   / "Capital income:"
+#     report 744 = "Operating expenses:" / "Capital expenses:"
+# Reading those is authoritative. Guessing which accounts are capital would be
+# exactly the kind of invented rule this platform exists to avoid.
+#
+# Hope Vale is a TIER 8 council (confirmed from their audited FY2025 Financial
+# Sustainability Statement). Tier 8's benchmarks: operating cash ratio > 0%,
+# unrestricted cash cover > 4 months, asset sustainability > 90%, asset
+# consumption > 60%. The OPERATING SURPLUS RATIO IS CONTEXTUAL - it has NO
+# benchmark for Tier 8, and must never be red-flagged.
+$statutory = $null
+try {
+  # Sum the BALANCE (cumulative YTD) of every account linked under a section
+  # whose title matches $pattern, in report $rptky.
+  function FR-SectionTotal([int]$rptky, [string]$pattern) {
+    $total = 0.0
+    $secs = Invoke-Rows "SELECT KY, TITLE FROM FRSECTION WHERE RPTKY = $rptky"
+    foreach ($s in $secs) {
+      if (([string]$s.TITLE).Trim() -notmatch $pattern) { continue }
+      $sky = [int]$s.KY
+      foreach ($ln in (Invoke-Rows "SELECT KY FROM FRLINE WHERE SECTKY = $sky")) {
+        foreach ($a in (Invoke-Rows ("SELECT GLACCOUNT, INVERT FROM FRACCNTLINK WHERE LNKY = " + [int]$ln.KY))) {
+          $acc = ([string]$a.GLACCOUNT).Trim()
+          if (-not $balAt.ContainsKey($acc)) { continue }
+          $v = $balAt[$acc]
+          if (([string]$a.INVERT).Trim().ToUpper() -eq 'Y') { $v = -$v }
+          $total += $v
+        }
+      }
+    }
+    return (R2 $total)
+  }
+
+  $opRevenue  = FR-SectionTotal 743 '^\s*Operating income'
+  $capRevenue = FR-SectionTotal 743 '^\s*Capital income'
+  $opExpense  = FR-SectionTotal 744 '^\s*Operating expenses'
+  $capExpense = FR-SectionTotal 744 '^\s*Capital expenses'
+
+  $statutory = [ordered]@{
+    tier              = 8
+    operatingRevenue  = $opRevenue
+    capitalRevenue    = $capRevenue
+    operatingExpenses = $opExpense
+    capitalExpenses   = $capExpense
+    depreciation      = $deprec
+    # Net cash from operating activities - from the Cash Flow we just built.
+    operatingCashFlow = $(if ($cashFlow) { $cashFlow.operating.net } else { $null })
+    source            = 'FR reports 743 (income) / 744 (expenses); tier from the audited FY2025 Financial Sustainability Statement'
+  }
+  Write-Host ("Statutory inputs: operating revenue {0:N2}, operating expenses {1:N2}, capital revenue {2:N2}, depreciation {3:N2}" -f `
+    $opRevenue, $opExpense, $capRevenue, $deprec) -ForegroundColor Cyan
+} catch {
+  Write-Host ("Statutory ratio inputs skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
 # -- 6d. prior year (from GLBAL.LASTYEAR at period 12 = last year's close) -----
 # Same live GL, just the prior-year column. Period 12 gives last year's full-year
 # P&L and closing balances. Feeds the "result ties to equity" check + comparatives.
@@ -890,6 +948,7 @@ $snapshot = [ordered]@{
   jobBudgets    = $jobBudgets
   balanceSheet  = $balanceSheet
   cashFlow      = $cashFlow
+  statutory     = $statutory
   priorYear     = $priorYear
   meta = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"

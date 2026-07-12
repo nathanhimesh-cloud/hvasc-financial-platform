@@ -24,8 +24,16 @@ import type { GrantFigures } from "@/lib/grants";
  * 30 Jun 26 and job codes for the remaining grants.
  */
 
-/** Sector rule of thumb: hold at least this many months of opex in free cash. */
-export const MIN_MONTHS_COVER = 3;
+/**
+ * The Unrestricted Cash Expense Cover benchmark for Hope Vale.
+ *
+ * NOT the generic 3-month sector rule of thumb. Hope Vale is a **Tier 8** council
+ * under the Financial Management (Sustainability) Guideline 2024, and Tier 8's
+ * published target is "greater than 4 months" — confirmed from the Council's own
+ * audited FY2025 Financial Sustainability Statement, where they reported 46.11
+ * months against that target.
+ */
+export const MIN_MONTHS_COVER = 4;
 
 /** Current-asset lines that represent cash or a bank account. */
 const CASH_LINE = /cash|bank|qtc|maxi[\s-]?direct/i;

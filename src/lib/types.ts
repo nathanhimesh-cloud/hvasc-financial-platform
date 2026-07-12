@@ -283,6 +283,8 @@ export interface FinancialSnapshot {
   balanceSheet?: BalanceSheet;
   /** Statement of Cash Flows — from an uploaded Practical export. */
   cashFlow?: CashFlow;
+  /** Inputs for the statutory sustainability ratios (B8). */
+  statutory?: StatutoryInputs;
   /** Daily operating spend series (from GLTRN), for the daily trend. */
   dailySpend?: DailySpendPoint[];
   /** Recent GL transactions (from GLTRN) for the transaction report / drill-down. */
@@ -376,4 +378,24 @@ export interface AccountRef {
   budget: number;
   /** Budget cumulative to the current period. */
   budgetYtd?: number;
+}
+
+/**
+ * Inputs for the Queensland statutory sustainability ratios (Build Brief B8).
+ *
+ * The operating/capital split comes from Practical's OWN report definitions —
+ * FR report 743 ("Operating income" / "Capital income") and 744 ("Operating
+ * expenses" / "Capital expenses") — rather than a rule we invented.
+ */
+export interface StatutoryInputs {
+  /** Hope Vale is Tier 8 (audited FY2025 Financial Sustainability Statement). */
+  tier: number;
+  operatingRevenue: number;
+  capitalRevenue: number;
+  operatingExpenses: number;
+  capitalExpenses: number;
+  depreciation: number;
+  /** Net cash from operating activities, from the Cash Flow. */
+  operatingCashFlow: number | null;
+  source: string;
 }

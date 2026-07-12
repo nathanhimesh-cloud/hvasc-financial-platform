@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Briefcase,
   Activity,
+  Gauge,
   type LucideIcon,
 } from "lucide-react";
 import { can } from "@/lib/auth/roles";
@@ -27,6 +28,7 @@ export const overviewNav: NavLink[] = [
   { href: "/jobs", label: "Job Budgets", icon: Briefcase },
   { href: "/reports", label: "Detailed Reports", icon: FileText },
   { href: "/monthly-report", label: "Monthly Report", icon: FileBarChart },
+  { href: "/ratios", label: "Sustainability Ratios", icon: Gauge },
 ];
 
 /**
@@ -112,6 +114,9 @@ export function getPageMeta(
   }
   if (pathname === "/status") {
     return { title: "Data Status", subtitle: "Provenance & sync history" };
+  }
+  if (pathname === "/ratios") {
+    return { title: "Financial Sustainability Ratios", subtitle: "Tier 8 statutory measures" };
   }
   if (pathname === "/monthly-report") {
     return { title: "Monthly Management Report", subtitle: "Consolidated & departmental packs" };
