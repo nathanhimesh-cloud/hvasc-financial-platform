@@ -1,65 +1,84 @@
-# ODBC live feed — Civica Practical → dashboard
+# The Practical feed — what runs on HVASC-APP02
 
-Read-only automated feed that replaces the manual report-export process. Runs on
-**HVASC-APP02** as `sandsservice`, reads the General Ledger over the
-`Practical_Plus` DSN, builds the dashboard's `FinancialSnapshot`, and pushes it
-to the live site. **Strictly read-only — only `SELECT` queries.**
+These scripts read the Council's live general ledger out of Civica Practical Plus
+(Firebird 1.5, ODBC DSN `Practical_Plus`) and push it to the dashboard.
 
-See `../../../reports/practical_schema/SCHEMA-MAPPING.md` for the table→field
-mapping and the discovery findings behind these queries.
+**Read-only. `SELECT` only. Always.** The platform never writes to Practical — that
+is the central constraint of the engagement, and no script here has any business
+breaking it.
 
-## Scripts (run order)
+> 📖 **Read `knowledge-base/01-the-data-source.md` before writing a query.**
+> Practical's schema has a dozen traps that fail *silently* — producing a plausible
+> number rather than an error. Every one of them has cost this project real time.
 
-| Script | What it does |
+---
+
+## What runs in production
+
+A Windows Scheduled Task (as `sandsservice`) runs this at **06:00, 12:30 and 18:00**
+AEST:
+
+```
+07-run-feed.ps1
+   ├── 05-build-snapshot.ps1   Practical → snapshot.json
+   └── 06-push.ps1             snapshot.json → the dashboard
+```
+
+That is the whole automation, and it is complete — `05` builds every block the
+platform uses (statements, ratios, commitments, ageing, assets, transactions) in a
+single pass.
+
+| Script | |
 |---|---|
-| `01–04-discover.ps1` | One-off schema discovery (already run; kept for reference). |
-| `05-build-snapshot.ps1` | Reads Practical, writes `snapshot.json` next to the script. Prints a validation summary. |
-| `06-push.ps1` | PUTs `snapshot.json` to `/api/feed/snapshot` on the live site → Vercel Blob. |
-| `07-run-feed.ps1` | Build + push with logging. **This is what the Scheduled Task runs.** |
-| `08-install-task.ps1` | Installs the twice-daily Scheduled Task (stores secrets as machine env vars, registers the task as the service account). |
+| `05-build-snapshot.ps1` | **The feed.** |
+| `06-push.ps1` | Ships it. Advances the sync cursor **only** when the server confirms receipt, so a failed push never skips a transaction. |
+| `07-run-feed.ps1` | 05 → 06, with logging. What the task calls. |
+| `08-install-task.ps1` | Installs the scheduled task. Run once. |
+| `department-map.json` | Account → department. **Must sit beside `05`.** |
 
-## How the data maps (proven in discovery)
+## What does *not* run on a schedule
 
-- **Classification** — `GLMST.ACCNTTYPE`: `5` = revenue, `6` = expense (7/8 = assets, 9/10 = liabilities, 11 = equity).
-- **Function (department)** — `GLMST.L1ACCNT` → parent account `DESCRIPT`. 8 GL-native functions (Administration, Housing & Construction, Health & Social Welfare, Essential Services, Education/Youth/Rec, Economic Development, Land & Sea Management, CDEP).
-- **Amounts** — `GLBAL.BALANCE` (cumulative YTD) at the current period (`GLCON.MTH`). Monthly trend = `GLBAL.DEBIT−CREDIT` per `MTH`.
-- **Prior year** — `GLBAL.LASTYEAR` (FY25 actuals = budget baseline; FY26 budget = `GLBAL.BUDGET`, currently 0).
-- **Operating expenses exclude depreciation** (`ACCNTTYPE=6 AND ISCONTROL='N'`) so the net result ties to the council's income statement (~$6.67M).
-- **Grants** — revenue accounts with `ACCNT2` in 1100–1199 (funding received). Spend %/deadlines still need the council's grants register.
+`01`–`04` and `09`–`19` are **one-off discovery probes**. Their findings are baked
+into `05`; scheduling them would cost server capacity and return nothing new.
 
-> The statutory Note 3a 9-function view and the exact income-statement line items
-> live in Practical's FR reporting module, which `PCSACCESS` cannot read
-> (column-level permission denied). This feed uses the GL-native structure
-> instead. To switch to the exact statutory view, ask Civica to
-> `GRANT SELECT ON FRFUNCTIONS, FRACCNTLINK TO PCSACCESS`.
+Keep them. They are the audit trail behind every claim in the knowledge base, and
+re-running one is how you'd verify a change in Practical. `17-probe-fr-income.ps1` in
+particular is what `05` tells you to run when it refuses to publish the ratios.
 
-## One-time setup
+`12-backfill-prior-year.ps1` is a manual, archive-only backfill.
 
-1. **Vercel:** create a Blob store (injects `BLOB_READ_WRITE_TOKEN`) and set an
-   `UPLOAD_PASSWORD` env var. Redeploy.
-2. **APP02:** copy this `odbc/` folder somewhere stable, e.g.
-   `D:\SandS\odbc\`. Set the Practical DB password as an env var (it is **not**
-   stored in the repo) and test once by hand:
-   ```powershell
-   $env:PRACTICAL_PWD = '<read-only PCSACCESS password>'
-   powershell -ExecutionPolicy Bypass -File .\05-build-snapshot.ps1   # check the validation summary
-   .\06-push.ps1 -Url https://<your-app>.vercel.app -Password <UPLOAD_PASSWORD>
-   ```
-   For the scheduled task, set `PRACTICAL_PWD` as a machine/service-account
-   environment variable so the unattended run can read it.
-3. **Scheduled Task** (twice daily, as `sandsservice`) — run the installer once:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\08-install-task.ps1 -Url https://<your-app>.vercel.app
-   ```
-   It prompts (securely) for the Practical DB password, the website
-   `UPLOAD_PASSWORD`, and the service-account password, stores the first two as
-   machine env vars, and registers the task to run at **06:00 and 18:00**
-   (change with `-Times "07:00","19:00"`). Logs land in `odbc\logs\`
-   (last 30 runs kept). Test immediately with
-   `Start-ScheduledTask -TaskName "HVASC Financial Feed"`.
+---
 
-## Safety
+## When `05` refuses to do something
 
-- Every query is `SELECT`. No `INSERT`/`UPDATE`/`DELETE`/`DDL`, no changes to
-  Practical data, settings, `PCS.INI`, or the DSN.
-- The blob token stays on Vercel; APP02 only holds the `UPLOAD_PASSWORD`.
+It is designed to. **Do not work around a refusal** — it is telling you something true.
+
+| Refusal | Means |
+|---|---|
+| `REFUSING TO WRITE` | The connection failed or a query returned nothing. Usually a wrong `PRACTICAL_PWD` overriding the DSN's own working login. |
+| `NOT EMITTING the statutory ratios` | The FR report doesn't classify the whole ledger, so any operating/capital split from it would be wrong. Run `17-probe-fr-income.ps1` — it reports which report *does* reconcile. |
+| `Commitments: NOT EMITTED` | 8,919 order lines produced no commitment. That's a wrong column, not an absence of orders. |
+| `Cash Flow build skipped` | It didn't tie to the actual movement in cash. A wrong cash flow in front of the CFO is worse than none. |
+
+> **A wrong number that looks right is worse than no number at all.**
+> That sentence is the reason every guard in here exists. Each one was added because
+> something got through.
+
+---
+
+## Two gotchas that will bite you
+
+**Never set `PRACTICAL_PWD` unless you know you need it.** The DSN carries its own
+Firebird login; a wrong password in that variable **overrides** it and yields a
+snapshot of zeros rather than an error.
+
+```powershell
+Remove-Item Env:\PRACTICAL_PWD -ErrorAction SilentlyContinue
+```
+
+**Keep these files pure ASCII.** A single non-ASCII character breaks PowerShell
+parsing on the server.
+
+```powershell
+Select-String -Path .\05-build-snapshot.ps1 -Pattern '[^\x00-\x7F]'
+```

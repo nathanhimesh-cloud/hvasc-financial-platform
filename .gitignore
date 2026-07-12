@@ -47,3 +47,10 @@ next-env.d.ts
 /scripts/odbc/snapshot.json
 /scripts/odbc/logs/
 /scripts/odbc/discover*-output.txt
+/scripts/odbc/push-response.json
+/scripts/odbc/sync-cursor.json
+/scripts/odbc/*-probe.txt
+/scripts/odbc/module-probe.txt
+/scripts/odbc/orders-probe.txt
+/scripts/odbc/assets-po-ageing.txt
+/scripts/odbc/fr-income-probe.txt

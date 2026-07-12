@@ -184,13 +184,18 @@ Write-Host "Period: $periodLabel  (month $cur of FY$yr)" -ForegroundColor Cyan
 # So the ANNUAL budget is BUDGET at period 12, and the YTD budget is BUDGET at the
 # current period. The old code read the current period's value, called it annual,
 # and then prorated it a second time - understating both figures.
+# The annual budget (period 12) comes in on a LEFT JOIN, not a correlated
+# subquery. The subquery form ran once per row - a thousand extra lookups on
+# every sync, for a value one join fetches in a single pass. LEFT, not INNER: an
+# account with no period-12 row must still appear, with a null budget, rather
+# than vanishing from the department totals.
 $acctRows = Invoke-Rows @"
 SELECT m.GLACCOUNT, m.DESCRIPT, m.ACCNTTYPE, m.ACCNT2,
        b.BALANCE, b.BUDGET AS BUDYTD, b.LASTYEAR,
-       (SELECT b12.BUDGET FROM GLBAL b12
-         WHERE b12.GLACCOUNT = b.GLACCOUNT AND b12.MTH = 12) AS BUDANN
+       b12.BUDGET AS BUDANN
 FROM GLBAL b
 JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+LEFT JOIN GLBAL b12 ON b12.GLACCOUNT = b.GLACCOUNT AND b12.MTH = 12
 WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5,6)
 "@
 
@@ -894,27 +899,6 @@ try {
     $balLy[([string]$r.GLACCOUNT).Trim()] = [double]$r.BAL
   }
 
-  # Sum a balance map over every account linked under a section whose title
-  # matches $pattern, in report $rptky.
-  function FR-SectionTotal([int]$rptky, [string]$pattern, $balMap) {
-    $total = 0.0
-    $secs = Invoke-Rows "SELECT KY, TITLE FROM FRSECTION WHERE RPTKY = $rptky"
-    foreach ($s in $secs) {
-      if (([string]$s.TITLE).Trim() -notmatch $pattern) { continue }
-      $sky = [int]$s.KY
-      foreach ($ln in (Invoke-Rows "SELECT KY FROM FRLINE WHERE SECTKY = $sky")) {
-        foreach ($a in (Invoke-Rows ("SELECT GLACCOUNT, INVERT FROM FRACCNTLINK WHERE LNKY = " + [int]$ln.KY))) {
-          $acc = ([string]$a.GLACCOUNT).Trim()
-          if (-not $balMap.ContainsKey($acc)) { continue }
-          $v = $balMap[$acc]
-          if (([string]$a.INVERT).Trim().ToUpper() -eq 'Y') { $v = -$v }
-          $total += $v
-        }
-      }
-    }
-    return (R2 $total)
-  }
-
   # WHICH REPORT SUPPLIES THE SPLIT.
   #
   # 743/744 were the obvious choice - their sections are literally called
@@ -934,19 +918,69 @@ try {
   # => operating surplus ratio 12.6% for FY2025-26. Sane, and the right sign.
   #
   # "Recurrent" is the accounting term for what the Guideline calls "operating".
-  $FR_INCOME_RPT  = 804
-  $FR_EXPENSE_RPT = 804
+  $FR_RPT     = 804
   $RX_OP_INC  = '^\s*1\.1\.1\b|Recurrent revenue'
   $RX_CAP_INC = '^\s*1\.1\.2\b|Capital revenue'
   $RX_OP_EXP  = '^\s*2\.1\b|Recurrent expenses'
   $RX_CAP_EXP = '^\s*2\.2\b|Capital expenses'
 
+  # LOAD THE REPORT'S STRUCTURE ONCE.
+  #
+  # This used to be a classic N+1: for each of the four sections we wanted, and
+  # for BOTH balance maps (this year and last), it re-queried FRSECTION, then ran
+  # one query per line, then one query per line's account links. Eight calls, each
+  # firing twenty-odd round trips - several hundred queries to Firebird, to read a
+  # report definition that does not change between the first call and the eighth.
+  #
+  # Three queries now. The section -> line -> account structure is loaded into
+  # memory and every total is summed from that. On a server that feeds three times
+  # a day, forever, an avoidable query is a cost the Council pays forever too.
+  $frSections = Invoke-Rows "SELECT KY, TITLE FROM FRSECTION WHERE RPTKY = $FR_RPT"
+  $frLines    = Invoke-Rows "SELECT KY, SECTKY FROM FRLINE WHERE SECTKY IN (SELECT KY FROM FRSECTION WHERE RPTKY = $FR_RPT)"
+  $frLinks    = Invoke-Rows "SELECT LNKY, GLACCOUNT, INVERT FROM FRACCNTLINK WHERE RPTKY = $FR_RPT"
+
+  # line KY -> its account links
+  $linksOfLine = @{}
+  foreach ($a in $frLinks) {
+    $lk = [int]$a.LNKY
+    if (-not $linksOfLine.ContainsKey($lk)) { $linksOfLine[$lk] = @() }
+    $linksOfLine[$lk] += $a
+  }
+  # section KY -> every account it references, with its invert flag, flattened.
+  $acctsOfSection = @{}
+  foreach ($ln in $frLines) {
+    $sk = [int]$ln.SECTKY
+    $lk = [int]$ln.KY
+    if (-not $linksOfLine.ContainsKey($lk)) { continue }
+    if (-not $acctsOfSection.ContainsKey($sk)) { $acctsOfSection[$sk] = @() }
+    $acctsOfSection[$sk] += $linksOfLine[$lk]
+  }
+
+  # Sum a balance map over every account under a section whose title matches
+  # $pattern. Pure memory - no database.
+  function FR-SectionTotal([string]$pattern, $balMap) {
+    $total = 0.0
+    foreach ($s in $frSections) {
+      if (([string]$s.TITLE).Trim() -notmatch $pattern) { continue }
+      $sk = [int]$s.KY
+      if (-not $acctsOfSection.ContainsKey($sk)) { continue }
+      foreach ($a in $acctsOfSection[$sk]) {
+        $acc = ([string]$a.GLACCOUNT).Trim()
+        if (-not $balMap.ContainsKey($acc)) { continue }
+        $v = $balMap[$acc]
+        if (([string]$a.INVERT).Trim().ToUpper() -eq 'Y') { $v = -$v }
+        $total += $v
+      }
+    }
+    return (R2 $total)
+  }
+
   function FR-Inputs($balMap) {
     return [ordered]@{
-      operatingRevenue  = (FR-SectionTotal $FR_INCOME_RPT  $RX_OP_INC  $balMap)
-      capitalRevenue    = (FR-SectionTotal $FR_INCOME_RPT  $RX_CAP_INC $balMap)
-      operatingExpenses = (FR-SectionTotal $FR_EXPENSE_RPT $RX_OP_EXP  $balMap)
-      capitalExpenses   = (FR-SectionTotal $FR_EXPENSE_RPT $RX_CAP_EXP $balMap)
+      operatingRevenue  = (FR-SectionTotal $RX_OP_INC  $balMap)
+      capitalRevenue    = (FR-SectionTotal $RX_CAP_INC $balMap)
+      operatingExpenses = (FR-SectionTotal $RX_OP_EXP  $balMap)
+      capitalExpenses   = (FR-SectionTotal $RX_CAP_EXP $balMap)
     }
   }
 
@@ -979,7 +1013,7 @@ try {
   $covExp = $(if ($glExpenseLy -ne 0) { 100 * $rptExpenseLy / $glExpenseLy } else { 0 })
 
   Write-Host ""
-  Write-Host ("Statutory source check - does FR report {0} account for the whole ledger?" -f $FR_INCOME_RPT) -ForegroundColor Cyan
+  Write-Host ("Statutory source check - does FR report {0} account for the whole ledger?" -f $FR_RPT) -ForegroundColor Cyan
   Write-Host ("  income  : report {0,15:N2} vs GL {1,15:N2}  = {2,6:N1}%  (expect ~100)" -f $rptIncomeLy, $glIncomeLy, $covInc)
   Write-Host ("  expenses: report {0,15:N2} vs GL {1,15:N2}  = {2,6:N1}%  (expect ~100)" -f $rptExpenseLy, $glExpenseLy, $covExp)
 
@@ -988,11 +1022,11 @@ try {
   if ($covInc -lt 95 -or $covInc -gt 105 -or $covExp -lt 95 -or $covExp -gt 105) {
     Write-Host ""
     Write-Host "  NOT EMITTING the statutory ratios this run." -ForegroundColor Red
-    Write-Host ("  FR report {0} does not classify the whole general ledger, so any" -f $FR_INCOME_RPT) -ForegroundColor Red
+    Write-Host ("  FR report {0} does not classify the whole general ledger, so any" -f $FR_RPT) -ForegroundColor Red
     Write-Host "  operating/capital split taken from it would be wrong. The dashboard will" -ForegroundColor Red
     Write-Host "  show 'needs data' rather than a confident, incorrect percentage." -ForegroundColor Red
     Write-Host "  Run 17-probe-fr-income.ps1 - it reports which report DOES reconcile." -ForegroundColor Yellow
-    throw "FR report $FR_INCOME_RPT does not reconcile to the GL (income $([math]::Round($covInc,1))%, expenses $([math]::Round($covExp,1))%)"
+    throw "FR report $FR_RPT does not reconcile to the GL (income $([math]::Round($covInc,1))%, expenses $([math]::Round($covExp,1))%)"
   }
 
   $statutory = [ordered]@{
@@ -1021,7 +1055,7 @@ try {
       depreciation      = $lyDeprec
       operatingCashFlow = $null
     }
-    source = "FR report $FR_INCOME_RPT (Statement of Comprehensive Income: recurrent vs capital); tier from the audited FY2025 Financial Sustainability Statement"
+    source = "FR report $FR_RPT (Statement of Comprehensive Income: recurrent vs capital); tier from the audited FY2025 Financial Sustainability Statement"
   }
   Write-Host ("Statutory inputs YTD (month {0}): op revenue {1:N2}, op expenses {2:N2}, capital revenue {3:N2}" -f `
     $cur, $ytdIn.operatingRevenue, $ytdIn.operatingExpenses, $ytdIn.capitalRevenue) -ForegroundColor Cyan
@@ -1117,9 +1151,13 @@ FROM OPDET d JOIN OPMST m ON m.KY = d.MSTKY
   # GL account. COSTTYPE 'J' lines (8,504 of 8,919) are job-costed and carry a
   # BLANK GLACCOUNT - the account lives on the job. Resolve through JCMST, and
   # count anything we still can't place rather than silently calling it operating.
+  #
+  # $jobRows is JCMST, already read in full by the job-budget section above.
+  # Re-querying its 4,118 rows to fetch two columns we are holding in memory is a
+  # round trip the Council pays for three times a day and gets nothing back for.
   $jobToGl = @{}
-  if ((Test-JcCol 'JCACCOUNT') -and (Test-JcCol 'PYGLACC')) {
-    foreach ($j in (Invoke-Rows "SELECT JCACCOUNT, PYGLACC FROM JCMST")) {
+  if ($jobRows -and (Test-JcCol 'JCACCOUNT') -and (Test-JcCol 'PYGLACC')) {
+    foreach ($j in $jobRows) {
       $jk = ([string]$j.JCACCOUNT).Trim()
       $jg = ([string]$j.PYGLACC).Trim()
       if ($jk -and $jg) { $jobToGl[$jk] = $jg }
