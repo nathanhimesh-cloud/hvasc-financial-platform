@@ -8,14 +8,25 @@
   Run it, then send Nathan the file it writes:
       scripts\odbc\probe-invoices.txt
 
-  We already know both tables are readable and that CRTRN carries an ORDERNO.
-  What we do NOT know is their column names -- and every Practical trap that has
-  cost this project time came from assuming a column instead of looking at it.
+  ---------------------------------------------------------------------------
+  WHY v2: the first version of this script failed on every table.
+
+  It queried the RDB$ system catalogue and wrote RDB\$FIELD_NAME inside a
+  double-quoted here-string. In PowerShell the escape character is a BACKTICK, not
+  a backslash -- so the backslash went to Firebird literally and it died with
+  "Token unknown - line 1, column 14", which is exactly where the RDB\$ sits.
+
+  The fix is better than escaping it correctly: DON'T QUERY THE CATALOGUE AT ALL.
+  `SELECT FIRST 1 *` hands back a DataTable that already knows its own column
+  names and types. The system catalogue was never needed.
+
+  It also wrote UTF-16 (Tee-Object's default), which is why the output arrived as
+  s p a c e d   o u t   l e t t e r s. Forced to ASCII below.
+  ---------------------------------------------------------------------------
 
   Firebird 1.5 rules this script obeys (they are not optional):
     * SELECT FIRST n     -- there is no TOP and no LIMIT
     * no ABS()           -- it does not exist
-    * user tables have RDB$SYSTEM_FLAG = NULL, not 0
     * ASCII only         -- non-ASCII characters break parsing on the server
 #>
 
@@ -23,125 +34,81 @@ $ErrorActionPreference = 'Stop'
 $out = Join-Path $PSScriptRoot 'probe-invoices.txt'
 if (Test-Path $out) { Remove-Item $out -Force }
 
-function Log($m) { $m | Tee-Object -FilePath $out -Append }
+# ASCII, explicitly. Tee-Object defaults to UTF-16 and the file comes back unreadable.
+function Log($m) {
+  Write-Host $m
+  $m | Out-File -FilePath $out -Append -Encoding ascii
+}
 
 $conn = New-Object System.Data.Odbc.OdbcConnection('DSN=Practical_Plus')
 $conn.Open()
 Log "Connected to Practical_Plus"
 Log ""
 
-function Get-Rows($sql) {
+# Returns the DataTable itself, so the caller can read .Columns AND .Rows.
+function Get-Table($sql) {
   $cmd = $conn.CreateCommand()
   $cmd.CommandText = $sql
-  $cmd.CommandTimeout = 120
+  $cmd.CommandTimeout = 180
   $da = New-Object System.Data.Odbc.OdbcDataAdapter($cmd)
   $dt = New-Object System.Data.DataTable
   [void]$da.Fill($dt)
-  # ASSIGN, then return. Piping a returned array hands the WHOLE array over as one
-  # object -- that trap once string-joined 914 table names into a single blob and
-  # reported the count as "1".
-  $rows = @($dt.Rows)
-  return $rows
+  return ,$dt          # comma stops PowerShell unrolling the table into rows
 }
 
-foreach ($table in @('DRINV', 'CRTRN', 'DRMST', 'CRMST')) {
+foreach ($table in @('DRINV', 'CRTRN', 'DRMST', 'CRMST', 'DRTRN')) {
 
   Log "==============================================================="
   Log "TABLE: $table"
   Log "==============================================================="
 
-  # ---- 1. Columns -------------------------------------------------------
-  # RDB$RELATION_FIELDS is the column catalogue. RDB$FIELD_SOURCE points at the
-  # domain that carries the actual type.
+  # ---- Row count --------------------------------------------------------
   try {
-    $cols = Get-Rows @"
-SELECT rf.RDB\$FIELD_NAME AS COLNAME,
-       f.RDB\$FIELD_TYPE  AS FTYPE,
-       f.RDB\$FIELD_LENGTH AS FLEN,
-       f.RDB\$FIELD_SCALE  AS FSCALE
-FROM RDB\$RELATION_FIELDS rf
-JOIN RDB\$FIELDS f ON f.RDB\$FIELD_NAME = rf.RDB\$FIELD_SOURCE
-WHERE rf.RDB\$RELATION_NAME = '$table'
-ORDER BY rf.RDB\$FIELD_POSITION
-"@
-    Log ("  {0} columns:" -f $cols.Count)
-    foreach ($c in $cols) {
-      $n = ([string]$c.COLNAME).Trim()
-      Log ("    {0,-22} type={1,-4} len={2,-6} scale={3}" -f $n, $c.FTYPE, $c.FLEN, $c.FSCALE)
-    }
+    $c = Get-Table "SELECT COUNT(*) AS N FROM $table"
+    Log ("  row count: {0}" -f $c.Rows[0].N)
   } catch {
-    Log ("  COLUMN READ FAILED: " + $_.Exception.Message)
+    Log ("  TABLE NOT READABLE: " + $_.Exception.Message.Split("`n")[0])
     Log ""
     continue
   }
-  Log ""
 
-  # ---- 2. Row count -----------------------------------------------------
+  # ---- Columns, straight off the result set ------------------------------
+  # No system catalogue, no escaping, nothing to get wrong.
   try {
-    $n = Get-Rows "SELECT COUNT(*) AS N FROM $table"
-    Log ("  row count: {0}" -f $n[0].N)
-  } catch {
-    Log ("  COUNT FAILED: " + $_.Exception.Message)
-  }
-  Log ""
+    $dt = Get-Table "SELECT FIRST 5 * FROM $table"
 
-  # ---- 3. Five real rows ------------------------------------------------
-  # The column list tells you what exists. The DATA tells you what is actually
-  # populated -- which is a different question, and the one that matters. Half of
-  # Practical's columns are defined and never filled in (COMMITBAL was zero on all
-  # 8,919 order lines; the grant register's date columns are empty on all 89 rows).
-  try {
-    $sample = Get-Rows "SELECT FIRST 5 * FROM $table"
-    Log "  5 sample rows:"
-    foreach ($r in $sample) {
+    Log ("  {0} columns:" -f $dt.Columns.Count)
+    foreach ($col in $dt.Columns) {
+      Log ("    {0,-22} {1}" -f $col.ColumnName, $col.DataType.Name)
+    }
+    Log ""
+
+    # ---- What is actually POPULATED ---------------------------------------
+    # The column list says what EXISTS. This says what is FILLED IN, which is a
+    # different question and the one that matters. Practical is full of columns
+    # that are defined and never used: COMMITBAL was zero on all 8,919 order
+    # lines, and the grant register's date columns are empty on all 89 rows.
+    Log "  5 sample rows (empty columns omitted):"
+    $n = 0
+    foreach ($r in $dt.Rows) {
+      $n++
       $pairs = @()
-      foreach ($c in $r.Table.Columns) {
-        $v = $r[$c.ColumnName]
-        if ($v -ne $null -and "$v".Trim() -ne '') {
-          $pairs += ("{0}={1}" -f $c.ColumnName, ("$v".Trim()))
+      foreach ($col in $dt.Columns) {
+        $v = $r[$col.ColumnName]
+        if ($null -ne $v -and "$v".Trim() -ne '' -and "$v" -ne 'System.DBNull') {
+          $pairs += ("{0}={1}" -f $col.ColumnName, "$v".Trim())
         }
       }
-      Log ("    " + ($pairs -join '  |  '))
+      Log ("    [$n] " + ($pairs -join '  |  '))
       Log ""
     }
   } catch {
-    Log ("  SAMPLE FAILED: " + $_.Exception.Message)
+    Log ("  SAMPLE FAILED: " + $_.Exception.Message.Split("`n")[0])
   }
   Log ""
-}
-
-# ---- 4. The specific questions the reports need answered -----------------
-Log "==============================================================="
-Log "WHAT THE REPORTS ACTUALLY NEED"
-Log "==============================================================="
-
-# An invoice report needs: who, how much, when, paid or not.
-# A supplier report needs the same, plus which purchase order it came from.
-$questions = @(
-  @{ q = "DRINV rows in the last 12 months";
-     s = "SELECT COUNT(*) AS N FROM DRINV WHERE INVDATE >= '2025-07-01'" },
-  @{ q = "CRTRN rows in the last 12 months";
-     s = "SELECT COUNT(*) AS N FROM CRTRN WHERE TRANDATE >= '2025-07-01'" },
-  @{ q = "CRTRN rows carrying an ORDERNO (links a bill to a purchase order)";
-     s = "SELECT COUNT(*) AS N FROM CRTRN WHERE ORDERNO IS NOT NULL AND ORDERNO <> ''" }
-)
-
-foreach ($item in $questions) {
-  Log ""
-  Log ("Q: " + $item.q)
-  try {
-    $r = Get-Rows $item.s
-    Log ("   -> {0}" -f $r[0].N)
-  } catch {
-    # A failure here is INFORMATION, not an error. It means the column is named
-    # something else -- and the column list printed above will show what.
-    Log ("   -> column guess was wrong: " + $_.Exception.Message)
-    Log ("      (check the column list above for the real date/order column)")
-  }
 }
 
 $conn.Close()
-Log ""
 Log "==============================================================="
 Log "DONE. Send Nathan this file: scripts\odbc\probe-invoices.txt"
 Log "==============================================================="
