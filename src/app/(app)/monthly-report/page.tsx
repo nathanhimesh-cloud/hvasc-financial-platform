@@ -1,6 +1,6 @@
 import { Content } from "@/components/kit/panel";
-import { PrintButton } from "@/components/kit/print-button";
-import { PeriodSelector } from "@/components/kit/period-selector";
+import { PageToolbar } from "@/components/kit/page-toolbar";
+import { InfoNote } from "@/components/kit/info-popover";
 import { MonthlyReportView } from "@/components/reports/monthly-report-view";
 import { MonthlyReportPicker } from "@/components/reports/monthly-report-picker";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
@@ -32,18 +32,17 @@ export default async function MonthlyReportPage({
 
   return (
     <Content>
-      <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <MonthlyReportPicker scopes={scopes} selected={selected} />
-          <PeriodSelector
-            periods={view.periods}
-            selected={view.selected}
-            isLatest={view.isLatest}
-            hasHistory={view.hasHistory}
-          />
-        </div>
-        <PrintButton label="Print / PDF this report" />
-      </div>
+      <PageToolbar
+        view={view}
+        filters={<MonthlyReportPicker scopes={scopes} selected={selected} />}
+        notes={
+          <InfoNote label="Early in the financial year">
+            Year-to-date figures in the first months of a year are small, and expenses can read
+            negative where June&apos;s year-end accruals are being reversed. That is expected, not an
+            error.
+          </InfoNote>
+        }
+      />
 
       <MonthlyReportView report={report} />
     </Content>

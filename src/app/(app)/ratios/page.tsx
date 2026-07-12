@@ -1,7 +1,7 @@
 import { CheckCircle2, AlertTriangle, Info, MinusCircle } from "lucide-react";
 import { Content, Panel, PanelHeader } from "@/components/kit/panel";
-import { PrintButton } from "@/components/kit/print-button";
-import { PeriodSelector } from "@/components/kit/period-selector";
+import { PageToolbar } from "@/components/kit/page-toolbar";
+import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { assessRatios, type Ratio } from "@/lib/ratios";
 import { formatPercent } from "@/lib/format";
@@ -12,81 +12,72 @@ export const dynamic = "force-dynamic";
 /**
  * Statutory financial sustainability ratios (Build Brief B8).
  *
- * Hope Vale is a **Tier 8** council under the Financial Management
- * (Sustainability) Guideline 2024 — confirmed from their own audited FY2025
- * Financial Sustainability Statement.
+ * Hope Vale is **Tier 8** — confirmed from their audited FY2025 Financial
+ * Sustainability Statement. The Operating Surplus Ratio is CONTEXTUAL for Tier 8:
+ * it has no benchmark, and this page never red-flags it.
  *
- * The Operating Surplus Ratio is CONTEXTUAL for Tier 8: it has no benchmark, and
- * this page never red-flags it. Showing a red light against a target the Council
- * is not held to would be worse than showing nothing.
+ * LAYOUT. The first version gave equal weight to every measure, so three real
+ * ratios sat among four that said "needs data" in identical boxes, each with a
+ * paragraph of orange explanation. The page read as broken when it was mostly
+ * working. Computed ratios lead; the ones we can't compute are folded into one
+ * quiet section at the bottom that says what's missing and who can supply it.
  */
 export default async function RatiosPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const view = await resolvePeriodView(await searchParams);
   const report = assessRatios(view.snapshot);
 
+  const live = report.ratios.filter((r) => r.status !== "unavailable");
+  const blocked = report.ratios.filter((r) => r.status === "unavailable");
+
   const groups = ["Operating Performance", "Liquidity", "Asset Management", "Financial Capacity"] as const;
 
   return (
     <Content>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <PeriodSelector
-            periods={view.periods}
-            selected={view.selected}
-            isLatest={view.isLatest}
-            hasHistory={view.hasHistory}
-          />
+      <PageToolbar
+        view={view}
+        filters={
           <span className="rounded-full border border-gold/30 bg-gold-dim px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.06em] text-gold-light">
-            Tier {report.tier} council
+            Tier {report.tier}
           </span>
-        </div>
-        <PrintButton />
-      </div>
-
-      {/* The tier rule — the most important thing on this page. */}
-      <Panel className="mb-5 flex gap-2.5">
-        <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-gold" strokeWidth={1.75} />
-        <div className="text-[12px] leading-relaxed text-muted-foreground">
-          Hope Vale is <span className="text-foreground">Tier 8</span> under the Financial Management
-          (Sustainability) Guideline 2024 — confirmed from the Council&apos;s audited FY2025 Financial
-          Sustainability Statement. Benchmarks differ by tier.{" "}
-          <span className="text-foreground">
-            The Operating Surplus Ratio is contextual for Tier 8 — it has no benchmark
-          </span>
-          , so it is reported but never flagged. The Leverage Ratio is omitted because the Council holds
-          no debt (the Cash Flow&apos;s financing section is empty, which corroborates this).
-        </div>
-      </Panel>
+        }
+        notable
+        notes={
+          <>
+            <InfoNote label="Tier 8">
+              Hope Vale is Tier 8 under the Financial Management (Sustainability) Guideline 2024 —
+              confirmed from the Council&apos;s audited FY2025 Financial Sustainability Statement.
+              Benchmarks differ by tier. The <span className="text-foreground">Operating Surplus Ratio
+              is contextual for Tier 8: it has no benchmark</span>, so it is reported but never flagged.
+            </InfoNote>
+            <InfoNote label="Why last year&apos;s figures?">
+              These are <span className="text-foreground">annual</span> measures. The Council raises its
+              rates once a year and receives most grant income late, so a surplus ratio calculated from
+              July alone would be wildly negative and would tell you nothing. Flow ratios are reported on{" "}
+              {report.flowBasis}; the cash cover and asset ratios are point-in-time and are current.
+            </InfoNote>
+            <InfoNote label="No leverage ratio">
+              Omitted — the Council holds no debt. The Cash Flow&apos;s financing section is empty, which
+              corroborates it.
+            </InfoNote>
+            <InfoNote label="Reference figures">
+              &quot;Audited FY25&quot; is the Council&apos;s own published actual, for comparison.
+            </InfoNote>
+          </>
+        }
+      />
 
       {report.needsResync && (
-        <Panel className="mb-5 flex gap-2.5 border-amber/30 bg-amber/5">
+        <Panel className="mb-4 flex gap-2.5 border-amber/30 bg-amber/5">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber" strokeWidth={1.75} />
           <div className="text-[12px] leading-relaxed text-muted-foreground">
-            <span className="text-amber">Awaiting a data resync.</span> The ratios need the
-            operating-versus-capital split, which the feed now reads from Practical&apos;s own report
-            definitions (FR reports 743 and 744). Run the next sync and these populate.
-          </div>
-        </Panel>
-      )}
-
-      {/* Why the headline figures say "last year" — the single most likely question. */}
-      {report.usingPriorYear && (
-        <Panel className="mb-5 flex gap-2.5">
-          <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-gold" strokeWidth={1.75} />
-          <div className="text-[12px] leading-relaxed text-muted-foreground">
-            These are <span className="text-foreground">annual</span> measures, so they are reported
-            on <span className="text-foreground">{report.flowBasis}</span> — the last complete
-            financial year. The Council raises its rates once a year and receives most grant income
-            later in the year, so a surplus ratio calculated from the first month of a year would be
-            wildly negative and would tell you nothing. The current year&apos;s figures appear here as
-            it progresses, and are benchmarked at 30 June. The cash cover ratio below is a
-            point-in-time measure and is current.
+            <span className="text-amber">Awaiting a data resync.</span> Run the next sync and these
+            populate.
           </div>
         </Panel>
       )}
 
       {groups.map((g) => {
-        const rows = report.ratios.filter((r) => r.group === g);
+        const rows = live.filter((r) => r.group === g);
         if (!rows.length) return null;
         return (
           <Panel key={g} className="mb-4">
@@ -100,11 +91,37 @@ export default async function RatiosPage({ searchParams }: { searchParams: Promi
         );
       })}
 
-      <p className="mt-4 font-mono text-[10px] leading-relaxed text-muted-foreground">
-        Reference figures are the Council&apos;s audited FY2025 actuals, from its published Financial
-        Sustainability Statement. Ratios marked &quot;needs data&quot; require the asset register or
-        external (ABS) data that the finance system does not hold.
-      </p>
+      {blocked.length > 0 && (
+        <Panel>
+          <PanelHeader
+            title="Not yet computable"
+            subtitle={`${blocked.length} of ${report.ratios.length} measures · what each one needs`}
+          />
+          <div className="flex flex-col divide-y divide-border">
+            {blocked.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 py-2.5 first:pt-0 last:pb-0">
+                <div className="flex min-w-[13rem] flex-1 items-center gap-2">
+                  <MinusCircle className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" strokeWidth={2} />
+                  <span className="text-[13px] text-foreground">{r.label}</span>
+                </div>
+                <p className="flex-[2] text-[11px] leading-relaxed text-muted-foreground">
+                  {r.blockedReason}
+                </p>
+                {r.audited2025 !== undefined && (
+                  <div className="text-right">
+                    <div className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
+                      Audited FY25
+                    </div>
+                    <div className="font-mono text-[12px] tabular-nums text-muted-foreground">
+                      {r.unit === "months" ? `${r.audited2025} mo` : `${r.audited2025}%`}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
     </Content>
   );
 }
@@ -113,24 +130,20 @@ function RatioRow({ r }: { r: Ratio }) {
   const fmt = (v: number | null) =>
     v === null ? "—" : r.unit === "months" ? `${v.toFixed(1)} months` : formatPercent(v / 100, 2);
 
-  // "provisional" reads as neutral, never green or red — it is explicitly not a verdict.
+  // "provisional" and "contextual" read neutral — neither is a verdict.
   const tone =
     r.status === "pass"
       ? "text-green"
       : r.status === "fail"
         ? "text-red"
-        : r.status === "contextual" || r.status === "provisional"
-          ? "text-foreground"
-          : "text-muted-foreground";
+        : "text-foreground";
 
   const Icon =
     r.status === "pass"
       ? CheckCircle2
       : r.status === "fail"
         ? AlertTriangle
-        : r.status === "contextual" || r.status === "provisional"
-          ? Info
-          : MinusCircle;
+        : Info;
 
   return (
     <div className="rounded-md border border-border bg-elevated/30 px-3.5 py-3">
@@ -146,23 +159,16 @@ function RatioRow({ r }: { r: Ratio }) {
             )}
           </div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">{r.meaning}</p>
-          <p className="mt-1 font-mono text-[10px] text-muted-foreground">{r.formula}</p>
-          {r.blockedReason && (
-            <p className="mt-1 text-[11px] leading-relaxed text-amber">{r.blockedReason}</p>
-          )}
         </div>
 
         <div className="flex flex-shrink-0 items-start gap-5 text-right">
           <div>
-            <div className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
-              Measured over
-            </div>
-            <div className={cn("mt-0.5 font-heading text-[19px] font-semibold tabular-nums", tone)}>
-              {r.status === "unavailable" ? "needs data" : fmt(r.value)}
+            <div className={cn("font-heading text-[20px] font-semibold tabular-nums", tone)}>
+              {fmt(r.value)}
             </div>
             <div className="mt-0.5 font-mono text-[9px] text-muted-foreground">{r.basis}</div>
           </div>
-          <div>
+          <div className="min-w-[8rem]">
             <div className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
               Target
             </div>

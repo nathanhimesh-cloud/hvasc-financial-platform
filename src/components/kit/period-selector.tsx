@@ -115,6 +115,16 @@ export function PeriodSelector({
 
       {pending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" strokeWidth={2} />}
 
+      {/*
+        ONE chip, not three.
+        This control used to end with three separate notes — "archived period",
+        "one period synced so far", and "data as at ...". Two of those are
+        reassurance, not information, and they appeared at the top of every single
+        screen. The provenance now lives behind the page's info icon.
+
+        The archived-period warning STAYS on the page, because a stale figure that
+        looks live is the most dangerous thing this platform could show.
+      */}
       {!isLatest && (
         <span
           className={cn(
@@ -123,19 +133,7 @@ export function PeriodSelector({
           )}
         >
           <History className="h-3 w-3" strokeWidth={2} />
-          Archived period — not the latest
-        </span>
-      )}
-
-      {!hasHistory && (
-        <span className="font-mono text-[10px] text-muted-foreground">
-          one period synced so far
-        </span>
-      )}
-
-      {selected.generatedAt && (
-        <span className="font-mono text-[10px] text-muted-foreground">
-          data as at {selected.generatedAt}
+          Archived
         </span>
       )}
     </div>

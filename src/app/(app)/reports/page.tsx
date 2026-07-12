@@ -1,10 +1,12 @@
 import { Content } from "@/components/kit/panel";
+import { PageToolbar } from "@/components/kit/page-toolbar";
+import { InfoNote } from "@/components/kit/info-popover";
 import { ReportsView, type ReportPeriod, type ReportDept } from "@/components/reports/reports-view";
-import { PeriodSelector } from "@/components/kit/period-selector";
 import { resolvePeriodView, periodDateRange, type SearchParams } from "@/lib/periods";
 import { assessIntegrity } from "@/lib/integrity";
 import { budgetReportFY27 } from "@/data/budget-report-fy27";
 import { queryTransactions, isLedgerEnabled } from "@/lib/ledger";
+import { spendTrend } from "@/lib/trend";
 import type { IncomeStatement } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -101,14 +103,30 @@ export default async function ReportsPage({
 
   return (
     <Content>
-      <div className="mb-4">
-        <PeriodSelector
-          periods={view.periods}
-          selected={view.selected}
-          isLatest={view.isLatest}
-          hasHistory={view.hasHistory}
-        />
-      </div>
+      <PageToolbar
+        view={view}
+        print={false} /* ReportsView carries its own print button, per statement */
+        notable={integrity.status === "fail"}
+        notes={
+          <>
+            <InfoNote label="Accuracy checks">
+              Four rules that must always hold: the Balance Sheet balances, the Cash Flow reconciles,
+              cash agrees across both statements, and the net result ties to the movement in equity. A
+              failure usually means an unmapped account or a period mismatch — not a typo. The figures
+              come straight from Practical.
+            </InfoNote>
+            <InfoNote label="Cash Flow">
+              Built from Practical&apos;s own Cash Flow report definition (report 739), not a rule we
+              invented. Some accounts move cash without being mapped to a line in that report; they are
+              shown as &quot;Other operating&quot; so the statement still ties to the cent.
+            </InfoNote>
+            <InfoNote label="Early in the financial year">
+              Small and even negative figures in the first months are expected — June&apos;s year-end
+              accruals reverse in July.
+            </InfoNote>
+          </>
+        }
+      />
       <ReportsView
         fyLabel={period.fyLabel}
         monthOfYear={period.monthOfYear}
@@ -116,7 +134,7 @@ export default async function ReportsPage({
         comparisonLabel={period.comparisonLabel ?? "Budget"}
         periods={periods}
         departments={departments}
-        monthlySpend={snapshot.monthlySpend}
+        trend={spendTrend(snapshot)}
         balanceSheet={snapshot.balanceSheet}
         cashFlow={snapshot.cashFlow}
         integrity={integrity}

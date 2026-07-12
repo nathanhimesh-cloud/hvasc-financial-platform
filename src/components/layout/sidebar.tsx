@@ -12,7 +12,7 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react";
-import { allDepartmentsNav, dataNav, dataNavFor, overviewNav } from "@/lib/nav";
+import { allDepartmentsNav, dataNav, dataNavFor, overviewNav, trackingNav, reportsNav } from "@/lib/nav";
 import { getDeptIcon } from "@/lib/icons";
 import { PROFILE } from "@/lib/profile";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -51,8 +51,11 @@ export function Sidebar({
 
   // The Departments list is long, so let it collapse. Persist the choice, and
   // always reveal it while you're on a department route.
+  // Collapsed by DEFAULT. Four department links expanded on every screen is four
+  // links most people never click, pushing everything else down. It opens on its
+  // own when you're actually in a department, and the choice is remembered.
   const deptActive = pathname.startsWith("/departments");
-  const [deptsOpen, setDeptsOpen] = useState(true);
+  const [deptsOpen, setDeptsOpen] = useState(false);
   useEffect(() => {
     // Restore the saved choice on mount (kept out of the initial state to avoid
     // an SSR/hydration mismatch — the server has no localStorage).
@@ -119,33 +122,40 @@ export function Sidebar({
               href={item.href}
               label={item.label}
               icon={item.icon}
-              active={
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname === item.href || pathname.startsWith(item.href + "/")
-              }
+              active={item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)}
+              collapsed={collapsed}
+            />
+          ))}
+        </NavGroup>
+
+        {/* Things with a lifecycle you're following through to a conclusion. */}
+        <NavGroup label="Tracking" collapsed={collapsed}>
+          {trackingNav.map((item) => (
+            <NavRow
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={pathname === item.href || pathname.startsWith(item.href + "/")}
               collapsed={collapsed}
               badge={item.href === "/grants" && grantsBadge > 0 ? grantsBadge : undefined}
             />
           ))}
         </NavGroup>
 
-        {/* Role-aware: signed-in users see only what their role permits. When auth
-            isn't configured there's no role, so fall back to the default links. */}
-        {dataLinks.length > 0 && (
-          <NavGroup label="Data" collapsed={collapsed}>
-            {dataLinks.map((item) => (
-              <NavRow
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={pathname === item.href || pathname.startsWith(item.href + "/")}
-                collapsed={collapsed}
-              />
-            ))}
-          </NavGroup>
-        )}
+        {/* Formal statements — the things you'd print, sign, or send to Council. */}
+        <NavGroup label="Reports" collapsed={collapsed}>
+          {reportsNav.map((item) => (
+            <NavRow
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={pathname === item.href || pathname.startsWith(item.href + "/")}
+              collapsed={collapsed}
+            />
+          ))}
+        </NavGroup>
 
         <NavGroup
           label="Departments"
@@ -173,6 +183,23 @@ export function Sidebar({
             />
           ))}
         </NavGroup>
+
+        {/* Role-aware: signed-in users see only what their role permits. Last,
+            because provenance and admin are what you check, not what you use. */}
+        {dataLinks.length > 0 && (
+          <NavGroup label="Data" collapsed={collapsed}>
+            {dataLinks.map((item) => (
+              <NavRow
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                active={pathname === item.href || pathname.startsWith(item.href + "/")}
+                collapsed={collapsed}
+              />
+            ))}
+          </NavGroup>
+        )}
       </nav>
 
       {/* Data sync status (replaces the old Reporting Period block — brief B10) */}

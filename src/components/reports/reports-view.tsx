@@ -20,6 +20,8 @@ import { KpiCard } from "@/components/kit/kpi-card";
 import { IntegrityBanner } from "@/components/kit/integrity-banner";
 import { DataStamp } from "@/components/kit/data-stamp";
 import { PrintButton } from "@/components/kit/print-button";
+import { TrendBars } from "@/components/kit/trend-bars";
+import type { SpendTrend } from "@/lib/trend";
 import { BudgetVsActual } from "./budget-vs-actual";
 import { TransactionsView, type TransactionFilters } from "./transactions-view";
 import { bgDim, textColor } from "@/lib/colors";
@@ -63,7 +65,7 @@ export function ReportsView({
   comparisonLabel,
   periods,
   departments,
-  monthlySpend,
+  trend,
   balanceSheet,
   cashFlow,
   integrity,
@@ -81,7 +83,8 @@ export function ReportsView({
   comparisonLabel: string;
   periods: ReportPeriod[];
   departments: ReportDept[];
-  monthlySpend: { month: string; amount: number }[];
+  /** What to plot: months once there are enough, days before that. */
+  trend: SpendTrend | null;
   balanceSheet?: BalanceSheet;
   cashFlow?: CashFlow;
   integrity: IntegrityReport;
@@ -397,11 +400,21 @@ export function ReportsView({
             )}
           </Panel>
 
-          {/* Monthly expense trend */}
-          <Panel>
-            <PanelHeader title="Monthly Expense Trend" subtitle="COUNCIL-WIDE · PER MONTH" />
-            <TrendBars data={monthlySpend} highlight={current.month} />
-          </Panel>
+          {/* Spend trend. Falls back to a DAILY series early in the year, when
+              a monthly chart would be a single bar and not a trend at all. */}
+          {trend && (
+            <Panel>
+              <PanelHeader
+                title={trend.granularity === "day" ? "Daily Expense Trend" : "Monthly Expense Trend"}
+                subtitle={trend.subtitle}
+              />
+              <TrendBars
+                data={trend.points}
+                highlight={trend.highlight}
+                labelEvery={trend.labelEvery}
+              />
+            </Panel>
+          )}
         </>
       )}
     </div>
@@ -717,26 +730,3 @@ function Num({
   );
 }
 
-function TrendBars({ data, highlight }: { data: { month: string; amount: number }[]; highlight: string }) {
-  const max = Math.max(...data.map((d) => d.amount), 1);
-  return (
-    <div className="flex items-end gap-2" style={{ height: 140 }}>
-      {data.map((d) => {
-        const h = Math.max((d.amount / max) * 100, 2);
-        const isHi = d.month === highlight;
-        return (
-          <div key={d.month} className="group flex flex-1 flex-col items-center gap-1.5">
-            <div className="flex w-full flex-1 items-end">
-              <div
-                className={cn("w-full rounded-t transition-colors", isHi ? "bg-gold" : "bg-elevated group-hover:bg-[#2a2a2a]")}
-                style={{ height: `${h}%` }}
-                title={`${d.month}: ${formatCompact(d.amount)}`}
-              />
-            </div>
-            <span className={cn("font-mono text-[9px]", isHi ? "text-gold-light" : "text-muted-foreground")}>{d.month}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}

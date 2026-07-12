@@ -1,8 +1,8 @@
 import { Briefcase, Wallet, Activity, AlertTriangle, Unlink } from "lucide-react";
+import { PageToolbar } from "@/components/kit/page-toolbar";
+import { InfoNote } from "@/components/kit/info-popover";
 import { Content, Panel } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
-import { PrintButton } from "@/components/kit/print-button";
-import { PeriodSelector } from "@/components/kit/period-selector";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { jobBudgetGroups, jobBudgetSummary } from "@/lib/job-budgets";
 import { JobBudgetTable } from "@/components/jobs/job-budget-table";
@@ -20,18 +20,30 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
   return (
     <Content>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <PeriodSelector
-            periods={view.periods}
-            selected={view.selected}
-            isLatest={view.isLatest}
-            hasHistory={view.hasHistory}
-          />
-          {groups.length > 0 && <DataQualityBadge issues={jobIssues(s)} />}
-        </div>
-        <PrintButton />
-      </div>
+      <PageToolbar
+        view={view}
+        filters={groups.length > 0 ? <DataQualityBadge issues={jobIssues(s)} /> : undefined}
+        notes={
+          <>
+            <InfoNote label="Where the budget lives">
+              Practical holds the budget on the GL <span className="text-foreground">account</span>, not
+              on the job — in the FY26 export only 12 of 384 jobs carried an estimate of their own. So
+              this mirrors Practical&apos;s own Jobs Budget report: budget from the account, actuals from
+              the jobs beneath it.
+            </InfoNote>
+            <InfoNote label="Actual vs job-costed">
+              <span className="text-foreground">Actual</span> is the account&apos;s full balance;{" "}
+              <span className="text-foreground">job-costed</span> is only the part carrying a job code.
+              The difference is spend posted without a job — kept visible rather than netted away.
+            </InfoNote>
+            <InfoNote label="Committed">
+              Value ordered on purchase orders but not yet invoiced. Practical&apos;s own committed field
+              is unused at this site, so it comes from the order ledger. A job can be under budget on
+              actuals and already over-committed on orders.
+            </InfoNote>
+          </>
+        }
+      />
 
       {groups.length === 0 ? (
         <Panel className="py-14 text-center">

@@ -1,11 +1,11 @@
 import { Landmark, Banknote, Send, AlertTriangle, Lock } from "lucide-react";
+import { PageToolbar } from "@/components/kit/page-toolbar";
+import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
-import { PeriodSelector } from "@/components/kit/period-selector";
 import { allGrantFigures, grantSummary, GRANT_REGISTER } from "@/lib/grants";
 import { formatCompact, formatPercent } from "@/lib/format";
 import { Content } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
-import { PrintButton } from "@/components/kit/print-button";
 import { GrantRegisterTable } from "@/components/grants/grant-register-table";
 import { GrantMix } from "@/components/dashboard/grant-mix";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
@@ -29,22 +29,22 @@ export default async function GrantsPage({
 
   return (
     <Content>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-          Register: {GRANT_REGISTER.source} · imported {GRANT_REGISTER.importedAt}
-        </p>
-        <PrintButton />
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <PeriodSelector
-          periods={view.periods}
-          selected={view.selected}
-          isLatest={view.isLatest}
-          hasHistory={view.hasHistory}
-        />
-        <DataQualityBadge issues={grantIssues(s)} />
-      </div>
+      <PageToolbar
+        view={view}
+        filters={<DataQualityBadge issues={grantIssues(s)} />}
+        notes={
+          <>
+            <InfoNote label="The register">
+              {GRANT_REGISTER.source} · imported {GRANT_REGISTER.importedAt}.
+            </InfoNote>
+            <InfoNote label="How spend is measured">
+              Grant expenditure is the sum of its job codes&apos; costs in the general ledger — not a
+              figure anyone types in. Grants with no job code cannot be measured, and are flagged rather
+              than shown as $0 spent.
+            </InfoNote>
+          </>
+        }
+      />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard color="gold" icon={Landmark} label="Grants Tracked" value={s.count} meta="From the grant register" />

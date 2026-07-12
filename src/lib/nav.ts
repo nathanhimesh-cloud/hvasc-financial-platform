@@ -22,12 +22,32 @@ export interface NavLink {
   icon: LucideIcon;
 }
 
-/** "Overview" section — the reporting views. */
+/**
+ * The sidebar, grouped by what you'd go there to DO.
+ *
+ * It used to be one undifferentiated list of seven links under "Overview" —
+ * dashboard, grants, jobs, commitments, three kinds of report — followed by three
+ * more under "Data". Everything looked equally important, so nothing did.
+ *
+ *   Overview     where you land
+ *   Tracking     things with a lifecycle you're following (grants, jobs, orders)
+ *   Reports      formal statements you'd print or send
+ *   Departments  the drill-down (collapsed by default)
+ *   Data         provenance and admin
+ */
 export const overviewNav: NavLink[] = [
   { href: "/", label: "CFO Dashboard", icon: LayoutDashboard },
+];
+
+/** Things with a lifecycle — money you're following through to a conclusion. */
+export const trackingNav: NavLink[] = [
   { href: "/grants", label: "Grant Tracker", icon: Landmark },
   { href: "/jobs", label: "Job Budgets", icon: Briefcase },
   { href: "/commitments", label: "Commitments & Debtors", icon: FileClock },
+];
+
+/** Formal statements — the things you'd print, sign, or send to Council. */
+export const reportsNav: NavLink[] = [
   { href: "/reports", label: "Detailed Reports", icon: FileText },
   { href: "/monthly-report", label: "Monthly Report", icon: FileBarChart },
   { href: "/ratios", label: "Sustainability Ratios", icon: Gauge },

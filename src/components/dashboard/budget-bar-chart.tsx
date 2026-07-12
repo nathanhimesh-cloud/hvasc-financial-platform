@@ -5,11 +5,15 @@ import { hex, statusToColor, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
 import { formatCompact, formatCurrency, formatPercent } from "@/lib/format";
 import { CardBadge, Panel, PanelHeader } from "@/components/kit/panel";
+import { TrendBars } from "@/components/kit/trend-bars";
+import type { SpendTrend } from "@/lib/trend";
 import { cn } from "@/lib/utils";
 
 interface Props {
   departments: DepartmentDerived[];
   monthlySpend: MonthlySpend[];
+  /** What to plot when there is not yet enough of a year for a monthly line. */
+  trend?: SpendTrend | null;
   monthLabel: string; // e.g. "Month 9"
   /** Budget figures are an estimate (FY26 budget not loaded). */
   budgetEstimated?: boolean;
@@ -22,6 +26,7 @@ interface Props {
 export function BudgetBarChart({
   departments,
   monthlySpend,
+  trend,
   monthLabel,
   budgetEstimated,
   trendEstimated,
@@ -91,12 +96,26 @@ export function BudgetBarChart({
         })}
       </div>
 
-      <Sparkline
-        monthlySpend={monthlySpend}
-        monthlyBudget={monthlyBudget}
-        trendEstimated={trendEstimated}
-        isFy25={isFy25}
-      />
+      {/*
+        The sparkline needs at least two months to be a line, and it plots against
+        a POSITIVE budget reference. In July the Council has one month of spend and
+        it is NEGATIVE (June's accruals reversing), so the point rendered below the
+        axis and the chart came out blank. Fall back to the shared bar chart, which
+        handles a signed series and can plot the daily detail instead.
+      */}
+      {monthlySpend.length >= 2 ? (
+        <Sparkline
+          monthlySpend={monthlySpend}
+          monthlyBudget={monthlyBudget}
+          trendEstimated={trendEstimated}
+          isFy25={isFy25}
+        />
+      ) : trend ? (
+        <div>
+          <TrendBars data={trend.points} labelEvery={trend.labelEvery} height={96} />
+          <p className="mt-2 font-mono text-[9px] text-muted-foreground">{trend.subtitle}</p>
+        </div>
+      ) : null}
     </Panel>
   );
 }

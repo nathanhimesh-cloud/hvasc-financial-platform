@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { spendTrend } from "@/lib/trend";
 import {
   Settings2,
   RotateCcw,
@@ -254,7 +255,7 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
     "operating-position": <OperatingPosition totalIncome={fin.income} totalExpenses={fin.expenses} netResult={fin.net} periodLabel={fin.label} />,
     "cash-position": <CashPosition cash={cash} periodLabel={snapshot.period.label} />,
     "grant-mix": <GrantMix summary={grantMix} periodLabel={snapshot.period.label} />,
-    "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} monthLabel={`Month ${snapshot.period.monthOfYear}`} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
+    "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} trend={spendTrend(snapshot)} monthLabel={`Month ${snapshot.period.monthOfYear}`} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
     "allocation-donut": <AllocationDonut allocation={allocation} totalBudget={totalBudget} revenueLines={snapshot.revenueLines} totalRevenue={revenue} budgetEstimated={budgetEstimated} comparisonLabel={comparisonLabel} />,
     "department-table": <DepartmentTable departments={depts} periodLabel={snapshot.period.label} comparisonLabel={comparisonLabel} />,
   };

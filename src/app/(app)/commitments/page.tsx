@@ -1,8 +1,8 @@
-import { HardHat, FileClock, ArrowDownLeft, ArrowUpRight, AlertTriangle, Info } from "lucide-react";
+import { HardHat, FileClock, ArrowDownLeft, ArrowUpRight, AlertTriangle } from "lucide-react";
 import { Content, Panel, PanelHeader } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
-import { PrintButton } from "@/components/kit/print-button";
-import { PeriodSelector } from "@/components/kit/period-selector";
+import { PageToolbar } from "@/components/kit/page-toolbar";
+import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { assessWorkingCapital, commitmentsBySupplier, type AgeingInsight } from "@/lib/working-capital";
 import { formatCurrency, formatCompact, formatPercent } from "@/lib/format";
@@ -32,15 +32,36 @@ export default async function CommitmentsPage({
 
   return (
     <Content>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <PeriodSelector
-          periods={view.periods}
-          selected={view.selected}
-          isLatest={view.isLatest}
-          hasHistory={view.hasHistory}
-        />
-        <PrintButton />
-      </div>
+      <PageToolbar
+        view={view}
+        notable={wc.receivables?.alarming || !!c?.staleCount}
+        notes={
+          <>
+            <InfoNote label="What a commitment is">
+              Value ordered on a purchase order but not yet invoiced. It has left the Council in every
+              sense that matters, but it hasn&apos;t touched the general ledger yet — so it is invisible
+              in every other report.
+            </InfoNote>
+            <InfoNote label="How it&apos;s measured">
+              Practical&apos;s own <span className="font-mono">COMMITBAL</span> field is unused at this
+              site (zero on all 8,919 order lines), so the commitment is derived as ordered less
+              invoiced — per line, floored at zero, on lines not yet fully invoiced and raised in the
+              last 12 months. Capital vs operating comes from the GL account each line posts to.
+            </InfoNote>
+            {c?.staleCount ? (
+              <InfoNote label="Excluded from the total">
+                A further {formatCurrency(c.stale ?? 0)} sits on {c.staleCount} order lines raised over a
+                year ago and never invoiced or closed off. Excluded — an order nobody has actioned in a
+                year is more likely an untidy ledger than a live obligation. Worth a clean-up either way.
+              </InfoNote>
+            ) : null}
+            <InfoNote label="Ageing">
+              Straight from Practical&apos;s own end-of-month ageing buckets (
+              <span className="font-mono">DRMST / CRMST</span>) — nothing is recomputed here.
+            </InfoNote>
+          </>
+        }
+      />
 
       {wc.needsResync ? (
         <Panel className="py-14 text-center">
@@ -91,7 +112,13 @@ export default async function CommitmentsPage({
             />
           </div>
 
-          {/* The single most actionable thing on this page. */}
+          {/*
+            The ONE thing that stays on the page.
+            Everything else moved behind the info icon — methodology, provenance,
+            the stale-order caveat. This didn't, because it is not an explanation:
+            it is a finding, it costs the Council money, and someone has to act on
+            it. That is the test for what earns a place on the screen.
+          */}
           {wc.receivables?.alarming && (
             <Panel className="mb-5 flex gap-2.5 border-red/30 bg-red/5">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red" strokeWidth={1.75} />
@@ -101,27 +128,10 @@ export default async function CommitmentsPage({
                   {formatCurrency(wc.receivables.schedule.total)} owed to the Council is more than 90
                   days overdue
                 </span>{" "}
-                — {formatPercent(wc.receivables.overdueShare ?? 0, 0)} of the whole debtors book. Debt
-                this old rarely collects itself. The largest overdue accounts are listed below.
+                — {formatPercent(wc.receivables.overdueShare ?? 0, 0)} of the debtors book.
               </div>
             </Panel>
           )}
-
-          {c && c.staleCount ? (
-            <Panel className="mb-5 flex gap-2.5">
-              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber" strokeWidth={1.75} />
-              <div className="text-[12px] leading-relaxed text-muted-foreground">
-                A further{" "}
-                <span className="text-foreground">{formatCurrency(c.stale ?? 0)}</span> sits on{" "}
-                <span className="text-foreground">{c.staleCount} order lines raised over a year ago</span>{" "}
-                and never invoiced or closed off. They are <span className="text-foreground">excluded</span>{" "}
-                from the commitment figures above, because an order nobody has actioned in a year is
-                more likely an untidy ledger than a live obligation — but they are either real money
-                the Council owes, or a purchase-order clean-up waiting to happen. Worth a look either
-                way.
-              </div>
-            </Panel>
-          ) : null}
 
           {/* Capital works in progress */}
           {wc.workInProgress.length > 0 && (
@@ -197,9 +207,6 @@ export default async function CommitmentsPage({
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted-foreground">
-                {c?.source}
-              </p>
             </Panel>
           )}
 
