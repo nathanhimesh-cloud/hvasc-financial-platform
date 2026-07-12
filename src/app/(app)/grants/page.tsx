@@ -10,6 +10,14 @@ import { GrantRegisterTable } from "@/components/grants/grant-register-table";
 import { GrantMix } from "@/components/dashboard/grant-mix";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
 import { grantIssues } from "@/lib/data-quality";
+import { grantRisk } from "@/lib/grant-risk";
+import { GrantRiskPanel } from "@/components/grants/grant-risk-panel";
+import { grantDeadlines } from "@/lib/grant-deadlines";
+import { DeadlinePanel } from "@/components/grants/deadline-panel";
+import { NarrativeDrafter } from "@/components/grants/narrative-drafter";
+import { aiConfigured } from "@/lib/ai/narrative";
+import { getSession } from "@/lib/auth/session";
+import { can } from "@/lib/auth/roles";
 import { ReferenceUploadButton } from "@/components/kit/reference-upload";
 import { referenceMeta } from "@/lib/reference";
 
@@ -25,6 +33,10 @@ export default async function GrantsPage({
   const regMeta = (await referenceMeta())["grant-register"];
   const figures = allGrantFigures(snapshot);
   const s = grantSummary(figures);
+  const risk = grantRisk(figures);
+  const deadlines = grantDeadlines(figures);
+  const session = await getSession();
+  const mayDraft = can(session?.role, "grants.edit");
   const utilisation = s.totalBudgetedExpense > 0 ? s.expenseToDate / s.totalBudgetedExpense : 0;
 
   return (
@@ -97,9 +109,25 @@ export default async function GrantsPage({
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <GrantMix summary={s} periodLabel={snapshot.period.label} />
+        <GrantRiskPanel risk={risk} />
       </div>
+
+      <div className="mb-6">
+        <DeadlinePanel report={deadlines} />
+      </div>
+
+      {mayDraft && (
+        <div className="mb-6">
+          <NarrativeDrafter
+            configured={aiConfigured()}
+            grants={figures
+              .filter((f) => f.entry.active && !f.hasUnresolvedCodes)
+              .map((f) => ({ id: f.entry.id, name: f.entry.name }))}
+          />
+        </div>
+      )}
 
       <GrantRegisterTable figures={figures} />
     </Content>

@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { LogOut, KeyRound, ShieldCheck, Check, Activity, Tags, ChevronRight, RefreshCw, FileSpreadsheet, type LucideIcon } from "lucide-react";
+import { LogOut, KeyRound, ShieldCheck, Check, Activity, Tags, ChevronRight, RefreshCw, FileSpreadsheet, Users, Plug, type LucideIcon } from "lucide-react";
 import { getSnapshot } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { ROLES, can, type Capability } from "@/lib/auth/roles";
 import { Content, Panel, PanelHeader } from "@/components/kit/panel";
 import { lastSync } from "@/lib/sync-log";
+import { getMfa } from "@/lib/auth/db";
+import { MfaSetup } from "@/components/users/mfa-setup";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,8 @@ export default async function AccountPage() {
   const session = await getSession();
   const snapshot = await getSnapshot();
   const sync = await lastSync().catch(() => null);
+  const mfa = session ? await getMfa(session.id).catch(() => null) : null;
+  const mfaEnabled = !!mfa?.enabled;
 
   const role = ROLES.find((r) => r.id === session?.role);
 
@@ -211,12 +215,39 @@ export default async function AccountPage() {
               description="Immutable record of every change: who, what, old value, new value, when."
             />
           )}
+          {can(session?.role, "users.manage") && (
+            <ToolLink
+              href="/integrations"
+              icon={Plug}
+              title="Integrations"
+              description="What the platform is connected to, and whether each key is set. Keys live in the deployment environment — never in the database."
+            />
+          )}
+          {can(session?.role, "users.manage") && (
+            <ToolLink
+              href="/users"
+              icon={Users}
+              title="Users"
+              description="Add people, set roles, and suspend anyone instantly. Users are never deleted — the audit trail must outlive them."
+            />
+          )}
         </div>
       </Panel>
 
       {session && (
         <Panel>
-          <PanelHeader title="Security" subtitle="Password and session" />
+          <PanelHeader title="Security" subtitle="Password, two-factor, session" />
+
+          {/*
+            MFA is enrolled BY the user, never FOR them. An administrator cannot turn
+            it on for someone else — the secret has to reach that person's phone and
+            nowhere else. A secret an admin has seen is a second factor the admin also
+            holds, which is not a second factor at all.
+          */}
+          <div className="mb-4 rounded-md border border-border bg-elevated/30 px-3.5 py-3">
+            <MfaSetup enabled={mfaEnabled} />
+          </div>
+
           <div className="flex flex-wrap gap-2.5">
             <Link
               href="/change-password"

@@ -5,6 +5,8 @@ import { clearSnapshotCache } from "@/lib/data";
 import { saveSnapshot } from "@/lib/history";
 import { saveTransactions, type IncomingTransaction } from "@/lib/ledger";
 import { recordSync } from "@/lib/sync-log";
+import { recordIntegrity } from "@/lib/integrity-log";
+import { assessIntegrity } from "@/lib/integrity";
 
 /**
  * Direct snapshot push — for the ODBC live feed.
@@ -157,6 +159,19 @@ export async function PUT(request: Request) {
     maxKy: meta?.maxKy ?? null,
     source: meta?.source ?? null,
   });
+
+  /*
+    A4b — RUN THE ACCURACY CHECKS AND RECORD THE VERDICT, EVERY TIME.
+
+    This runs the same checks the Reports page runs, at the moment the data lands,
+    and appends the result to an immutable log. It answers the question A4 could not:
+    not "is today's report trustworthy?" but "has it ever not been?" — which is what
+    an auditor asks, and what nobody could answer while each sync overwrote the last.
+
+    Best-effort, deliberately. A failure to WRITE the audit row must never reject a
+    good snapshot; the ledger arriving matters more than the note that it arrived.
+  */
+  await recordIntegrity(snapshot, assessIntegrity(snapshot));
 
   clearSnapshotCache();
   revalidateTag("snapshot", "max");

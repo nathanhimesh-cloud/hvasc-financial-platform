@@ -166,6 +166,12 @@ export function getPageMeta(
   if (pathname === "/data") {
     return { title: "Data Upload", subtitle: "Practical exports" };
   }
+  if (pathname === "/integrations") {
+    return { title: "Integrations", subtitle: "Connected systems and keys" };
+  }
+  if (pathname === "/users") {
+    return { title: "Users", subtitle: "Roles, access, and MFA" };
+  }
   if (pathname === "/account") {
     return { title: "Settings", subtitle: "Profile · Permissions · Data tools" };
   }

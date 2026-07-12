@@ -5,6 +5,7 @@ import { ReportsView, type ReportPeriod, type ReportDept } from "@/components/re
 import { resolvePeriodView, periodDateRange, type SearchParams } from "@/lib/periods";
 import { assessIntegrity } from "@/lib/integrity";
 import { budgetReportFY27 } from "@/data/budget-report-fy27";
+import { revenueTrend } from "@/lib/revenue-trend";
 import { queryTransactions, isLedgerEnabled } from "@/lib/ledger";
 import { spendTrend } from "@/lib/trend";
 import type { IncomeStatement } from "@/lib/types";
@@ -156,6 +157,7 @@ export default async function ReportsPage({
         monthsInYear={period.monthsInYear}
         comparisonLabel={period.comparisonLabel ?? "Budget"}
         periods={periods}
+        revenue={revenueTrend(snapshot.monthlyStatements, budgetReportFY27, snapshot.period.monthsInYear ?? 12)}
         departments={departments}
         trend={spendTrend(snapshot)}
         priorYear={snapshot.priorYear}

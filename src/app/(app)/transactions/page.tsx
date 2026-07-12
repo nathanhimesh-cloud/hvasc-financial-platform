@@ -1,4 +1,6 @@
-import { Content } from "@/components/kit/panel";
+import Link from "next/link";
+import { CornerDownRight } from "lucide-react";
+import { Content, Panel } from "@/components/kit/panel";
 import { PageToolbar } from "@/components/kit/page-toolbar";
 import { InfoNote } from "@/components/kit/info-popover";
 import { TransactionsView } from "@/components/reports/transactions-view";
@@ -37,8 +39,13 @@ export default async function TransactionsPage({
   const { period } = snapshot;
 
   const range = periodDateRange(period.fyLabel, period.monthOfYear);
-  const filters = { q: one(sp.q), from: one(sp.from), to: one(sp.to) };
-  const hasFilters = !!(filters.q || filters.from || filters.to);
+
+  // `code` arrives when someone CLICKED a figure elsewhere (the B3 drill-down).
+  // It's prefix-matched in Postgres, so "1255-2000" drills into every sub-account
+  // beneath it — which is how a reader thinks about an account.
+  const code = one(sp.code);
+  const filters = { q: one(sp.q), from: one(sp.from), to: one(sp.to), code };
+  const hasFilters = !!(filters.q || filters.from || filters.to || code);
 
   // Never let a user-supplied bound escape the selected period.
   const from = filters.from && range && filters.from > range.from ? filters.from : range?.from;
@@ -49,8 +56,13 @@ export default async function TransactionsPage({
     from,
     to,
     search: filters.q,
+    code,
     limit: 1000,
   });
+
+  // The name of the account we drilled into, for the banner. Taken from the rows
+  // themselves so it's whatever Practical calls it, not a label we invented.
+  const drillAccount = code ? (ledger.rows[0]?.account ?? "") : "";
 
   // The ledger owns the data once it has any. Otherwise fall back to whatever the
   // snapshot still carries, and tell the view it must filter in the browser.
@@ -89,6 +101,34 @@ export default async function TransactionsPage({
           </>
         }
       />
+
+      {/*
+        You arrived here by CLICKING a figure. Say so, say which account, and give
+        a way back to the whole ledger — otherwise a filtered view looks like a
+        broken one, and the reader concludes there are only nine transactions in
+        the entire council.
+      */}
+      {code && (
+        <Panel className="mb-4 flex flex-wrap items-center justify-between gap-3 border-gold/25 bg-gold-dim">
+          <div className="flex items-center gap-2.5">
+            <CornerDownRight className="h-4 w-4 flex-shrink-0 text-gold" strokeWidth={2} />
+            <span className="text-[13px] text-foreground">
+              Transactions behind{" "}
+              <span className="font-mono text-gold-light">{code}</span>
+              {drillAccount && <span className="text-muted-foreground"> · {drillAccount}</span>}
+            </span>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {transactionTotal?.toLocaleString()} row{transactionTotal === 1 ? "" : "s"}
+            </span>
+          </div>
+          <Link
+            href="/transactions"
+            className="font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            show all transactions →
+          </Link>
+        </Panel>
+      )}
 
       <TransactionsView
         transactions={transactions}

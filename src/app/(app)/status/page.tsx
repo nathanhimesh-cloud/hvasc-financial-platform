@@ -6,6 +6,8 @@ import { listSyncs } from "@/lib/sync-log";
 import { listPeriods, isHistoryEnabled } from "@/lib/history";
 import { isLedgerEnabled, queryTransactions } from "@/lib/ledger";
 import { cn } from "@/lib/utils";
+import { listIntegrityRuns, summariseHistory } from "@/lib/integrity-log";
+import { IntegrityHistoryPanel } from "@/components/kit/integrity-history";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,8 @@ export default async function StatusPage() {
   // Read the snapshot first — that's what sets the origin.
   const snapshot = await getSnapshot();
   const origin = snapshotOrigin();
+  // A4b — every sync records whether the figures passed their checks.
+  const history = summariseHistory(await listIntegrityRuns(60));
 
   const [syncs, periods] = await Promise.all([listSyncs(20), listPeriods()]);
   const ledger = isLedgerEnabled()
@@ -42,6 +46,10 @@ export default async function StatusPage() {
 
   return (
     <Content>
+      <div className="mb-4">
+        <IntegrityHistoryPanel history={history} />
+      </div>
+
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel>
           <PanelHeader title="Where this data comes from" />

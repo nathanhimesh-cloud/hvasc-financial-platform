@@ -147,11 +147,34 @@ if (cf) {
 if (snap.incomeTotals && snap.priorYear && bs) {
   const movement = bs.totalEquity - snap.priorYear.closingEquity;
   const gap = snap.incomeTotals.netResult - movement;
-  check(
-    "Net result ties to the movement in equity",
-    Math.abs(gap) <= TOL,
-    `net result ${D(snap.incomeTotals.netResult)} vs equity movement ${D(movement)} — differ by ${D(gap)}`,
-  );
+
+  // Explain the gap by the year-end roll, if the arithmetic supports it. You
+  // cannot find the anomaly by looking at which equity account moved MOST: at the
+  // start of a year the two biggest movements are last year's surplus rolling from
+  // Current Surplus into Accumulated Surplus — millions of dollars that net to
+  // exactly zero. The roll is the lever, not the noise: whatever leaves the surplus
+  // account must arrive in the accumulated one, so anything EXTRA that arrived is
+  // money posted straight to equity, bypassing the P&L.
+  let detail = `net result ${D(snap.incomeTotals.netResult)} vs equity movement ${D(movement)} — differ by ${D(gap)}`;
+
+  const moves = (bs.equity?.lines ?? [])
+    .filter((l) => l.priorYear !== undefined)
+    .map((l) => ({ label: l.label, prior: l.priorYear, moved: l.amount - l.priorYear }));
+
+  if (moves.length >= 2) {
+    const rose = [...moves].sort((a, b) => b.moved - a.moved)[0];
+    const fell = [...moves].sort((a, b) => a.moved - b.moved)[0];
+    const excess = rose.moved - fell.prior;
+    if (rose.label !== fell.label && Math.abs(excess + gap) <= TOL * 5) {
+      detail =
+        `${D(Math.abs(gap))} posted STRAIGHT TO EQUITY, bypassing the P&L. ` +
+        `At year-end ${D(fell.prior)} rolled out of ${fell.label} into ${rose.label}, ` +
+        `but ${rose.label} received ${D(rose.moved)} — ${D(Math.abs(excess))} more than came out. ` +
+        `Normally a reserve transfer or prior-period adjustment. Ask Micah to confirm.`;
+    }
+  }
+
+  check("Net result ties to the movement in equity", Math.abs(gap) <= TOL, detail);
 }
 
 // ── 3. Postgres ledger vs the snapshot ──────────────────────────────────────

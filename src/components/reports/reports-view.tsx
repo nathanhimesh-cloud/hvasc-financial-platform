@@ -12,6 +12,7 @@ import {
   Table,
   Receipt,
   ArrowRight,
+  AlertOctagon,
 } from "lucide-react";
 import type { BrandColor, BalanceSheet, CashFlow, Transaction, DailySpendPoint, PriorYear } from "@/lib/types";
 import type { IntegrityReport } from "@/lib/integrity";
@@ -22,6 +23,10 @@ import { IntegrityBanner } from "@/components/kit/integrity-banner";
 import { DataStamp } from "@/components/kit/data-stamp";
 import { PrintButton } from "@/components/kit/print-button";
 import { TrendBars } from "@/components/kit/trend-bars";
+import { DrillLink } from "@/components/kit/drill-link";
+import { MultiPeriod } from "./multi-period";
+import { RevenueVsBudget } from "./revenue-vs-budget";
+import type { RevenueTrend } from "@/lib/revenue-trend";
 import type { SpendTrend } from "@/lib/trend";
 import { BudgetVsActual } from "./budget-vs-actual";
 import { TransactionsView, type TransactionFilters } from "./transactions-view";
@@ -59,7 +64,7 @@ export interface ReportDept {
 }
 
 type Statement = "pnl" | "budget" | "balance" | "cashflow" | "transactions";
-type Mode = "cumulative" | "monthly";
+type Mode = "cumulative" | "monthly" | "quarter" | "year";
 
 export function ReportsView({
   fyLabel,
@@ -69,6 +74,7 @@ export function ReportsView({
   periods,
   departments,
   trend,
+  revenue,
   priorYear,
   balanceSheet,
   cashFlow,
@@ -89,6 +95,8 @@ export function ReportsView({
   departments: ReportDept[];
   /** What to plot: months once there are enough, days before that. */
   trend: SpendTrend | null;
+  /** B6 — cumulative revenue against the (straight-lined) budget. */
+  revenue?: RevenueTrend;
   /** Last COMPLETE financial year, for the year-on-year comparison. */
   priorYear?: PriorYear;
   balanceSheet?: BalanceSheet;
@@ -122,15 +130,34 @@ export function ReportsView({
   const isLatestYtd = selectedIdx === latestIdx && mode === "cumulative";
   const totalDeptYtd = departments.reduce((a, d) => a + d.ytdActual, 0);
 
-  // Figures for the selected period + mode. In "monthly" mode we difference the
-  // cumulative checkpoint against the previous one to isolate that month.
-  const diffLine = (line: { id: string; label: string; ytd: number }) => {
-    if (mode === "cumulative" || !prior) return line.ytd;
-    const was = prior.revenueLines.find((r) => r.id === line.id)?.ytd ?? 0;
-    return line.ytd - was;
-  };
+  /*
+    EVERY PERIOD TYPE IS A SUBTRACTION (Build Brief B1: "a month, a quarter,
+    year-to-date, or a custom from–to range").
+
+    The snapshot stores CUMULATIVE year-to-date checkpoints, one per month. So any
+    period is the difference between two of them — pick the right baseline and the
+    arithmetic is the same every time:
+
+        Year to date   baseline = nothing (the year's start)
+        This month     baseline = the month before
+        This quarter   baseline = the month before the quarter began
+        Full year      baseline = nothing, and jump to the last month posted
+
+    The Australian FY starts in July, so quarters are months 1–3, 4–6, 7–9, 10–12 —
+    NOT calendar quarters. Q1 is Jul–Sep. Getting that wrong would silently report
+    the wrong three months, and every figure would still look plausible.
+  */
+  const baseline = useMemo(() => {
+    if (mode === "cumulative" || mode === "year") return undefined;
+    if (mode === "monthly") return prior;
+    // quarter: the checkpoint at the month before this quarter started.
+    const qStart = Math.floor((selectedIdx - 1) / 3) * 3 + 1;
+    if (qStart <= 1) return undefined; // Q1 starts at the year's start — nothing to subtract
+    return byIdx.get(qStart - 1);
+  }, [mode, prior, selectedIdx, byIdx]);
+
   const figures = useMemo(() => {
-    if (mode === "cumulative" || !prior) {
+    if (!baseline) {
       return {
         totalIncome: current.totalIncome,
         totalExpenses: current.totalExpenses,
@@ -138,13 +165,14 @@ export function ReportsView({
         revenueLines: current.revenueLines.map((r) => ({ ...r, value: r.ytd })),
       };
     }
+    const was = (id: string) => baseline.revenueLines.find((r) => r.id === id)?.ytd ?? 0;
     return {
-      totalIncome: current.totalIncome - prior.totalIncome,
-      totalExpenses: current.totalExpenses - prior.totalExpenses,
-      netResult: current.netResult - prior.netResult,
-      revenueLines: current.revenueLines.map((r) => ({ ...r, value: diffLine(r) })),
+      totalIncome: current.totalIncome - baseline.totalIncome,
+      totalExpenses: current.totalExpenses - baseline.totalExpenses,
+      netResult: current.netResult - baseline.netResult,
+      revenueLines: current.revenueLines.map((r) => ({ ...r, value: r.ytd - was(r.id) })),
     };
-  }, [current, prior, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [current, baseline]);
 
   // Prior-period figures (for the KPI deltas) in the same mode.
   const priorFigures = useMemo(() => {
@@ -164,7 +192,12 @@ export function ReportsView({
 
   // Per-department expense breakdown. Real at latest-YTD; otherwise allocated
   // from the council expense total by each department's YTD share (estimated).
-  const monthsCovered = mode === "monthly" ? 1 : selectedIdx;
+  // How many months this view actually spans — the department comparison is
+  // pro-rated on it, so getting it wrong makes every department look wrong.
+  const monthsCovered =
+    mode === "monthly" ? 1
+    : mode === "quarter" ? selectedIdx - (Math.floor((selectedIdx - 1) / 3) * 3)
+    : selectedIdx;
   const deptRows = useMemo(() => {
     return departments
       .map((d) => {
@@ -184,21 +217,50 @@ export function ReportsView({
 
   const estimated = !isLatestYtd; // breakdown is allocated, not real, for past periods
 
-  const periodName = mode === "monthly" ? current.month : `YTD to ${current.month}`;
+  const QUARTER = ["Q1 (Jul-Sep)", "Q2 (Oct-Dec)", "Q3 (Jan-Mar)", "Q4 (Apr-Jun)"];
+  const periodName =
+    mode === "monthly" ? current.month
+    : mode === "quarter" ? `${QUARTER[Math.floor((selectedIdx - 1) / 3)]} to ${current.month}`
+    : mode === "year" ? `${fyLabel} full year`
+    : `YTD to ${current.month}`;
   const deltaPct = (now: number, was: number) => (was !== 0 ? (now - was) / Math.abs(was) : 0);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
       {/*
-        The accuracy checks used to open HERE, as a wall of red four items deep,
-        across the top of every report. They now live behind the page's info icon,
-        which carries a red badge with the failure count — so nothing is hidden,
-        but the report is a report and not a lecture.
+        THE ONE LINE THAT CANNOT BE HIDDEN.
 
-        They are still PRINTED. A statement that failed its checks must never leave
-        the building looking clean, so `print:block` puts them back on paper even
-        though they're out of the way on screen.
+        The build brief is unambiguous about this: "If any check fails, show a clear
+        red banner ('This report did not pass its accuracy checks') and a short
+        reason, and don't present it as final. This single feature is the most
+        important thing in the whole build — it is what makes the client trust us."
+
+        Nathan asked for the checks to move into an icon, and he was right: four
+        items of red across the top of every report is a lecture, and people stop
+        reading lectures. But hiding the failure ENTIRELY would mean a statement
+        that doesn't reconcile could be read, printed and believed with nothing
+        saying otherwise. That is the exact failure the brief exists to prevent.
+
+        So: the DETAIL lives behind the icon. The VERDICT stays on the page — one
+        line, unmissable, and it says the figures are a draft. When everything
+        passes, this renders nothing at all.
       */}
+      {integrity.status === "fail" && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-red/40 bg-red/[0.07] px-3.5 py-2.5">
+          <AlertOctagon className="h-4 w-4 flex-shrink-0 text-red" strokeWidth={2} />
+          <span className="text-[13px] font-semibold text-red">
+            This report did not pass its accuracy checks
+          </span>
+          <span className="text-[12px] text-muted-foreground">
+            — {integrity.failedCount} of {integrity.checkedCount} failed. Figures are a{" "}
+            <span className="text-red">draft, not reconciled</span>. Open the{" "}
+            <span className="text-foreground">ⓘ</span> above for the reason.
+          </span>
+        </div>
+      )}
+
+      {/* The full detail is still PRINTED, so a statement that failed its checks can
+          never leave the building looking clean. */}
       <div className="hidden print:block">
         <IntegrityBanner report={integrity} />
       </div>
@@ -256,20 +318,36 @@ export function ReportsView({
               </Field>
               <Field label="View">
                 <div className="flex rounded-md border border-border bg-elevated/40 p-0.5">
-                  {(["cumulative", "monthly"] as Mode[]).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMode(m)}
-                      disabled={m === "monthly" && !prior}
-                      className={cn(
-                        "rounded px-3 py-1.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                        mode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {m === "cumulative" ? "Cumulative (YTD)" : "This month only"}
-                    </button>
-                  ))}
+                  {(["cumulative", "monthly", "quarter", "year"] as Mode[]).map((m) => {
+                    // A period type you cannot compute is offered disabled, not hidden:
+                    // a control that vanishes reads as a missing feature.
+                    const noPrior = !prior;
+                    const disabled =
+                      (m === "monthly" && noPrior) ||
+                      (m === "quarter" && noPrior);
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          setMode(m);
+                          // "Full year" means the whole year, so go to the last month posted.
+                          if (m === "year") setSelectedIdx(latestIdx);
+                        }}
+                        disabled={disabled}
+                        title={disabled ? "Needs more than one month of data" : undefined}
+                        className={cn(
+                          "rounded px-3 py-1.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                          mode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {m === "cumulative" ? "YTD"
+                          : m === "monthly" ? "Month"
+                          : m === "quarter" ? "Quarter"
+                          : "Full year"}
+                      </button>
+                    );
+                  })}
                 </div>
               </Field>
             </div>
@@ -475,6 +553,15 @@ export function ReportsView({
               />
             </Panel>
           )}
+
+          {/* B6 — the other half of the trend: what came IN, against what was meant to. */}
+          {revenue && (
+            <RevenueVsBudget points={revenue.points} annualBudget={revenue.annualBudget} />
+          )}
+
+          {/* B1 — months side by side. The shape of the year, which no single-period
+              view can show. */}
+          <MultiPeriod periods={periods} />
         </>
       )}
     </div>
@@ -557,22 +644,51 @@ function StatementBlock({
   total,
 }: {
   label?: string;
-  lines: { label: string; amount: number }[];
+  /** `code` and `priorYear` are optional — a cash-flow line has neither. */
+  lines: { label: string; amount: number; code?: string; priorYear?: number }[];
   totalLabel: string;
   total: number;
 }) {
+  // A balance sheet is supposed to have a prior-year column. Now that the feed
+  // carries last year's close per line, show it — but only when it's actually
+  // there, so a cash-flow statement (which has no such thing) doesn't grow an
+  // empty column.
+  const hasPrior = lines.some((l) => l.priorYear !== undefined);
+
   return (
     <div>
       {label && (
-        <div className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-          {label}
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+            {label}
+          </span>
+          {hasPrior && (
+            <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
+              last year
+            </span>
+          )}
         </div>
       )}
       {lines.map((l, i) => (
-        <div key={i} className="flex items-center justify-between border-b border-border py-2 text-[13px] last:border-0">
-          <span className="text-foreground">{l.label}</span>
-          <span className={cn("font-mono tabular-nums", l.amount < 0 ? "text-red" : "text-foreground")}>
-            {formatCurrency(l.amount)}
+        <div key={i} className="flex items-center justify-between gap-3 border-b border-border py-2 text-[13px] last:border-0">
+          {/* Click the line, see the postings behind it (B3). Only where we have a
+              GL code — a rolled-up cash-flow line has no single account to drill to. */}
+          {l.code ? (
+            <DrillLink code={l.code} className="text-foreground">
+              {l.label}
+            </DrillLink>
+          ) : (
+            <span className="text-foreground">{l.label}</span>
+          )}
+          <span className="flex items-baseline gap-4">
+            {hasPrior && (
+              <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                {l.priorYear !== undefined ? formatCompact(l.priorYear) : "—"}
+              </span>
+            )}
+            <span className={cn("font-mono tabular-nums", l.amount < 0 ? "text-red" : "text-foreground")}>
+              {formatCurrency(l.amount)}
+            </span>
           </span>
         </div>
       ))}

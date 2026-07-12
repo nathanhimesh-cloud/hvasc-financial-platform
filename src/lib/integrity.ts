@@ -237,25 +237,56 @@ function checkResultTiesToEquity(
     question Micah can answer in one sentence — "yes, that was a reserve transfer"
     — instead of a mystery that sits on the report forever.
   */
-  const movers = (equity?.lines ?? [])
-    .filter((l) => l.priorYear !== undefined)
-    .map((l) => ({ label: l.label, code: l.code, moved: l.amount - (l.priorYear ?? 0) }))
-    // The account holding this year's surplus SHOULD move by the net result —
-    // that's the P&L doing its job, not an anomaly. Everything else is the gap.
-    .filter((m) => Math.abs(m.moved) > INTEGRITY_TOLERANCE)
-    .filter((m) => Math.abs(m.moved - income.netResult) > INTEGRITY_TOLERANCE)
-    .sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved));
+  return fail(id, label, description, gap, detail, explainEquityGap(gap, equity));
+}
 
-  const named = movers
-    .slice(0, 3)
-    .map((m) => `${m.label} (${formatCurrency(m.moved)})`)
-    .join(", ");
+/**
+ * WHY THE YEAR-END ROLL MAKES THIS HARD, AND HOW TO SEE PAST IT.
+ *
+ * You cannot find the anomaly by looking at which equity account moved the most,
+ * because at the start of a financial year the two biggest movements are an
+ * illusion: last year's surplus rolls out of "Current Surplus" and into
+ * "Accumulated Surplus". At Hope Vale that is ±$9.6M — a hundred times the gap
+ * we're actually hunting — and it nets to exactly zero. Naming those two accounts
+ * would be true, and useless.
+ *
+ * But the roll gives us the lever. Whatever leaves the surplus account must arrive
+ * in the accumulated one. So:
+ *
+ *     gap = (what accumulated GAINED) − (what the surplus account HELD last year)
+ *
+ * Anything over that is money posted straight to equity, bypassing the P&L. At
+ * Hope Vale: Accumulated received $9,678,500 while only $9,608,749 rolled out of
+ * Current Surplus — $69,752 more went in than came out. That is a sentence Micah
+ * can answer. "$69,752 difference" is not.
+ */
+function explainEquityGap(gap: number, equity?: BalanceSheet["equity"]): string {
+  const generic = `Net result and equity movement differ by ${formatCurrency(Math.abs(gap))} (after reserve transfers).`;
 
-  const reason = movers.length
-    ? `${formatCurrency(Math.abs(gap))} moved through equity without passing through the P&L: ${named}. That is normally a reserve transfer or a revaluation — legitimate, but it should be confirmed rather than assumed.`
-    : `Net result and equity movement differ by ${formatCurrency(Math.abs(gap))} (after reserve transfers).`;
+  const lines = (equity?.lines ?? []).filter((l) => l.priorYear !== undefined);
+  if (lines.length < 2) return generic;
 
-  return fail(id, label, description, gap, detail, reason);
+  const moves = lines.map((l) => ({
+    label: l.label,
+    prior: l.priorYear ?? 0,
+    moved: l.amount - (l.priorYear ?? 0),
+  }));
+
+  const rose = [...moves].sort((a, b) => b.moved - a.moved)[0];
+  const fell = [...moves].sort((a, b) => a.moved - b.moved)[0];
+  if (!rose || !fell || rose.label === fell.label) return generic;
+
+  // Does the roll actually explain the gap? If the arithmetic doesn't hold, say
+  // nothing clever — a confident wrong explanation is worse than a vague true one.
+  const excess = rose.moved - fell.prior;
+  if (Math.abs(excess - gap * -1) > INTEGRITY_TOLERANCE * 5) return generic;
+
+  return (
+    `${formatCurrency(Math.abs(gap))} was posted straight to equity, bypassing the P&L. ` +
+    `At year-end ${formatCurrency(fell.prior)} rolled out of ${fell.label} into ${rose.label} — ` +
+    `but ${rose.label} received ${formatCurrency(rose.moved)}, which is ${formatCurrency(Math.abs(excess))} more than came out. ` +
+    `That is normally a reserve transfer or a prior-period adjustment: legitimate, but worth confirming rather than assuming.`
+  );
 }
 
 /**

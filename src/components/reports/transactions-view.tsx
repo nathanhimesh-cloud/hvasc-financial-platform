@@ -6,6 +6,7 @@ import { Search, Download, Loader2, X } from "lucide-react";
 import type { Transaction, DailySpendPoint } from "@/lib/types";
 import { Panel, PanelHeader } from "@/components/kit/panel";
 import { TrendBars } from "@/components/kit/trend-bars";
+import { ExportButton } from "@/components/kit/export-button";
 import { formatCurrency, formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -225,10 +226,33 @@ export function TransactionsView({
           )}
           {pending && <Loader2 className="mb-2 h-3.5 w-3.5 animate-spin text-muted-foreground" strokeWidth={2} />}
         </div>
+        {/* Excel AND CSV. The brief asks for Excel; CSV mangles GL codes ("0205-4147"
+            becomes a date in an Australian locale) so it cannot be the only option. */}
+        <ExportButton
+          filename="hvasc-transactions"
+          meta={{ period: fyLabel }}
+          csv={exportCsv}
+          sheets={[
+            {
+              name: "Transactions",
+              rows: filtered,
+              columns: [
+                { header: "Date", value: (t) => t.date, width: 12 },
+                { header: "GL code", value: (t) => t.code, width: 16 },
+                { header: "Account", value: (t) => t.account, width: 34 },
+                { header: "Description", value: (t) => t.description, width: 44 },
+                { header: "Reference", value: (t) => t.ref, width: 14 },
+                { header: "Debit", value: (t) => t.debit || null, type: "money", width: 14 },
+                { header: "Credit", value: (t) => t.credit || null, type: "money", width: 14 },
+              ],
+            },
+          ]}
+        />
+
         <button
           type="button"
           onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="hidden"
         >
           <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
           Export CSV

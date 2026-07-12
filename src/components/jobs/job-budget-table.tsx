@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DrillLink } from "@/components/kit/drill-link";
+import { ExportButton } from "@/components/kit/export-button";
 import { Search, Download, ChevronRight, AlertTriangle } from "lucide-react";
 import type { JobBudgetView } from "@/lib/job-budgets";
 import { Panel, PanelHeader } from "@/components/kit/panel";
@@ -110,14 +112,30 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
             Over budget only
           </button>
         </div>
-        <button
-          type="button"
-          onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Export CSV
-        </button>
+        <ExportButton
+          filename="hvasc-job-budgets"
+          csv={exportCsv}
+          sheets={[
+            {
+              name: "Budget vs Actual",
+              rows,
+              columns: [
+                { header: "GL account", value: (g) => g.glAccount, width: 18 },
+                { header: "Account name", value: (g) => g.glName, width: 34 },
+                { header: "Department", value: (g) => g.departmentId ?? "", width: 20 },
+                { header: "Annual budget", value: (g) => g.budget || null, type: "money", width: 16 },
+                { header: "Budget to date", value: (g) => g.budgetYtd || null, type: "money", width: 16 },
+                { header: "Actual", value: (g) => g.glActual || null, type: "money", width: 16 },
+                { header: "of which job-costed", value: (g) => g.jobActual || null, type: "money", width: 18 },
+                { header: "Not job-costed", value: (g) => g.unjobbed || null, type: "money", width: 16 },
+                { header: "Capital / non-operating", value: (g) => g.nonOperatingSpend || null, type: "money", width: 20 },
+                { header: "Variance to date", value: (g) => (g.hasBudget ? g.variance : null), type: "money", width: 16 },
+                { header: "% of budget to date", value: (g) => (g.hasBudgetYtd ? g.utilisationYtd : null), type: "percent", width: 18 },
+                { header: "Jobs", value: (g) => g.jobs.length, type: "number", width: 8 },
+              ],
+            },
+          ]}
+        />
       </Panel>
 
       <Panel className="overflow-hidden">
@@ -180,7 +198,18 @@ function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolea
               <span className="text-[13px] font-medium text-foreground">
                 {g.glName || (g.glAccount === "unmapped" ? "Jobs with no GL account" : g.glAccount)}
               </span>
-              <span className="font-mono text-[11px] text-muted-foreground">{g.glAccount}</span>
+              {/* Click the code, see the postings behind it (B3). stopPropagation
+                  because the ROW toggles the job list — a click that both expands a
+                  row and navigates away is a click that does neither on purpose. */}
+              {g.glAccount === "unmapped" ? (
+                <span className="font-mono text-[11px] text-muted-foreground">{g.glAccount}</span>
+              ) : (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <DrillLink code={g.glAccount} className="font-mono text-[11px] text-muted-foreground">
+                    {g.glAccount}
+                  </DrillLink>
+                </span>
+              )}
             </span>
           </div>
         </td>

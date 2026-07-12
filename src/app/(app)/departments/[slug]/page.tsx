@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DrillLink } from "@/components/kit/drill-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Landmark, Scale, TrendingUp, Wallet } from "lucide-react";
 import { getSnapshot } from "@/lib/data";
@@ -141,12 +142,13 @@ export default async function DepartmentPage(
                 key={gl.code}
                 className="flex items-center gap-3 border-b border-border py-2.5 last:border-0"
               >
-                <span className="rounded bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                {/* Click the account, see the postings behind it (B3). */}
+                <DrillLink code={gl.code} className="rounded bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground no-underline hover:text-gold-light">
                   {gl.code}
-                </span>
-                <span className="flex-1 text-[13px] text-foreground">
+                </DrillLink>
+                <DrillLink code={gl.code} className="flex-1 text-[13px] text-foreground">
                   {gl.account}
-                </span>
+                </DrillLink>
                 <span
                   className={cn(
                     "font-mono text-[13px] font-medium tabular-nums",
