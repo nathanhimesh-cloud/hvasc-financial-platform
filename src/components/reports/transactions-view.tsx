@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Search, Download, Loader2, X } from "lucide-react";
 import type { Transaction, DailySpendPoint } from "@/lib/types";
 import { Panel, PanelHeader } from "@/components/kit/panel";
+import { TrendBars } from "@/components/kit/trend-bars";
 import { formatCurrency, formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -158,10 +159,22 @@ export function TransactionsView({
   };
 
   if (!transactions.length && !hasFilters) {
+    // This message used to say the transactions would arrive "once the live feed
+    // includes GLTRN data (the next sync after this build ships)" — which stopped
+    // being true weeks ago, and told a reader to wait for something that had
+    // already happened. An empty state has to say what is actually wrong.
     return (
-      <Panel className="py-14 text-center text-[13px] text-muted-foreground">
-        No transactions in the current feed yet. They appear once the live feed includes GLTRN data
-        (the next sync after this build ships).
+      <Panel className="py-12 text-center">
+        <p className="text-[13px] text-muted-foreground">
+          No transactions stored for {fyLabel ?? "this financial year"}.
+        </p>
+        <p className="mx-auto mt-2 max-w-md text-[12px] leading-relaxed text-muted-foreground">
+          The feed sends transactions <span className="text-foreground">incrementally</span> — only
+          what is new since the last successful sync. If the ledger was cleared, or this is a fresh
+          financial year, ask SandS to run a full resync (
+          <span className="font-mono">05-build-snapshot.ps1 -FullResync</span>) and the year is
+          rebuilt from the start.
+        </p>
       </Panel>
     );
   }
@@ -171,7 +184,15 @@ export function TransactionsView({
       {dailySpend.length > 0 && (
         <Panel>
           <PanelHeader title="Daily Spend" subtitle="Operating spend by day · current FY" />
-          <DailyBars data={dailySpend} />
+          {/* The shared chart. The local one put a percentage height on a bar
+              whose parent column had no height - a percentage of `auto` is ZERO, so
+              every bar rendered 0px tall and the panel looked like missing data.
+              Exactly the bug TrendBars already had, in a component I forgot about. */}
+          <TrendBars
+            data={dailySpend.map((d) => ({ label: dayLabel(d.date), amount: d.amount }))}
+            labelEvery={dailySpend.length > 14 ? Math.ceil(dailySpend.length / 10) : 1}
+            height={120}
+          />
         </Panel>
       )}
 
@@ -312,18 +333,11 @@ function Amt({ value, bold }: { value: number; bold?: boolean }) {
   );
 }
 
-function DailyBars({ data }: { data: DailySpendPoint[] }) {
-  const max = Math.max(...data.map((d) => Math.abs(d.amount)), 1);
-  return (
-    <div className="flex items-end gap-0.5 overflow-x-auto" style={{ height: 120 }}>
-      {data.map((d) => {
-        const h = Math.max((Math.abs(d.amount) / max) * 100, 1);
-        return (
-          <div key={d.date} className="group flex min-w-[6px] flex-1 flex-col items-center justify-end" title={`${d.date}: ${formatCompact(d.amount)}`}>
-            <div className={cn("w-full rounded-t transition-colors", d.amount < 0 ? "bg-green/60" : "bg-gold/70 group-hover:bg-gold")} style={{ height: `${h}%` }} />
-          </div>
-        );
-      })}
-    </div>
-  );
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/** "2026-07-08" -> "8 Jul". */
+function dayLabel(iso: string): string {
+  const [, m, d] = iso.split("-");
+  return `${Number(d)} ${MONTHS[Number(m) - 1] ?? ""}`.trim();
 }
