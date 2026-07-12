@@ -51,7 +51,6 @@ export function AppShell({
       <Sidebar
         departments={departments}
         grantsBadge={grantsBadge}
-        lastSync={lastSync}
         user={user}
         collapsed={collapsed}
         onToggle={toggle}

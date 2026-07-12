@@ -9,10 +9,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LifeBuoy,
-  LogOut,
   type LucideIcon,
 } from "lucide-react";
-import { allDepartmentsNav, dataNav, dataNavFor, overviewNav, trackingNav, reportsNav } from "@/lib/nav";
+import { allDepartmentsNav, overviewNav, trackingNav, reportsNav } from "@/lib/nav";
 import { getDeptIcon } from "@/lib/icons";
 import { PROFILE } from "@/lib/profile";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -27,8 +26,6 @@ export interface DeptNavItem {
 interface SidebarProps {
   departments: DeptNavItem[];
   grantsBadge: number;
-  /** ISO date of the last successful sync (snapshot.meta.generatedAt). */
-  lastSync?: string;
   /** Logged-in user (null when auth isn't configured). */
   user?: { username: string; role: string } | null;
   collapsed: boolean;
@@ -38,16 +35,11 @@ interface SidebarProps {
 export function Sidebar({
   departments,
   grantsBadge,
-  lastSync,
   user,
   collapsed,
   onToggle,
 }: SidebarProps) {
   const pathname = usePathname();
-
-  // With auth on, the "Data" links depend on the user's role. With auth off there
-  // is no user, so show the default set rather than hiding everything.
-  const dataLinks = user ? dataNavFor(user.role) : dataNav;
 
   // The Departments list is long, so let it collapse. Persist the choice, and
   // always reveal it while you're on a department route.
@@ -184,87 +176,23 @@ export function Sidebar({
           ))}
         </NavGroup>
 
-        {/* Role-aware: signed-in users see only what their role permits. Last,
-            because provenance and admin are what you check, not what you use. */}
-        {dataLinks.length > 0 && (
-          <NavGroup label="Data" collapsed={collapsed}>
-            {dataLinks.map((item) => (
-              <NavRow
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={pathname === item.href || pathname.startsWith(item.href + "/")}
-                collapsed={collapsed}
-              />
-            ))}
-          </NavGroup>
-        )}
       </nav>
 
-      {/* Data sync status (replaces the old Reporting Period block — brief B10) */}
-      {!collapsed && <SyncStatus lastSync={lastSync} />}
+      {/*
+        The sidebar's job is navigation. It used to also carry a sync-status card
+        and a sign-out link — two things you look at rarely and act on rarely,
+        occupying permanent space on every screen.
 
-      {/* Help + Profile */}
+        Both now live where they belong: sync status on /status (linked from
+        Settings and the Data Status page), sign-out inside the profile menu, one
+        click away. The profile menu is where every application on earth puts it.
+      */}
       <div className="border-t border-sidebar-border p-2.5">
         <HelpLink collapsed={collapsed} />
         <ProfileMenu collapsed={collapsed} user={user} />
-        {user && !collapsed && (
-          <a
-            href="/logout"
-            className="mt-1 flex items-center gap-2.5 rounded-md px-2 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
-            Sign out
-          </a>
-        )}
       </div>
     </aside>
   );
-}
-
-// 6:00am · 12:30pm · 6:00pm AEST (Queensland has no daylight saving), in minutes.
-const SYNC_SLOTS = [6 * 60, 12 * 60 + 30, 18 * 60];
-
-function SyncStatus({ lastSync }: { lastSync?: string }) {
-  const [nextLabel, setNextLabel] = useState("");
-  useEffect(() => {
-    // AEST = UTC+10 year-round. Shift so the UTC fields read AEST wall-clock time.
-    const aest = new Date(Date.now() + 10 * 3600 * 1000);
-    const cur = aest.getUTCHours() * 60 + aest.getUTCMinutes();
-    let slot = SYNC_SLOTS.find((s) => s > cur);
-    const day = slot === undefined ? "tomorrow" : "today";
-    if (slot === undefined) slot = SYNC_SLOTS[0];
-    const h = Math.floor(slot / 60);
-    const h12 = h % 12 === 0 ? 12 : h % 12;
-    const ap = h < 12 ? "am" : "pm";
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNextLabel(`${h12}:${(slot % 60).toString().padStart(2, "0")}${ap} ${day}`);
-  }, []);
-
-  return (
-    <div className="px-4 pb-3">
-      <div className="rounded-md border border-sidebar-border bg-card px-3 py-2.5">
-        <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
-          Data Sync
-        </div>
-        <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-green [animation:pulse-dot_2s_infinite]" />
-          {lastSync ? `Last: ${formatSyncDate(lastSync)}` : "Awaiting first sync"}
-        </div>
-        <div className="mt-1 font-mono text-[10px] text-muted-foreground">
-          {nextLabel ? `Next ~${nextLabel} · AEST` : "6am · 12:30pm · 6pm AEST"}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatSyncDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 function HelpLink({ collapsed }: { collapsed: boolean }) {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, KeyRound, ShieldCheck, Check } from "lucide-react";
+import { LogOut, KeyRound, ShieldCheck, Check, Activity, Tags, ChevronRight, type LucideIcon } from "lucide-react";
 import { getSnapshot } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { ROLES, can, type Capability } from "@/lib/auth/roles";
@@ -107,12 +107,40 @@ export default async function AccountPage() {
           />
           <Row label="Period on file" value={`${snapshot.period.label} · ${snapshot.period.fyLabel}`} mono />
         </dl>
-        <Link
-          href="/status"
-          className="mt-4 inline-block text-[12px] text-gold-light underline-offset-2 hover:underline"
-        >
-          Full sync history and provenance →
-        </Link>
+      </Panel>
+
+      {/*
+        The three admin tools. They used to sit permanently in the sidebar, under
+        "Data" — three links most people open once a month, competing for attention
+        with the pages they use every morning. They belong here, with the other
+        settings, and they're role-gated so nobody sees a link they can't follow.
+      */}
+      <Panel className="mb-4">
+        <PanelHeader title="Data tools" subtitle="Provenance and administration" />
+        <div className="flex flex-col divide-y divide-border">
+          <ToolLink
+            href="/status"
+            icon={Activity}
+            title="Data Status"
+            description="Every sync, when it ran, what it carried, and whether the ledger accepted it."
+          />
+          {can(session?.role, "mapping.edit") && (
+            <ToolLink
+              href="/mapping"
+              icon={Tags}
+              title="Account Mapping"
+              description="Which GL account belongs to which department. Changes what reports group by — never a figure."
+            />
+          )}
+          {can(session?.role, "audit.view") && (
+            <ToolLink
+              href="/audit"
+              icon={ShieldCheck}
+              title="Audit Log"
+              description="Immutable record of every change: who, what, old value, new value, when."
+            />
+          )}
+        </div>
       </Panel>
 
       {session && (
@@ -162,5 +190,37 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
       <dt className="text-muted-foreground">{label}</dt>
       <dd className={mono ? "font-mono text-[12px] text-foreground" : "text-foreground"}>{value}</dd>
     </div>
+  );
+}
+
+function ToolLink({
+  href,
+  icon: Icon,
+  title,
+  description,
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+    >
+      <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border bg-elevated text-muted-foreground transition-colors group-hover:border-[rgba(255,255,255,0.2)] group-hover:text-foreground">
+        <Icon className="h-4 w-4" strokeWidth={1.75} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
+          {title}
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
+        </span>
+        <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">
+          {description}
+        </span>
+      </span>
+    </Link>
   );
 }

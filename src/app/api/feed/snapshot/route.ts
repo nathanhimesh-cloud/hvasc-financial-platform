@@ -163,6 +163,41 @@ export async function PUT(request: Request) {
   revalidatePath("/", "layout");
 
   const totalSpend = snapshot.departments.reduce((a, d) => a + (d.ytdActual ?? 0), 0);
+
+  /**
+   * THE RECEIPT MUST NAME WHAT ARRIVED.
+   *
+   * This used to report a fixed handful of counts — departments, grants,
+   * transactions — chosen when those were the only things in a snapshot. So when
+   * the feed started carrying commitments, debtor ageing, the asset base and the
+   * statutory ratio inputs, the push still answered `PUSH OK (HTTP 200)` and said
+   * nothing about any of them. The data was there; you simply had to take it on
+   * faith, and "did my push actually land?" became a question only the developer
+   * could answer.
+   *
+   * So the receipt now lists every block, and whether it came through. If a block
+   * reads `null` or `0`, that push didn't carry it — which is exactly what you
+   * want a receipt to tell you.
+   */
+  const blocks = {
+    balanceSheet: snapshot.balanceSheet ? "ok" : null,
+    cashFlow: snapshot.cashFlow ? "ok" : null,
+    statutoryRatios: snapshot.statutory
+      ? `tier ${snapshot.statutory.tier}, ${snapshot.statutory.priorYear?.fyLabel ?? "prior year"} basis`
+      : null,
+    commitments: snapshot.commitments
+      ? `${snapshot.commitments.orderCount} open orders, ${Math.round(snapshot.commitments.total).toLocaleString()} committed`
+      : null,
+    ageing: snapshot.ageing
+      ? `${snapshot.ageing.receivables.count} debtors, ${snapshot.ageing.payables.count} creditors`
+      : null,
+    assets: snapshot.assets
+      ? `consumption ${snapshot.assets.consumptionRatio ?? "?"}%, ${snapshot.assets.workInProgress?.length ?? 0} projects in progress`
+      : null,
+    jobBudgets: snapshot.jobBudgets?.length ?? 0,
+    accounts: snapshot.accounts?.length ?? 0,
+  };
+
   return Response.json({
     ok: true,
     store: archiveOnly ? "archive-only" : storeKind(),
@@ -174,11 +209,11 @@ export async function PUT(request: Request) {
       period: snapshot.period?.label,
       departments: snapshot.departments.length,
       grants: snapshot.grants.length,
-      revenueLines: snapshot.revenueLines.length,
       transactions: incoming.length,
       jobCosts: snapshot.jobCosts?.length ?? 0,
       totalYtdSpend: totalSpend,
       source: snapshot.meta?.source,
     },
+    blocks,
   });
 }

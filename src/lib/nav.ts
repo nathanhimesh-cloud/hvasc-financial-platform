@@ -162,7 +162,7 @@ export function getPageMeta(
     return { title: "Data Upload", subtitle: "Practical exports" };
   }
   if (pathname === "/account") {
-    return { title: "Account", subtitle: "Profile · Preferences · Data Access" };
+    return { title: "Settings", subtitle: "Profile · Permissions · Data tools" };
   }
   if (pathname === "/support") {
     return { title: "Help Centre", subtitle: "Guides · FAQ · Contact" };
