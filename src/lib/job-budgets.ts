@@ -81,9 +81,29 @@ export function jobBudgetGroups(snapshot: FinancialSnapshot): JobBudgetView[] {
   // PowerShell's ConvertTo-Json emits a bare object, not an array, for one item.
   const list: JobBudgetGroup[] = Array.isArray(raw) ? raw : raw ? [raw as JobBudgetGroup] : [];
 
+  /**
+   * Committed spend per job — from OPEN PURCHASE ORDERS, not from JCMST.COMTOT.
+   *
+   * COMTOT is the field Practical provides for exactly this, and at Hope Vale it
+   * is zero on every one of the 4,118 job rows: the site doesn't maintain it. The
+   * real commitment lives in the purchase-order module (value ordered, less value
+   * invoiced), which the feed now computes. Overlay it here so a job shows budget,
+   * actual AND what's already been ordered against it — the last of which is
+   * invisible in the general ledger and is exactly how an account quietly goes
+   * over budget without anyone seeing it coming.
+   */
+  const committedByJob = new Map<string, number>();
+  for (const c of snapshot.commitments?.byJob ?? []) {
+    committedByJob.set(c.code, c.amount);
+  }
+
   return list
     .map((g) => {
-      const jobs = Array.isArray(g.jobs) ? g.jobs : g.jobs ? [g.jobs] : [];
+      const rawJobs = Array.isArray(g.jobs) ? g.jobs : g.jobs ? [g.jobs] : [];
+      const jobs = rawJobs.map((j) => ({
+        ...j,
+        committed: committedByJob.get(j.code) ?? j.committed ?? 0,
+      }));
       const hasBudget = g.budget > 0;
 
       // Judge spend against the budget TO DATE, not the whole year's. Nine days

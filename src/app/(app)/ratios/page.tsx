@@ -69,6 +69,22 @@ export default async function RatiosPage({ searchParams }: { searchParams: Promi
         </Panel>
       )}
 
+      {/* Why the headline figures say "last year" — the single most likely question. */}
+      {report.usingPriorYear && (
+        <Panel className="mb-5 flex gap-2.5">
+          <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-gold" strokeWidth={1.75} />
+          <div className="text-[12px] leading-relaxed text-muted-foreground">
+            These are <span className="text-foreground">annual</span> measures, so they are reported
+            on <span className="text-foreground">{report.flowBasis}</span> — the last complete
+            financial year. The Council raises its rates once a year and receives most grant income
+            later in the year, so a surplus ratio calculated from the first month of a year would be
+            wildly negative and would tell you nothing. The current year&apos;s figures appear here as
+            it progresses, and are benchmarked at 30 June. The cash cover ratio below is a
+            point-in-time measure and is current.
+          </div>
+        </Panel>
+      )}
+
       {groups.map((g) => {
         const rows = report.ratios.filter((r) => r.group === g);
         if (!rows.length) return null;
@@ -97,12 +113,13 @@ function RatioRow({ r }: { r: Ratio }) {
   const fmt = (v: number | null) =>
     v === null ? "—" : r.unit === "months" ? `${v.toFixed(1)} months` : formatPercent(v / 100, 2);
 
+  // "provisional" reads as neutral, never green or red — it is explicitly not a verdict.
   const tone =
     r.status === "pass"
       ? "text-green"
       : r.status === "fail"
         ? "text-red"
-        : r.status === "contextual"
+        : r.status === "contextual" || r.status === "provisional"
           ? "text-foreground"
           : "text-muted-foreground";
 
@@ -111,7 +128,7 @@ function RatioRow({ r }: { r: Ratio }) {
       ? CheckCircle2
       : r.status === "fail"
         ? AlertTriangle
-        : r.status === "contextual"
+        : r.status === "contextual" || r.status === "provisional"
           ? Info
           : MinusCircle;
 
@@ -122,6 +139,11 @@ function RatioRow({ r }: { r: Ratio }) {
           <div className="flex items-center gap-2">
             <Icon className={cn("h-3.5 w-3.5 flex-shrink-0", tone)} strokeWidth={2} />
             <span className="text-[13px] font-semibold text-foreground">{r.label}</span>
+            {r.status === "provisional" && (
+              <span className="rounded border border-border px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
+                Provisional
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">{r.meaning}</p>
           <p className="mt-1 font-mono text-[10px] text-muted-foreground">{r.formula}</p>
@@ -133,11 +155,12 @@ function RatioRow({ r }: { r: Ratio }) {
         <div className="flex flex-shrink-0 items-start gap-5 text-right">
           <div>
             <div className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
-              This year
+              Measured over
             </div>
             <div className={cn("mt-0.5 font-heading text-[19px] font-semibold tabular-nums", tone)}>
               {r.status === "unavailable" ? "needs data" : fmt(r.value)}
             </div>
+            <div className="mt-0.5 font-mono text-[9px] text-muted-foreground">{r.basis}</div>
           </div>
           <div>
             <div className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">

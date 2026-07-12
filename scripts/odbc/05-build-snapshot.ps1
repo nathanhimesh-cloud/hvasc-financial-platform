@@ -170,6 +170,7 @@ if ($cur -lt 1 -or $cur -gt 12) { $cur = 11 }
 $calYr       = if ($cur -le 6) { $yr - 1 } else { $yr }
 $periodLabel = "$($MONTHS[$cur-1]) $calYr"
 $fyLabel     = "FY$($yr-1)-" + ($yr.ToString().Substring(2))   # FY2026-27
+$pyFyLabel   = "FY$($yr-2)-" + (($yr-1).ToString().Substring(2))   # prior FY, e.g. FY2025-26
 Write-Host "Period: $periodLabel  (month $cur of FY$yr)" -ForegroundColor Cyan
 
 # -- 2. department rollup - 3 departments, via the account->department map -----
@@ -649,7 +650,11 @@ function Build-BsSection($def) {
     Sort-Object { [math]::Abs([double]$_.BALANCE) } -Descending
   foreach ($row in $match) {
     $amt = R2 $row.BALANCE
-    $lines += [ordered]@{ label = ([string]$row.DESCRIPT).Trim(); amount = $amt }
+    # Carry the GL code. Without it the only way to ask "is this line cash?" is to
+    # pattern-match its NAME, and the Council has bank accounts called "Bank QTC"
+    # and "Maxi-Direct" that no sane regex agrees on. The code lets the integrity
+    # check compare the Balance Sheet against the Cash Flow's OWN cash accounts.
+    $lines += [ordered]@{ code = ([string]$row.GLACCOUNT).Trim(); label = ([string]$row.DESCRIPT).Trim(); amount = $amt }
     $total += $amt
   }
   return [ordered]@{ label = $def.label; lines = $lines; total = (R2 $total) }
@@ -834,6 +839,11 @@ try {
     netChange = $netChange
     cashStart = $cashStart
     cashEnd   = $cashEnd
+    # The accounts report 739 itself treats as cash. Publishing them turns the
+    # "Balance Sheet cash doesn't match Cash Flow cash" check from a mystery
+    # dollar gap into a named list of accounts one statement counts and the
+    # other doesn't - which is a question the Council can actually answer.
+    cashAccounts = @($cashAccts)
     asAt      = $periodLabel
   }
   Write-Host ("Cash Flow (report 739): net change {0:N2}, reconciles to cash movement (gap {1:N2})." -f $netChange, $cfGap) -ForegroundColor Green
@@ -861,11 +871,32 @@ try {
 # unrestricted cash cover > 4 months, asset sustainability > 90%, asset
 # consumption > 60%. The OPERATING SURPLUS RATIO IS CONTEXTUAL - it has NO
 # benchmark for Tier 8, and must never be red-flagged.
+# CRITICAL: these ratios are ANNUAL measures. Feeding them a year-to-date figure
+# from month 1 produces nonsense - Hope Vale raises its rates and receives most of
+# its grants later in the year, so operating revenue at 31 July is a few hundred
+# dollars and the ratio explodes (we shipped -8,815% before catching this).
+#
+# So we emit TWO sets of inputs:
+#   ytd       - the current year to date. Indicative only; never benchmarked.
+#   priorYear - the LAST COMPLETE financial year, from GLBAL.LASTYEAR at period 12
+#               over the same FR-linked accounts. THIS is what gets benchmarked.
 $statutory = $null
 try {
-  # Sum the BALANCE (cumulative YTD) of every account linked under a section
-  # whose title matches $pattern, in report $rptky.
-  function FR-SectionTotal([int]$rptky, [string]$pattern) {
+  # Closing balance per account for the current period, and last year's full-year
+  # close. Built here rather than reused from the Cash Flow block, which may have
+  # been skipped - a statutory figure must not silently depend on that succeeding.
+  $balNow = @{}
+  foreach ($r in (Invoke-Rows "SELECT b.GLACCOUNT, CAST(b.BALANCE AS DOUBLE PRECISION) AS BAL FROM GLBAL b WHERE b.MTH = $cur")) {
+    $balNow[([string]$r.GLACCOUNT).Trim()] = [double]$r.BAL
+  }
+  $balLy = @{}
+  foreach ($r in (Invoke-Rows "SELECT b.GLACCOUNT, CAST(b.LASTYEAR AS DOUBLE PRECISION) AS BAL FROM GLBAL b WHERE b.MTH = 12")) {
+    $balLy[([string]$r.GLACCOUNT).Trim()] = [double]$r.BAL
+  }
+
+  # Sum a balance map over every account linked under a section whose title
+  # matches $pattern, in report $rptky.
+  function FR-SectionTotal([int]$rptky, [string]$pattern, $balMap) {
     $total = 0.0
     $secs = Invoke-Rows "SELECT KY, TITLE FROM FRSECTION WHERE RPTKY = $rptky"
     foreach ($s in $secs) {
@@ -874,8 +905,8 @@ try {
       foreach ($ln in (Invoke-Rows "SELECT KY FROM FRLINE WHERE SECTKY = $sky")) {
         foreach ($a in (Invoke-Rows ("SELECT GLACCOUNT, INVERT FROM FRACCNTLINK WHERE LNKY = " + [int]$ln.KY))) {
           $acc = ([string]$a.GLACCOUNT).Trim()
-          if (-not $balAt.ContainsKey($acc)) { continue }
-          $v = $balAt[$acc]
+          if (-not $balMap.ContainsKey($acc)) { continue }
+          $v = $balMap[$acc]
           if (([string]$a.INVERT).Trim().ToUpper() -eq 'Y') { $v = -$v }
           $total += $v
         }
@@ -884,26 +915,505 @@ try {
     return (R2 $total)
   }
 
-  $opRevenue  = FR-SectionTotal 743 '^\s*Operating income'
-  $capRevenue = FR-SectionTotal 743 '^\s*Capital income'
-  $opExpense  = FR-SectionTotal 744 '^\s*Operating expenses'
-  $capExpense = FR-SectionTotal 744 '^\s*Capital expenses'
+  # WHICH REPORT SUPPLIES THE SPLIT.
+  #
+  # 743/744 were the obvious choice - their sections are literally called
+  # "Operating income:" and "Capital income:" - and they are WRONG. They are the
+  # by-FUNCTION note (the segment analysis), their account links are stale, and
+  # 17-probe-fr-income.ps1 measured exactly how stale: report 743 accounts for
+  # 34% of the Council's income and reports capital income as $0.00. It produced a
+  # confident, plausible operating surplus ratio of -30.25% against an audited
+  # +23.20%. Nothing about the number looked wrong; only the reconciliation caught it.
+  #
+  # RPTKY 804 is the real Statement of Comprehensive Income, and it reconciles:
+  #     1.1.1 Recurrent revenue   303 accounts   FY2025-26  23,005,644.86
+  #     1.1.2 Capital revenue      96 accounts               6,472,480.34
+  #     2.1   Recurrent expenses  558 accounts              20,116,408.93
+  #     2.2   Capital expenses      5 accounts                       0.00
+  # Income accounted for: 100.0% (a single $317.80 account unlinked).
+  # => operating surplus ratio 12.6% for FY2025-26. Sane, and the right sign.
+  #
+  # "Recurrent" is the accounting term for what the Guideline calls "operating".
+  $FR_INCOME_RPT  = 804
+  $FR_EXPENSE_RPT = 804
+  $RX_OP_INC  = '^\s*1\.1\.1\b|Recurrent revenue'
+  $RX_CAP_INC = '^\s*1\.1\.2\b|Capital revenue'
+  $RX_OP_EXP  = '^\s*2\.1\b|Recurrent expenses'
+  $RX_CAP_EXP = '^\s*2\.2\b|Capital expenses'
+
+  function FR-Inputs($balMap) {
+    return [ordered]@{
+      operatingRevenue  = (FR-SectionTotal $FR_INCOME_RPT  $RX_OP_INC  $balMap)
+      capitalRevenue    = (FR-SectionTotal $FR_INCOME_RPT  $RX_CAP_INC $balMap)
+      operatingExpenses = (FR-SectionTotal $FR_EXPENSE_RPT $RX_OP_EXP  $balMap)
+      capitalExpenses   = (FR-SectionTotal $FR_EXPENSE_RPT $RX_CAP_EXP $balMap)
+    }
+  }
+
+  $ytdIn = FR-Inputs $balNow
+  $lyIn  = FR-Inputs $balLy
+  $lyDeprec = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ISCONTROL='N' AND m.ACCNTTYPE=6")
+
+  # RECONCILE OR REFUSE.
+  #
+  # An FR report only tells the truth about the operating/capital split if it
+  # actually classifies the whole ledger. Measure it, and if it doesn't add up,
+  # emit NOTHING. A missing ratio is an honest gap; a confident wrong one in front
+  # of the CEO is a liability.
+  #
+  # NOTE WHAT THE EXPENSE GROUND TRUTH IS. Practical holds depreciation twice:
+  #     1282-2000-0000  Depreciation                        5,385,453.82  <- parent
+  #     1282-2000-0100    Depreciation Estimation Current Yr  5,383,564.92
+  #     1282-2000-0001    Depreciation - Funded Component         1,888.90
+  # The two children sum to the parent EXACTLY. The parent is a roll-up flagged
+  # ISCONTROL='N'; the children are the postings. So SUM(all type-6) counts
+  # depreciation twice and is NOT the Council's expense total - the ISCONTROL='Y'
+  # sum is, and it is the figure whose net result ties to audited equity within
+  # $5,141. Report 804 links the PARENT, the P&L picks up the CHILDREN; both carry
+  # depreciation exactly once, which is why the two agree to within 1.4%.
+  $glIncomeLy  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5")
+  $glExpenseLy = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE=6")
+  $rptIncomeLy  = R2 ($lyIn.operatingRevenue  + $lyIn.capitalRevenue)
+  $rptExpenseLy = R2 ($lyIn.operatingExpenses + $lyIn.capitalExpenses)
+  $covInc = $(if ($glIncomeLy  -ne 0) { 100 * $rptIncomeLy  / $glIncomeLy }  else { 0 })
+  $covExp = $(if ($glExpenseLy -ne 0) { 100 * $rptExpenseLy / $glExpenseLy } else { 0 })
+
+  Write-Host ""
+  Write-Host ("Statutory source check - does FR report {0} account for the whole ledger?" -f $FR_INCOME_RPT) -ForegroundColor Cyan
+  Write-Host ("  income  : report {0,15:N2} vs GL {1,15:N2}  = {2,6:N1}%  (expect ~100)" -f $rptIncomeLy, $glIncomeLy, $covInc)
+  Write-Host ("  expenses: report {0,15:N2} vs GL {1,15:N2}  = {2,6:N1}%  (expect ~100)" -f $rptExpenseLy, $glExpenseLy, $covExp)
+
+  # +/-5%. Tighter than that and the depreciation parent/child mismatch (1.4%)
+  # trips it; looser and a genuinely stale report could slip through.
+  if ($covInc -lt 95 -or $covInc -gt 105 -or $covExp -lt 95 -or $covExp -gt 105) {
+    Write-Host ""
+    Write-Host "  NOT EMITTING the statutory ratios this run." -ForegroundColor Red
+    Write-Host ("  FR report {0} does not classify the whole general ledger, so any" -f $FR_INCOME_RPT) -ForegroundColor Red
+    Write-Host "  operating/capital split taken from it would be wrong. The dashboard will" -ForegroundColor Red
+    Write-Host "  show 'needs data' rather than a confident, incorrect percentage." -ForegroundColor Red
+    Write-Host "  Run 17-probe-fr-income.ps1 - it reports which report DOES reconcile." -ForegroundColor Yellow
+    throw "FR report $FR_INCOME_RPT does not reconcile to the GL (income $([math]::Round($covInc,1))%, expenses $([math]::Round($covExp,1))%)"
+  }
 
   $statutory = [ordered]@{
-    tier              = 8
-    operatingRevenue  = $opRevenue
-    capitalRevenue    = $capRevenue
-    operatingExpenses = $opExpense
-    capitalExpenses   = $capExpense
-    depreciation      = $deprec
-    # Net cash from operating activities - from the Cash Flow we just built.
-    operatingCashFlow = $(if ($cashFlow) { $cashFlow.operating.net } else { $null })
-    source            = 'FR reports 743 (income) / 744 (expenses); tier from the audited FY2025 Financial Sustainability Statement'
+    tier = 8
+    # Year to date. monthOfYear says how far through the year this is; the app
+    # refuses to benchmark it until the year is complete.
+    ytd = [ordered]@{
+      operatingRevenue  = $ytdIn.operatingRevenue
+      capitalRevenue    = $ytdIn.capitalRevenue
+      operatingExpenses = $ytdIn.operatingExpenses
+      capitalExpenses   = $ytdIn.capitalExpenses
+      depreciation      = $deprec
+      operatingCashFlow = $(if ($cashFlow) { $cashFlow.operating.net } else { $null })
+      monthOfYear       = $cur
+    }
+    # The last COMPLETE financial year - what the ratios are actually reported on.
+    # operatingCashFlow is null here on purpose: GLBAL keeps DEBIT/CREDIT movement
+    # for the CURRENT year only, so a prior-year cash flow cannot be rebuilt from
+    # it. Inventing one would be worse than admitting we don't have it.
+    priorYear = [ordered]@{
+      fyLabel           = $pyFyLabel
+      operatingRevenue  = $lyIn.operatingRevenue
+      capitalRevenue    = $lyIn.capitalRevenue
+      operatingExpenses = $lyIn.operatingExpenses
+      capitalExpenses   = $lyIn.capitalExpenses
+      depreciation      = $lyDeprec
+      operatingCashFlow = $null
+    }
+    source = "FR report $FR_INCOME_RPT (Statement of Comprehensive Income: recurrent vs capital); tier from the audited FY2025 Financial Sustainability Statement"
   }
-  Write-Host ("Statutory inputs: operating revenue {0:N2}, operating expenses {1:N2}, capital revenue {2:N2}, depreciation {3:N2}" -f `
-    $opRevenue, $opExpense, $capRevenue, $deprec) -ForegroundColor Cyan
+  Write-Host ("Statutory inputs YTD (month {0}): op revenue {1:N2}, op expenses {2:N2}, capital revenue {3:N2}" -f `
+    $cur, $ytdIn.operatingRevenue, $ytdIn.operatingExpenses, $ytdIn.capitalRevenue) -ForegroundColor Cyan
+  Write-Host ("Statutory inputs {0} (FULL YEAR - this is what gets benchmarked):" -f $pyFyLabel) -ForegroundColor Cyan
+  Write-Host ("    op revenue {0,16:N2}   op expenses {1,16:N2}" -f $lyIn.operatingRevenue, $lyIn.operatingExpenses)
+  Write-Host ("    cap revenue{0,16:N2}   depreciation{1,15:N2}" -f $lyIn.capitalRevenue, $lyDeprec)
+  if ($lyIn.operatingRevenue -gt 0) {
+    $osr = 100 * ($lyIn.operatingRevenue - $lyIn.operatingExpenses) / $lyIn.operatingRevenue
+    Write-Host ("    => operating surplus ratio {0:N2}%   (audited FY2025 was 23.20% - a similar order is expected)" -f $osr) -ForegroundColor Green
+  } else {
+    Write-Host "    => operating revenue is not positive - the FR 743 section titles may not match. Tell Nathan." -ForegroundColor Red
+  }
 } catch {
   Write-Host ("Statutory ratio inputs skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
+# =============================================================================
+# 6f. COMMITMENTS - outstanding purchase orders (deliverable C4)
+# =============================================================================
+# I told Nathan twice that capital commitments were unobtainable. Both times I
+# was wrong, and the second time I was wrong for a better reason:
+#
+#   - FR report 787 has a section literally called "(d) Capital commitments" -
+#     but it is an ABANDONED TEMPLATE. Zero accounts linked to any line, and the
+#     text still names a refuse contract expiring 30 June 2003.
+#   - The Works Orders tables (WOORDERS) are permission-LOCKED.
+#   - But the PURCHASE ORDER module is right there and readable:
+#         OPMST  7,029 orders     OPDET  8,919 order lines
+#     and OPDET.COMMITBAL is exactly what we need: the value ordered but not yet
+#     invoiced. That IS the commitment.
+#
+# Capital vs operating is decided by the GL account each order line posts to -
+# an asset account (ACCNTTYPE 7/8) is capital, an expense account (6) is
+# operating. No invented rule; the chart of accounts already says which is which.
+$commitments = $null
+try {
+  # NO "WHERE COMMITBAL <> 0" HERE.
+  #
+  # That is what I wrote first, and it returned 0 rows from a table of 8,919.
+  # In SQL, NULL <> 0 evaluates to UNKNOWN, not TRUE - so if COMMITBAL is null on
+  # the open lines, the filter throws away every one of them and the result reads
+  # as "no commitments" rather than "the query was wrong". Exactly the same shape
+  # of mistake as RDB$SYSTEM_FLAG = 0, which made the module probe find 1 table
+  # out of 914.
+  #
+  # 8,919 rows is nothing. Read them all and filter in PowerShell, where R2()
+  # turns a null into 0 instead of silently dropping the row.
+  $coRows = Invoke-Rows @"
+SELECT d.GLACCOUNT, d.JCACCOUNT, d.ITEMDESC, d.STATUS, d.COMPIND,
+       CAST(d.COMMITBAL AS DOUBLE PRECISION) AS COMMITBAL,
+       CAST(d.ESTVALUE AS DOUBLE PRECISION) AS ESTVALUE,
+       CAST(d.AMTINV AS DOUBLE PRECISION) AS AMTINV,
+       m.ORDERNUM, m.ORDERDATE, m.CREDNAME
+FROM OPDET d JOIN OPMST m ON m.KY = d.MSTKY
+"@
+  Write-Host ("  OPDET: {0} order line(s) read." -f $coRows.Count) -ForegroundColor DarkGray
+
+  # GL account -> type/name, so we can classify a commitment without guessing.
+  $glType = @{}; $glName2 = @{}
+  foreach ($r in (Invoke-Rows "SELECT GLACCOUNT, DESCRIPT, ACCNTTYPE FROM GLMST")) {
+    $a = ([string]$r.GLACCOUNT).Trim()
+    $glType[$a] = [int]$r.ACCNTTYPE
+    $glName2[$a] = ([string]$r.DESCRIPT).Trim()
+  }
+
+  # HOW THE COMMITMENT IS MEASURED, and why not the obvious way.
+  #
+  # COMMITBAL is ZERO on all 8,919 rows (19-probe-orders.ps1 counted them: not
+  # null - actually zero). Hope Vale does not use Practical's commitment field.
+  # JCMST.COMTOT is empty too. So the field designed for this answer is unusable,
+  # and the commitment has to come from the order lines themselves:
+  #
+  #     outstanding = ESTVALUE - AMTINV      (ordered, less invoiced)
+  #
+  # PER LINE, FLOORED AT ZERO, and only where the line is not yet fully invoiced.
+  # Every one of those qualifiers is load-bearing:
+  #
+  #   * Per line, floored - summing the raw difference across the whole table
+  #     gives MINUS $221,170, because closed orders routinely invoice for more
+  #     than they estimated. A negative commitment is not a thing.
+  #   * Not fully invoiced (QTYINV < QTYORDERED) - a line that has been invoiced
+  #     in full is finished, whatever the money says.
+  #
+  # The ten newest orders prove the shape: ordered 10 Jul 2026, quantity
+  # delivered 0, invoiced 0, ESTVALUE $1,500. That is a live commitment.
+  #
+  # AGE. An un-invoiced order from 2019 is not a commitment, it is a line nobody
+  # ever closed off. We split them: `total` counts orders raised in the last 12
+  # months, `stale` reports the rest so it is visible rather than quietly dropped.
+  $STALE_AFTER_DAYS = 365
+  $today = Get-Date
+
+  # GL account. COSTTYPE 'J' lines (8,504 of 8,919) are job-costed and carry a
+  # BLANK GLACCOUNT - the account lives on the job. Resolve through JCMST, and
+  # count anything we still can't place rather than silently calling it operating.
+  $jobToGl = @{}
+  if ((Test-JcCol 'JCACCOUNT') -and (Test-JcCol 'PYGLACC')) {
+    foreach ($j in (Invoke-Rows "SELECT JCACCOUNT, PYGLACC FROM JCMST")) {
+      $jk = ([string]$j.JCACCOUNT).Trim()
+      $jg = ([string]$j.PYGLACC).Trim()
+      if ($jk -and $jg) { $jobToGl[$jk] = $jg }
+    }
+  }
+
+  $capTotal = 0.0; $opTotal = 0.0; $unTotal = 0.0; $staleTotal = 0.0
+  $staleCount = 0
+  $coLines = @()
+  foreach ($r in $coRows) {
+    $est = R2 $r.ESTVALUE
+    $inv = R2 $r.AMTINV
+    $qOrd = R2 $r.QTYORDERED
+    $qInv = R2 $r.QTYINV
+
+    # Fully invoiced = finished, regardless of what the amounts say.
+    if ($qOrd -gt 0 -and $qInv -ge $qOrd) { continue }
+    $amt = R2 ($est - $inv)
+    if ($amt -le 0.005) { continue }          # floored at zero, per line
+
+    $od = ''; $ageDays = 99999
+    if ($r.ORDERDATE) {
+      try {
+        $d = [datetime]$r.ORDERDATE
+        $od = $d.ToString('yyyy-MM-dd')
+        $ageDays = ($today - $d).TotalDays
+      } catch { $od = '' }
+    }
+    if ($ageDays -gt $STALE_AFTER_DAYS) {
+      $staleTotal += $amt; $staleCount++
+      continue                                 # counted, but never called a commitment
+    }
+
+    # Direct GL account, else the job's GL account, else unclassified.
+    $gl = ([string]$r.GLACCOUNT).Trim()
+    $jc = ([string]$r.JCACCOUNT).Trim()
+    if (-not $gl -and $jc) {
+      if ($jobToGl.ContainsKey($jc)) { $gl = $jobToGl[$jc] }
+      elseif ($glType.ContainsKey($jc)) { $gl = $jc }   # some lines carry a GL code in JCACCOUNT
+    }
+    $t = $(if ($gl -and $glType.ContainsKey($gl)) { $glType[$gl] } else { 0 })
+    $kind = if ($t -eq 7 -or $t -eq 8) { 'capital' } elseif ($t -eq 6) { 'operating' } else { 'unclassified' }
+    if     ($kind -eq 'capital')   { $capTotal += $amt }
+    elseif ($kind -eq 'operating') { $opTotal  += $amt }
+    else                           { $unTotal  += $amt }
+
+    $coLines += [pscustomobject]@{
+      orderNo   = ([string]$r.ORDERNUM).Trim()
+      orderDate = $od
+      supplier  = ([string]$r.CREDNAME).Trim()
+      item      = ([string]$r.ITEMDESC).Trim()
+      code      = $gl
+      account   = $(if ($gl -and $glName2.ContainsKey($gl)) { $glName2[$gl] } else { '' })
+      jobCode   = $jc
+      kind      = $kind
+      amount    = $amt
+    }
+  }
+  $coLines = @($coLines | Sort-Object { -[double]$_.amount })
+
+  # Committed-by-job, so the Job Budgets page can show budget / actual / committed.
+  $commitByJob = @{}
+  foreach ($l in $coLines) {
+    $jc = $l.jobCode
+    if ($jc.Length -lt 9) { continue }
+    $k = $jc.Substring(0, 9)
+    if (-not $commitByJob.ContainsKey($k)) { $commitByJob[$k] = 0.0 }
+    $commitByJob[$k] = [double]$commitByJob[$k] + [double]$l.amount
+  }
+  $jobCommitments = @()
+  foreach ($k in ($commitByJob.Keys | Sort-Object)) {
+    if ([math]::Abs($commitByJob[$k]) -lt 0.005) { continue }
+    $jobCommitments += [ordered]@{ code = $k; amount = (R2 $commitByJob[$k]) }
+  }
+
+  if ($coLines.Count -eq 0) {
+    # Never publish a zero as though it were a finding. 8,919 order lines that
+    # yield no commitment means the wrong column was read, not that the Council
+    # has ordered nothing.
+    $commitments = $null
+    Write-Host ("Commitments (C4): NOT EMITTED - {0} order lines read, none outstanding. That is suspicious; check 19-probe-orders.ps1." -f $coRows.Count) -ForegroundColor Red
+  } else {
+    $commitments = [ordered]@{
+      capital      = R2 $capTotal
+      operating    = R2 $opTotal
+      unclassified = R2 $unTotal
+      total        = R2 ($capTotal + $opTotal + $unTotal)
+      orderCount   = $coLines.Count
+      # Un-invoiced order lines older than a year. NOT counted as commitments -
+      # they are almost certainly orders nobody ever closed off. Reported anyway,
+      # because a number quietly dropped is a number nobody can question.
+      stale        = R2 $staleTotal
+      staleCount   = $staleCount
+      # The 200 biggest. The snapshot is not an archive, and nobody reads past the
+      # top of a commitments schedule.
+      lines        = @($coLines | Select-Object -First 200 | ForEach-Object {
+                       [ordered]@{ orderNo=$_.orderNo; orderDate=$_.orderDate; supplier=$_.supplier
+                                   item=$_.item; code=$_.code; account=$_.account
+                                   jobCode=$_.jobCode; kind=$_.kind; amount=$_.amount } })
+      byJob        = $jobCommitments
+      asAt         = $periodLabel
+      source       = 'Purchase orders (OPMST/OPDET): value ordered less value invoiced, per line, on lines not yet fully invoiced and raised in the last 12 months. Practical''s COMMITBAL field is unused at this site (zero on all 8,919 lines), so it cannot be used. Capital vs operating from the GL account the line posts to (via the job, for job-costed lines).'
+    }
+    Write-Host ("Commitments (C4): capital {0:N2}, operating {1:N2}, unclassified {2:N2} across {3} open order line(s)." -f `
+      $commitments.capital, $commitments.operating, $commitments.unclassified, $commitments.orderCount) -ForegroundColor Green
+    Write-Host ("    total committed: {0:N2}" -f $commitments.total) -ForegroundColor Green
+    if ($staleCount -gt 0) {
+      Write-Host ("    plus {0:N2} on {1} order line(s) over a year old - EXCLUDED (orders never closed off, not commitments)." -f $staleTotal, $staleCount) -ForegroundColor Yellow
+    }
+    if ($unTotal -ne 0) {
+      Write-Host ("    {0:N2} could not be classified capital/operating - no GL account on the line or its job." -f $unTotal) -ForegroundColor Yellow
+    }
+  }
+} catch {
+  Write-Host ("Commitments skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
+# =============================================================================
+# 6g. RECEIVABLES / PAYABLES AGEING (deliverable B4)
+# =============================================================================
+# DRMST (debtors) and CRMST (creditors) already carry the 30/60/90 buckets -
+# Practical ages them at end of month, so nothing needs computing here.
+#
+# The buckets reconcile exactly for debtors:
+#     BALANCE00 + BALANCE30 + BALANCE60 + BALANCE90 = BALANCE
+# CRMST has NO BALANCE00 column, so the current bucket is the remainder. Do not
+# assume the two tables have the same shape - they don't.
+$ageing = $null
+try {
+  function Age-Table([string]$tbl, [string]$keyCol, [bool]$hasCurrent) {
+    $cur0 = $(if ($hasCurrent) { ', CAST(BALANCE00 AS DOUBLE PRECISION) AS B00' } else { '' })
+    $rows = Invoke-Rows ("SELECT $keyCol AS ID, NAME, CAST(BALANCE AS DOUBLE PRECISION) AS BAL, " +
+      "CAST(BALANCE30 AS DOUBLE PRECISION) AS B30, CAST(BALANCE60 AS DOUBLE PRECISION) AS B60, " +
+      "CAST(BALANCE90 AS DOUBLE PRECISION) AS B90" + $cur0 + " FROM $tbl WHERE BALANCE <> 0")
+
+    $t = @{ current = 0.0; d30 = 0.0; d60 = 0.0; d90 = 0.0; total = 0.0 }
+    $accts = @()
+    foreach ($r in $rows) {
+      $bal = R2 $r.BAL
+      $b30 = R2 $r.B30; $b60 = R2 $r.B60; $b90 = R2 $r.B90
+      # Current = the explicit column when it exists, otherwise the remainder.
+      $b00 = $(if ($hasCurrent) { R2 $r.B00 } else { R2 ($bal - $b30 - $b60 - $b90) })
+      $t.current += $b00; $t.d30 += $b30; $t.d60 += $b60; $t.d90 += $b90; $t.total += $bal
+      $accts += [pscustomobject]@{
+        id = ([string]$r.ID).Trim(); name = ([string]$r.NAME).Trim()
+        current = $b00; d30 = $b30; d60 = $b60; d90 = $b90; total = $bal
+      }
+    }
+    $accts = @($accts | Sort-Object { -[double]$_.total })
+    return [ordered]@{
+      current  = R2 $t.current
+      days30   = R2 $t.d30
+      days60   = R2 $t.d60
+      days90   = R2 $t.d90
+      total    = R2 $t.total
+      count    = $accts.Count
+      accounts = @($accts | Select-Object -First 60 | ForEach-Object {
+                   [ordered]@{ id=$_.id; name=$_.name; current=$_.current
+                               days30=$_.d30; days60=$_.d60; days90=$_.d90; total=$_.total } })
+    }
+  }
+
+  $ageing = [ordered]@{
+    receivables = (Age-Table 'DRMST' 'DEBTOR'   $true)    # DRMST HAS BALANCE00
+    payables    = (Age-Table 'CRMST' 'CREDITOR' $false)   # CRMST does NOT
+    asAt        = $periodLabel
+    source      = "Practical's own ageing buckets (DRMST / CRMST, aged at end of month)."
+  }
+  Write-Host ("Ageing (B4): receivables {0:N2} ({1:N2} over 90 days), payables {2:N2}." -f `
+    $ageing.receivables.total, $ageing.receivables.days90, $ageing.payables.total) -ForegroundColor Green
+  if ($ageing.receivables.total -gt 0) {
+    $pct90 = 100 * $ageing.receivables.days90 / $ageing.receivables.total
+    $c = if ($pct90 -gt 40) { 'Yellow' } else { 'Green' }
+    Write-Host ("    {0:N1}% of money owed to the Council is more than 90 days overdue." -f $pct90) -ForegroundColor $c
+  }
+} catch {
+  Write-Host ("Ageing skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
+# =============================================================================
+# 6h. ASSETS - for the Asset Consumption ratio (B8)
+# =============================================================================
+# NOT from the asset register. ARMST holds 1,360 assets, but its totals do not
+# reconcile: gross 99.0M less accumulated depreciation 78.0M = 21.0M written
+# down, against ~127M of non-current assets on the balance sheet, and every
+# asset sampled had YEAROPENVAL = 0. The register is not maintained, and a ratio
+# built on it would read ~21% against the Council's audited 59.18%.
+#
+# ARGROUP gives us something better: the GL ACCOUNTS behind each asset class.
+#     Infrastructure   cost 0290-4000-0100  reval ...-0200  accum dep 0295-4010-0000
+#     Land             cost 0210-4000-0100                  (none - not depreciable)
+# Reading the ledger instead means the ratio reconciles to the balance sheet by
+# construction, and land drops out on its own because it has no depreciation
+# account - which is exactly the accounting treatment.
+#
+# CAREFUL: several groups share one set of accounts (5, 9 and 10 all point at the
+# same infrastructure accounts). Summing per GROUP would count ~$90M of
+# infrastructure three times. Dedupe on the account triple, not the group.
+$assets = $null
+try {
+  # $balNow is built in the statutory block. If that block threw, it may not
+  # exist - and the asset ratio must not silently depend on the statutory one
+  # having succeeded. Rebuild it here if we have to.
+  if (-not $balNow -or $balNow.Count -eq 0) {
+    $balNow = @{}
+    foreach ($r in (Invoke-Rows "SELECT b.GLACCOUNT, CAST(b.BALANCE AS DOUBLE PRECISION) AS BAL FROM GLBAL b WHERE b.MTH = $cur")) {
+      $balNow[([string]$r.GLACCOUNT).Trim()] = [double]$r.BAL
+    }
+  }
+  $grpRows = Invoke-Rows "SELECT GROUPNO, DESCRIPTION, DEFASSETGLACC, DEFREVALGLACC, DEFACCUMDEPGLACC FROM ARGROUP"
+  $seenTriple = @{}
+  $classes = @()
+  $grossDep = 0.0; $wdvDep = 0.0; $accumDep = 0.0; $landTotal = 0.0
+
+  foreach ($g in $grpRows) {
+    $ac = ([string]$g.DEFASSETGLACC).Trim()
+    $rc = ([string]$g.DEFREVALGLACC).Trim()
+    $dc = ([string]$g.DEFACCUMDEPGLACC).Trim()
+    if (-not $ac) { continue }
+    $triple = "$ac|$rc|$dc"
+    if ($seenTriple.ContainsKey($triple)) { continue }   # <- the triple-count guard
+    $seenTriple[$triple] = $true
+
+    $cost  = $(if ($balNow.ContainsKey($ac)) { R2 $balNow[$ac] } else { 0 })
+    $reval = $(if ($rc -and $balNow.ContainsKey($rc)) { R2 $balNow[$rc] } else { 0 })
+    # Accumulated depreciation is credit-normal, so it sits NEGATIVE in the ledger.
+    $adep  = $(if ($dc -and $balNow.ContainsKey($dc)) { R2 $balNow[$dc] } else { 0 })
+    $gross = R2 ($cost + $reval)
+    $wdv   = R2 ($gross + $adep)
+    if ($gross -eq 0 -and $wdv -eq 0) { continue }
+
+    # No depreciation account = not a depreciable asset (land). It belongs on the
+    # balance sheet but must NOT be in the asset consumption ratio.
+    $depreciable = [bool]$dc
+    if ($depreciable) { $grossDep += $gross; $wdvDep += $wdv; $accumDep += $adep }
+    else              { $landTotal += $wdv }
+
+    $classes += [ordered]@{
+      name        = ([string]$g.DESCRIPTION).Trim()
+      depreciable = $depreciable
+      cost        = $cost
+      revaluation = $reval
+      gross       = $gross
+      accumulatedDepreciation = $adep
+      writtenDownValue        = $wdv
+    }
+  }
+
+  # CAPITAL WORKS IN PROGRESS. The 0205-4xxx series - one non-current asset
+  # account per capital project (NDRRA, W4Q, LRCI, Secure Communities...), the
+  # same programs the grant register funds. These are NOT in ARGROUP because they
+  # aren't asset classes yet: they're spend accumulating until the work is
+  # finished and capitalised. Correctly excluded from the consumption ratio (WIP
+  # isn't depreciated), but far too useful to leave out of the snapshot.
+  $wipRows = Invoke-Rows @"
+SELECT m.GLACCOUNT, m.DESCRIPT, CAST(b.BALANCE AS DOUBLE PRECISION) AS BAL
+FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE = 8
+  AND m.GLACCOUNT LIKE '0205-%' AND b.BALANCE <> 0
+ORDER BY b.BALANCE DESC
+"@
+  $wip = @(); $wipTotal = 0.0
+  foreach ($r in $wipRows) {
+    $v = R2 $r.BAL
+    $wipTotal += $v
+    $wip += [ordered]@{
+      code    = ([string]$r.GLACCOUNT).Trim()
+      project = ([string]$r.DESCRIPT).Trim()
+      amount  = $v
+    }
+  }
+
+  $consumption = $(if ($grossDep -gt 0) { R2 (100 * $wdvDep / $grossDep) } else { $null })
+  $assets = [ordered]@{
+    classes = @($classes | Sort-Object { -[double]$_.gross })
+    grossDepreciable       = R2 $grossDep
+    writtenDownDepreciable = R2 $wdvDep
+    accumulatedDepreciation = R2 $accumDep
+    nonDepreciable         = R2 $landTotal   # land
+    consumptionRatio       = $consumption    # percent
+    # Capital works in progress, one line per project.
+    workInProgress         = $wip
+    workInProgressTotal    = R2 $wipTotal
+    asAt                   = $periodLabel
+    source = 'GL asset accounts, mapped by class from ARGROUP. Not from ARMST, whose totals do not reconcile to the balance sheet (gross 99.0M vs the ledger''s ~171M). Work in progress is the 0205 series, excluded from the consumption ratio because it is not yet depreciated.'
+  }
+  Write-Host ("Assets (B8): depreciable gross {0:N2}, written down {1:N2}" -f $assets.grossDepreciable, $assets.writtenDownDepreciable) -ForegroundColor Green
+  if ($null -ne $consumption) {
+    Write-Host ("    => asset consumption ratio {0:N2}%   (audited FY2025 was 59.18% - expect the same order)" -f $consumption) -ForegroundColor Green
+  }
+  Write-Host ("    land / non-depreciable: {0:N2}" -f $assets.nonDepreciable) -ForegroundColor DarkGray
+  Write-Host ("    capital works in progress: {0:N2} across {1} project(s)" -f $assets.workInProgressTotal, $wip.Count) -ForegroundColor Cyan
+} catch {
+  Write-Host ("Assets skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
 }
 
 # -- 6d. prior year (from GLBAL.LASTYEAR at period 12 = last year's close) -----
@@ -912,11 +1422,16 @@ try {
 $pyIncome  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ACCNTTYPE=5")
 $pyExpense = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE=6")
 $pyEquity  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ACCNTTYPE=11")
-$pyFyLabel = "FY$($yr-2)-" + (($yr-1).ToString().Substring(2))   # prior FY, e.g. FY2025-26
+# Prior-year depreciation. `$pyExpense` above INCLUDES it (via the two child
+# accounts 1282-2000-0100 and -0001), so anything that needs a CASH expense
+# figure - the months-of-cover runway above all - must subtract this. Depreciation
+# is a non-cash charge: it consumes no bank balance and cannot shorten a runway.
+$pyDeprec  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ISCONTROL='N' AND m.ACCNTTYPE=6")
 $priorYear = [ordered]@{
   fyLabel       = $pyFyLabel
   income        = $pyIncome
   expenses      = $pyExpense
+  depreciation  = $pyDeprec
   netResult     = R2 ($pyIncome - $pyExpense)
   closingEquity = $pyEquity
 }
@@ -949,6 +1464,9 @@ $snapshot = [ordered]@{
   balanceSheet  = $balanceSheet
   cashFlow      = $cashFlow
   statutory     = $statutory
+  commitments   = $commitments
+  ageing        = $ageing
+  assets        = $assets
   priorYear     = $priorYear
   meta = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"

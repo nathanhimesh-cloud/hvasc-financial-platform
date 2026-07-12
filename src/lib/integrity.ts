@@ -71,10 +71,31 @@ export interface IntegrityReport {
  * liquidity panel uses, so the two statements are compared like for like.
  */
 const BS_CASH_LINE = /cash|bank|qtc|maxi[\s-]?direct|petty|float/i;
-function findBalanceSheetCash(bs: BalanceSheet): number | undefined {
-  const lines = bs.currentAssets.lines.filter((l) => BS_CASH_LINE.test(l.label));
-  if (!lines.length) return undefined;
-  return lines.reduce((a, l) => a + l.amount, 0);
+
+/** Every account on the balance sheet that represents cash or a bank account. */
+function balanceSheetCashLines(bs: BalanceSheet) {
+  return bs.currentAssets.lines.filter((l) => BS_CASH_LINE.test(l.label));
+}
+
+/**
+ * The cash accounts the Balance Sheet has but Practical's Cash Flow report (739)
+ * does NOT count as cash.
+ *
+ * This is the whole point of the check. We already know report 739's account links
+ * are stale — ~24 operating accounts move cash without being mapped to any line —
+ * so it is entirely plausible its CASH list is stale too, and that the Cash Flow
+ * is understating the Council's cash by a real bank account or three.
+ *
+ * Naming them turns an unactionable "$4,005,709 difference" into a question the
+ * Council can actually answer: "is this a bank account? Then add it to report
+ * 739's cash line in Practical." Comparing only the accounts the two statements
+ * already agree on would make the discrepancy vanish, which is the opposite of
+ * what a reconciliation is for.
+ */
+function cashLinesMissingFromCashFlow(bs: BalanceSheet, cashAccounts?: string[]) {
+  const codes = new Set((cashAccounts ?? []).map((c) => c.trim()));
+  if (!codes.size) return [];
+  return balanceSheetCashLines(bs).filter((l) => !(l.code && codes.has(l.code.trim())));
 }
 
 function pass(
@@ -155,21 +176,29 @@ function checkCashAgrees(bs?: BalanceSheet, cf?: CashFlow): IntegrityCheck {
   const description = "Closing cash on the Cash Flow must equal the cash line on the Balance Sheet for the same period.";
   if (!bs || !cf) return skip(id, label, description, "Needs both Balance Sheet and Cash Flow for the same period.");
 
-  const bsCash = findBalanceSheetCash(bs);
-  if (bsCash === undefined) {
+  const lines = balanceSheetCashLines(bs);
+  if (!lines.length) {
     return skip(id, label, description, "Couldn't find a cash line on the Balance Sheet to compare.");
   }
+  const bsCash = lines.reduce((a, l) => a + l.amount, 0);
   const gap = cf.cashEnd - bsCash;
   const detail = `Cash Flow close ${formatCurrency(cf.cashEnd)} vs Balance Sheet cash ${formatCurrency(bsCash)}`;
   if (Math.abs(gap) <= INTEGRITY_TOLERANCE) return pass(id, label, description, detail);
-  return fail(
-    id,
-    label,
-    description,
-    gap,
-    detail,
-    `Cash differs by ${formatCurrency(Math.abs(gap))} between the two statements.`,
-  );
+
+  // Name the accounts that cause the difference, when the snapshot tells us which
+  // accounts report 739 counts as cash.
+  const orphans = cashLinesMissingFromCashFlow(bs, cf.cashAccounts);
+  const orphanTotal = orphans.reduce((a, l) => a + l.amount, 0);
+  const named = orphans
+    .slice(0, 4)
+    .map((l) => `${l.label} (${formatCurrency(l.amount)})`)
+    .join(", ");
+
+  const reason = orphans.length
+    ? `Cash differs by ${formatCurrency(Math.abs(gap))}. ${orphans.length} bank account${orphans.length === 1 ? " is" : "s are"} on the Balance Sheet but not counted as cash by Practical's Cash Flow report (739): ${named}${orphans.length > 4 ? "…" : ""}${orphans.length > 1 ? ` — ${formatCurrency(orphanTotal)} in total` : ""}. If these are real bank accounts, they should be added to report 739's cash line in Practical.`
+    : `Cash differs by ${formatCurrency(Math.abs(gap))} between the two statements.`;
+
+  return fail(id, label, description, gap, detail, reason);
 }
 
 /** Check 4 — Result ties to equity movement (needs prior-period equity close). */

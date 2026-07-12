@@ -9,6 +9,7 @@ import {
   Briefcase,
   Activity,
   Gauge,
+  FileClock,
   type LucideIcon,
 } from "lucide-react";
 import { can } from "@/lib/auth/roles";
@@ -26,6 +27,7 @@ export const overviewNav: NavLink[] = [
   { href: "/", label: "CFO Dashboard", icon: LayoutDashboard },
   { href: "/grants", label: "Grant Tracker", icon: Landmark },
   { href: "/jobs", label: "Job Budgets", icon: Briefcase },
+  { href: "/commitments", label: "Commitments & Debtors", icon: FileClock },
   { href: "/reports", label: "Detailed Reports", icon: FileText },
   { href: "/monthly-report", label: "Monthly Report", icon: FileBarChart },
   { href: "/ratios", label: "Sustainability Ratios", icon: Gauge },
@@ -123,6 +125,9 @@ export function getPageMeta(
   }
   if (pathname === "/jobs") {
     return { title: "Job Budgets", subtitle: "Budget vs actual by job" };
+  }
+  if (pathname === "/commitments") {
+    return { title: "Commitments & Debtors", subtitle: "Money in flight" };
   }
   if (pathname === "/departments") {
     return { title: "Manager View", subtitle: `${ctx?.deptCount ?? "All"} departments` };

@@ -70,20 +70,34 @@ export function totalCash(snapshot: FinancialSnapshot): { total: number; lines: 
 }
 
 /**
- * Monthly operating expenditure. Early in a financial year the year-to-date figure
- * is near zero and would give a meaningless (infinite) runway, so we fall back to
- * the prior year's average month.
+ * Monthly CASH operating expenditure — the runway denominator.
+ *
+ * Two things this must get right, and the first version got both wrong:
+ *
+ * 1. DEPRECIATION IS NOT CASH. It consumes no bank balance, so it cannot shorten
+ *    a cash runway. The expense totals in the snapshot INCLUDE it (Practical posts
+ *    it to 1282-2000-0100 / -0001, which sit inside the ISCONTROL='Y' expense sum),
+ *    so it has to be subtracted here. Leaving it in inflated the denominator by
+ *    ~37% and understated the runway: it reported 36 months where the Council's own
+ *    audited FY2025 statement reports 46.11.
+ *
+ * 2. Early in a financial year the year-to-date figure is near zero — at month 1 it
+ *    is actually NEGATIVE, because June's accruals are reversing — and dividing by
+ *    it gives a meaningless runway. So we fall back to the prior year's average
+ *    cash month.
  */
 function monthlyOpexOf(snapshot: FinancialSnapshot): number {
-  const ytd = snapshot.incomeTotals?.totalExpenses ?? 0;
   const month = snapshot.period?.monthOfYear ?? 0;
-  if (ytd > 0 && month > 0) {
-    const perMonth = ytd / month;
+  const ytdCash =
+    (snapshot.incomeTotals?.totalExpenses ?? 0) - (snapshot.statutory?.ytd.depreciation ?? 0);
+  if (ytdCash > 0 && month > 0) {
+    const perMonth = ytdCash / month;
     // Guard against one tiny opening month distorting the run rate.
     if (perMonth > 1000) return perMonth;
   }
-  const prior = snapshot.priorYear?.expenses ?? 0;
-  return prior > 0 ? prior / 12 : 0;
+  const prior = snapshot.priorYear;
+  const priorCash = (prior?.expenses ?? 0) - (prior?.depreciation ?? 0);
+  return priorCash > 0 ? priorCash / 12 : 0;
 }
 
 export function cashBreakdown(snapshot: FinancialSnapshot, grants: GrantFigures[]): CashBreakdown {

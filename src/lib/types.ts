@@ -189,7 +189,13 @@ export interface PriorYear {
   /** e.g. "FY2025-26". */
   fyLabel: string;
   income: number;
+  /** Total expenses. INCLUDES depreciation. */
   expenses: number;
+  /**
+   * Depreciation within `expenses`. Subtract it to get a CASH expense figure —
+   * depreciation consumes no bank balance, so it must not shorten a cash runway.
+   */
+  depreciation?: number;
   netResult: number;
   /** Prior-year closing total community equity. */
   closingEquity: number;
@@ -223,6 +229,13 @@ export interface MonthlyStatement extends IncomeStatement {
 export interface StatementLine {
   label: string;
   amount: number;
+  /**
+   * GL account code. Present on balance-sheet lines; absent on cash-flow lines,
+   * which are roll-ups of many accounts. Lets us ask "is this line cash?" by
+   * account rather than by guessing from its name — the Council has bank accounts
+   * called "Bank QTC" and "Maxi-Direct" that no regex reliably identifies.
+   */
+  code?: string;
 }
 
 /** A balance-sheet section (assets/liabilities/equity) with its subtotal. */
@@ -262,6 +275,12 @@ export interface CashFlow {
   netChange: number;
   cashStart: number;
   cashEnd: number;
+  /**
+   * The GL accounts Practical's own Cash Flow report (FR 739) treats as cash.
+   * The integrity check compares the Balance Sheet against exactly these, so a
+   * mismatch names the offending accounts instead of reporting a bare dollar gap.
+   */
+  cashAccounts?: string[];
   asAt?: string;
 }
 
@@ -285,6 +304,12 @@ export interface FinancialSnapshot {
   cashFlow?: CashFlow;
   /** Inputs for the statutory sustainability ratios (B8). */
   statutory?: StatutoryInputs;
+  /** Outstanding purchase-order commitments (C4). */
+  commitments?: Commitments;
+  /** Debtor / creditor ageing (B4). */
+  ageing?: Ageing;
+  /** Asset base by class, for the Asset Consumption ratio. */
+  assets?: AssetBase;
   /** Daily operating spend series (from GLTRN), for the daily trend. */
   dailySpend?: DailySpendPoint[];
   /** Recent GL transactions (from GLTRN) for the transaction report / drill-down. */
@@ -387,15 +412,150 @@ export interface AccountRef {
  * FR report 743 ("Operating income" / "Capital income") and 744 ("Operating
  * expenses" / "Capital expenses") — rather than a rule we invented.
  */
-export interface StatutoryInputs {
-  /** Hope Vale is Tier 8 (audited FY2025 Financial Sustainability Statement). */
-  tier: number;
+export interface StatutoryPeriodInputs {
   operatingRevenue: number;
   capitalRevenue: number;
   operatingExpenses: number;
   capitalExpenses: number;
   depreciation: number;
-  /** Net cash from operating activities, from the Cash Flow. */
+  /** Net cash from operating activities. Null when it can't be derived. */
   operatingCashFlow: number | null;
+  /** Only on the YTD block: how far through the financial year these figures are. */
+  monthOfYear?: number;
+  /** Only on the prior-year block. */
+  fyLabel?: string;
+}
+
+/**
+ * Outstanding purchase-order commitments (Build Brief C4).
+ *
+ * Value ordered but not yet invoiced — money the Council has committed to spend
+ * but hasn't paid. Source: OPDET.COMMITBAL joined to OPMST, from Practical's
+ * purchase-order module. Capital vs operating is decided by the GL account each
+ * order line posts to (asset account = capital, expense account = operating), so
+ * no classification is invented here.
+ */
+export interface CommitmentLine {
+  orderNo: string;
+  orderDate: string;
+  supplier: string;
+  item: string;
+  code: string;
+  account: string;
+  jobCode: string;
+  kind: "capital" | "operating" | "unclassified";
+  amount: number;
+}
+
+export interface Commitments {
+  capital: number;
+  operating: number;
+  unclassified: number;
+  total: number;
+  orderCount: number;
+  /**
+   * Un-invoiced order lines more than a year old. NOT counted in `total` — they
+   * are almost certainly orders nobody closed off rather than live commitments.
+   * Reported so the exclusion is visible rather than silent.
+   */
+  stale?: number;
+  staleCount?: number;
+  /** The largest open order lines. Not the full 8,919-line ledger. */
+  lines: CommitmentLine[];
+  /** Committed spend per job code, for budget vs actual vs committed. */
+  byJob: { code: string; amount: number }[];
+  asAt?: string;
+  source?: string;
+}
+
+/** One party in an ageing schedule. */
+export interface AgedAccount {
+  id: string;
+  name: string;
+  current: number;
+  days30: number;
+  days60: number;
+  days90: number;
+  total: number;
+}
+
+export interface AgedSchedule {
+  current: number;
+  days30: number;
+  days60: number;
+  days90: number;
+  total: number;
+  count: number;
+  accounts: AgedAccount[];
+}
+
+/**
+ * Debtor and creditor ageing (Build Brief B4). Practical ages these itself at
+ * end of month (DRMST / CRMST), so nothing is recomputed — we read its buckets.
+ */
+export interface Ageing {
+  receivables: AgedSchedule;
+  payables: AgedSchedule;
+  asAt?: string;
+  source?: string;
+}
+
+/**
+ * Asset base, for the Asset Consumption ratio.
+ *
+ * Read from the GL asset accounts — mapped to classes via ARGROUP — and NOT from
+ * the asset register (ARMST), whose totals don't reconcile to the balance sheet.
+ * Land carries no depreciation account, so it drops out of the ratio on its own.
+ */
+export interface AssetClass {
+  name: string;
+  depreciable: boolean;
+  cost: number;
+  revaluation: number;
+  gross: number;
+  /** Credit-normal, so this is negative. */
+  accumulatedDepreciation: number;
+  writtenDownValue: number;
+}
+
+/** One capital project still accumulating spend (the GL's 0205 series). */
+export interface WorkInProgress {
+  code: string;
+  project: string;
+  amount: number;
+}
+
+export interface AssetBase {
+  classes: AssetClass[];
+  grossDepreciable: number;
+  writtenDownDepreciable: number;
+  accumulatedDepreciation: number;
+  /** Land and anything else not depreciated. */
+  nonDepreciable: number;
+  /** Written-down ÷ gross, as a percentage. Null when there's nothing to divide. */
+  consumptionRatio: number | null;
+  /**
+   * Capital works in progress, one line per project — spend accumulating until
+   * the work is finished and capitalised. Excluded from the consumption ratio
+   * because WIP isn't depreciated.
+   */
+  workInProgress?: WorkInProgress[];
+  workInProgressTotal?: number;
+  asAt?: string;
+  source?: string;
+}
+
+export interface StatutoryInputs {
+  /** Hope Vale is Tier 8 (audited FY2025 Financial Sustainability Statement). */
+  tier: number;
+  /**
+   * Current financial year to date. INDICATIVE ONLY — these ratios are annual
+   * measures, and Hope Vale raises its rates and receives most grants late in the
+   * year, so an early-year operating revenue near zero makes the ratio explode.
+   * The app never benchmarks this.
+   */
+  ytd: StatutoryPeriodInputs;
+  /** The last COMPLETE financial year. This is what actually gets benchmarked. */
+  priorYear: StatutoryPeriodInputs;
   source: string;
 }
