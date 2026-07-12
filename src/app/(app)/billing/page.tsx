@@ -49,7 +49,21 @@ export default async function BillingPage({
     owed nothing", when the truth is "we haven't loaded it yet".
   */
   const notReady = invoices.notReady && bills.notReady;
-  const empty = !notReady && invoices.total === 0 && bills.total === 0;
+
+  /*
+    THREE DIFFERENT KINDS OF "NOTHING HERE", AND THEY NEED THREE DIFFERENT ANSWERS.
+
+      notReady    - the tables don't exist. Run the migration.
+      neverLoaded - the tables exist and are EMPTY. The feed has never delivered.
+      empty       - there is data, but none of it matches the current filters.
+
+    Collapsing the middle case into the last one is what the first version did, and it
+    told the user to "try widening the dates" when no date would have helped — sending
+    them to hunt a filter bug that did not exist. The fix for an empty table is on the
+    Council's server, not in the date picker.
+  */
+  const neverLoaded = !notReady && invoices.neverLoaded && bills.neverLoaded;
+  const empty = !notReady && !neverLoaded && invoices.total === 0 && bills.total === 0;
 
   return (
     <Content>
@@ -136,11 +150,41 @@ export default async function BillingPage({
             />
           </div>
 
-          {empty ? (
+          {neverLoaded ? (
+            <Panel className="border-amber/30 bg-amber/[0.04]">
+              <PanelHeader
+                title="The tables are ready. No data has arrived."
+                subtitle="This is a feed problem, not a filter problem"
+              />
+              <div className="flex items-start gap-2.5">
+                <Database className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber" strokeWidth={1.75} />
+                <div className="text-[13px] leading-relaxed text-muted-foreground">
+                  The database is set up correctly, but the Council&apos;s server has never sent an
+                  invoice or a supplier bill. <span className="text-foreground">No date range will
+                  help</span> — there is nothing to find.
+                  <p className="mt-2">Two things to check on HVASC-APP02:</p>
+                  <ol className="mt-1.5 flex list-decimal flex-col gap-1 pl-4">
+                    <li>
+                      Is it running the <span className="text-foreground">current</span>{" "}
+                      <code className="font-mono text-[12px] text-foreground">05-build-snapshot.ps1</code>?
+                      The build log should print{" "}
+                      <span className="text-foreground">&quot;Invoices + supplier bills (B4)&quot;</span>.
+                      If it doesn&apos;t, the script on the server is out of date.
+                    </li>
+                    <li>
+                      Did the <span className="text-foreground">push</span> succeed? A failed push
+                      leaves the cursor where it was and sends nothing.
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </Panel>
+          ) : empty ? (
             <Panel>
               <PanelHeader title="Nothing in range" subtitle="Try widening the dates" />
               <p className="text-[13px] text-muted-foreground">
-                The tables are loaded but no invoice or bill matches the current filters.
+                There <span className="text-foreground">is</span> invoice and bill data loaded — none
+                of it falls inside the current filters.
               </p>
             </Panel>
           ) : (

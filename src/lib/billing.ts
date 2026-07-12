@@ -201,6 +201,8 @@ export interface InvoicePage {
   totalOutstanding: number;
   /** True when the tables haven't been created yet — so the page can say so. */
   notReady: boolean;
+  /** True when the table exists but holds NOTHING — the feed has never delivered. */
+  neverLoaded: boolean;
 }
 
 export async function queryInvoices(q: BillingQuery = {}): Promise<InvoicePage> {
@@ -210,6 +212,7 @@ export async function queryInvoices(q: BillingQuery = {}): Promise<InvoicePage> 
     totalInvoiced: 0,
     totalOutstanding: 0,
     notReady: true,
+    neverLoaded: true,
   };
   const sql = db();
   if (!sql) return empty;
@@ -250,8 +253,11 @@ export async function queryInvoices(q: BillingQuery = {}): Promise<InvoicePage> 
         AND (${openOnly}::boolean = FALSE OR outstanding <> 0)
     `) as Record<string, number>[];
 
+    const [all] = (await sql`SELECT COUNT(*)::int AS n FROM ar_invoices`) as Record<string, number>[];
+
     return {
       notReady: false,
+      neverLoaded: Number(all?.n ?? 0) === 0,
       rows: rows.map((r) => ({
         ky: Number(r.ky),
         debtor: String(r.debtor ?? ""),
@@ -284,6 +290,8 @@ export interface BillPage {
   totalOpen: number;
   cancelledCount: number;
   notReady: boolean;
+  /** True when the table exists but holds NOTHING — the feed has never delivered. */
+  neverLoaded: boolean;
 }
 
 export async function queryBills(q: BillingQuery = {}): Promise<BillPage> {
@@ -294,6 +302,7 @@ export async function queryBills(q: BillingQuery = {}): Promise<BillPage> {
     totalOpen: 0,
     cancelledCount: 0,
     notReady: true,
+    neverLoaded: true,
   };
   const sql = db();
   if (!sql) return empty;
@@ -344,8 +353,11 @@ export async function queryBills(q: BillingQuery = {}): Promise<BillPage> {
                                      OR reference     ILIKE ${search})
     `) as Record<string, number>[];
 
+    const [all] = (await sql`SELECT COUNT(*)::int AS n FROM ap_bills`) as Record<string, number>[];
+
     return {
       notReady: false,
+      neverLoaded: Number(all?.n ?? 0) === 0,
       rows: rows.map((r) => {
         const status = String(r.status ?? "").trim();
         return {
