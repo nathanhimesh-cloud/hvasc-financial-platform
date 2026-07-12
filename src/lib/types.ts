@@ -244,6 +244,8 @@ export interface StatementLine {
    * called "Bank QTC" and "Maxi-Direct" that no regex reliably identifies.
    */
   code?: string;
+  /** This account's balance at the END of last financial year (GLBAL.LASTYEAR @ MTH 12). */
+  priorYear?: number;
 }
 
 /** A balance-sheet section (assets/liabilities/equity) with its subtotal. */

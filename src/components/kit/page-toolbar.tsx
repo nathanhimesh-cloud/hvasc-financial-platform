@@ -25,6 +25,7 @@ export function PageToolbar({
   actions,
   notes,
   notable,
+  alertCount,
   print = true,
 }: {
   view: PeriodView;
@@ -36,6 +37,8 @@ export function PageToolbar({
   notes?: React.ReactNode;
   /** Highlights the info icon — use when there's something genuinely worth reading. */
   notable?: boolean;
+  /** Failing checks. Shown as a red badge on the info icon so it cannot be missed. */
+  alertCount?: number;
   print?: boolean;
 }) {
   return (
@@ -53,7 +56,7 @@ export function PageToolbar({
       <div className="no-print flex items-center gap-2">
         {actions}
         {print && <PrintButton />}
-        <InfoPopover notable={notable}>
+        <InfoPopover notable={notable} alertCount={alertCount}>
           {notes}
           {/* Provenance, on every page, in exactly one place. */}
           <InfoNote label="Source">

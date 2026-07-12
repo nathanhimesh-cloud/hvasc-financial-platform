@@ -189,13 +189,23 @@ export function ReportsView({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-      {/* Provenance stamp + reconciliation status (Brief A1 + A4) */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <DataStamp generatedAt={generatedAt} periodLabel={periodName} fyLabel={fyLabel} source={source} />
-          <PrintButton />
-        </div>
+      {/*
+        The accuracy checks used to open HERE, as a wall of red four items deep,
+        across the top of every report. They now live behind the page's info icon,
+        which carries a red badge with the failure count — so nothing is hidden,
+        but the report is a report and not a lecture.
+
+        They are still PRINTED. A statement that failed its checks must never leave
+        the building looking clean, so `print:block` puts them back on paper even
+        though they're out of the way on screen.
+      */}
+      <div className="hidden print:block">
         <IntegrityBanner report={integrity} />
+      </div>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <DataStamp generatedAt={generatedAt} periodLabel={periodName} fyLabel={fyLabel} source={source} />
+        <PrintButton />
       </div>
 
       {/* Statement tabs */}

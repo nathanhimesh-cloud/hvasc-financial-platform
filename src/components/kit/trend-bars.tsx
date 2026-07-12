@@ -64,11 +64,25 @@ export function TrendBars({
                 <div
                   className={cn(
                     "absolute w-full transition-colors",
+                    /*
+                      COLOUR MEANS SOMETHING, so it has to mean the right thing.
+
+                      Positive bars were `bg-elevated` — near-black on a black
+                      background, which is why the chart looked half-empty: the
+                      spend days were invisible and only the negatives showed.
+
+                      And negative bars were RED, which reads as an error. A
+                      negative expense day is not an error. It is June's year-end
+                      accruals reversing — money coming BACK. Painting that red
+                      tells the CFO something went wrong when nothing did.
+
+                      Gold = money out. Teal = money back. Neither is a verdict.
+                    */
                     negative
-                      ? "rounded-b bg-red/70 group-hover:bg-red"
+                      ? "rounded-b bg-teal/60 group-hover:bg-teal"
                       : isHi
-                        ? "rounded-t bg-gold"
-                        : "rounded-t bg-elevated group-hover:bg-[#2a2a2a]",
+                        ? "rounded-t bg-gold group-hover:bg-gold-light"
+                        : "rounded-t bg-gold/50 group-hover:bg-gold",
                   )}
                   style={
                     negative
@@ -82,6 +96,20 @@ export function TrendBars({
           })}
         </div>
       </div>
+
+      {/* A bar below the axis needs explaining the first time you see one. */}
+      {hasNegative && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[9px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2.5 rounded-sm bg-gold/60" />
+            spend
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2.5 rounded-sm bg-teal/60" />
+            below the line = a credit, not a loss — usually June&apos;s accruals reversing
+          </span>
+        </div>
+      )}
 
       <div className="mt-1.5 flex w-full gap-[3px]">
         {data.map((d, i) => (

@@ -107,14 +107,36 @@ export default async function ReportsPage({
       <PageToolbar
         view={view}
         print={false} /* ReportsView carries its own print button, per statement */
-        notable={integrity.status === "fail"}
+        /*
+          The failure count rides on the info icon as a red badge. The checks moved
+          off the page — they were a wall of red across the top of every report —
+          but they cannot simply disappear: an unreconciled statement is the one
+          thing a CFO must not miss. So the icon turns red and carries the number.
+        */
+        alertCount={integrity.failedCount}
         notes={
           <>
-            <InfoNote label="Accuracy checks">
-              Four rules that must always hold: the Balance Sheet balances, the Cash Flow reconciles,
-              cash agrees across both statements, and the net result ties to the movement in equity. A
-              failure usually means an unmapped account or a period mismatch — not a typo. The figures
-              come straight from Practical.
+            {/* Every check, with its actual numbers. */}
+            {integrity.checks.map((c) => (
+              <InfoNote
+                key={c.id}
+                label={`${c.status === "pass" ? "PASS" : c.status === "fail" ? "FAILED" : "NOT CHECKED"} · ${c.label}`}
+              >
+                <span className={c.status === "fail" ? "text-red" : undefined}>
+                  {c.reason ?? c.description}
+                </span>
+                {c.detail && (
+                  <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                    {c.detail}
+                  </span>
+                )}
+              </InfoNote>
+            ))}
+            <InfoNote label="What a failed check means">
+              These four rules must always hold. A failure almost always means an unmapped account or a
+              period mismatch — <span className="text-foreground">not a typo</span>. Failed checks are
+              still printed on the report, so a statement that didn&apos;t reconcile can never leave the
+              building looking clean.
             </InfoNote>
             <InfoNote label="Cash Flow">
               Built from Practical&apos;s own Cash Flow report definition (report 739), not a rule we

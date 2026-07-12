@@ -8,7 +8,8 @@
     "build:feed": "node scripts/build-snapshot.mjs",
     "verify:budget": "node scripts/verify-budget-report.mjs",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:data": "node scripts/verify-data.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

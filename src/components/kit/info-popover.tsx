@@ -22,10 +22,21 @@ export function InfoPopover({
   children,
   /** Draws attention to the icon when there's something genuinely notable inside. */
   notable,
+  /**
+   * A count of things that FAILED. Shown as a red badge on the icon.
+   *
+   * The accuracy-check banner used to sit open across the top of the report, a
+   * wall of red four items deep. It belongs in here — but it cannot simply vanish,
+   * because an unreconciled statement is the one thing a CFO must not miss. So the
+   * icon carries the count, in red, and you cannot look at the page without seeing
+   * that something wants your attention.
+   */
+  alertCount,
 }: {
   title?: string;
   children: React.ReactNode;
   notable?: boolean;
+  alertCount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -46,21 +57,29 @@ export function InfoPopover({
     };
   }, [open]);
 
+  const failing = (alertCount ?? 0) > 0;
+
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={title}
+        aria-label={failing ? `${alertCount} accuracy check(s) failed — ${title}` : title}
         aria-expanded={open}
         className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors",
+          "relative flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors",
           "hover:border-[rgba(255,255,255,0.2)] hover:bg-elevated hover:text-foreground",
           open && "border-[rgba(255,255,255,0.2)] bg-elevated text-foreground",
-          notable && !open && "border-gold/30 text-gold",
+          notable && !open && !failing && "border-gold/30 text-gold",
+          failing && "border-red/50 bg-red/10 text-red",
         )}
       >
         <Info className="h-3.5 w-3.5" strokeWidth={2} />
+        {failing && (
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red px-1 font-mono text-[9px] font-bold leading-none text-background">
+            {alertCount}
+          </span>
+        )}
       </button>
 
       {open && (

@@ -206,6 +206,7 @@ function checkResultTiesToEquity(
   income?: IncomeStatement,
   priorEquity?: number,
   currentEquity?: number,
+  equity?: BalanceSheet["equity"],
 ): IntegrityCheck {
   const id = "result-ties-equity";
   const label = "Result ties to equity";
@@ -222,14 +223,39 @@ function checkResultTiesToEquity(
   const gap = income.netResult - movement;
   const detail = `Net result ${formatCurrency(income.netResult)} vs equity movement ${formatCurrency(movement)}`;
   if (Math.abs(gap) <= INTEGRITY_TOLERANCE) return pass(id, label, description, detail);
-  return fail(
-    id,
-    label,
-    description,
-    gap,
-    detail,
-    `Net result and equity movement differ by ${formatCurrency(Math.abs(gap))} (after reserve transfers).`,
-  );
+
+  /*
+    NAME THE ACCOUNT THAT MOVED.
+
+    This check used to end at "net result and equity movement differ by $69,752
+    (after reserve transfers)" — a number with no owner. Nobody can act on that,
+    so everybody learns to ignore it, and an alert nobody acts on is worse than no
+    alert at all: it teaches people that red means nothing.
+
+    Now that balance-sheet lines carry last year's closing balance, we can say
+    WHICH equity account moved without a corresponding entry in the P&L. That is a
+    question Micah can answer in one sentence — "yes, that was a reserve transfer"
+    — instead of a mystery that sits on the report forever.
+  */
+  const movers = (equity?.lines ?? [])
+    .filter((l) => l.priorYear !== undefined)
+    .map((l) => ({ label: l.label, code: l.code, moved: l.amount - (l.priorYear ?? 0) }))
+    // The account holding this year's surplus SHOULD move by the net result —
+    // that's the P&L doing its job, not an anomaly. Everything else is the gap.
+    .filter((m) => Math.abs(m.moved) > INTEGRITY_TOLERANCE)
+    .filter((m) => Math.abs(m.moved - income.netResult) > INTEGRITY_TOLERANCE)
+    .sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved));
+
+  const named = movers
+    .slice(0, 3)
+    .map((m) => `${m.label} (${formatCurrency(m.moved)})`)
+    .join(", ");
+
+  const reason = movers.length
+    ? `${formatCurrency(Math.abs(gap))} moved through equity without passing through the P&L: ${named}. That is normally a reserve transfer or a revaluation — legitimate, but it should be confirmed rather than assumed.`
+    : `Net result and equity movement differ by ${formatCurrency(Math.abs(gap))} (after reserve transfers).`;
+
+  return fail(id, label, description, gap, detail, reason);
 }
 
 /**
@@ -244,7 +270,7 @@ export function assessIntegrity(snapshot: FinancialSnapshot): IntegrityReport {
     checkCashFlowReconciles(cashFlow),
     checkCashAgrees(balanceSheet, cashFlow),
     // Movement = current equity − prior-year closing equity (from GLBAL.LASTYEAR).
-    checkResultTiesToEquity(incomeTotals, snapshot.priorYear?.closingEquity, balanceSheet?.totalEquity),
+    checkResultTiesToEquity(incomeTotals, snapshot.priorYear?.closingEquity, balanceSheet?.totalEquity, balanceSheet?.equity),
   ];
 
   const failedCount = checks.filter((c) => c.status === "fail").length;

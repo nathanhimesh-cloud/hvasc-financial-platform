@@ -648,9 +648,23 @@ $BS_SECTIONS = @(
   @{ key = 'equity';                label = 'Community equity';        types = @(11) }
 )
 $bsAllTypes = ($BS_SECTIONS | ForEach-Object { $_.types }) -join ','
+# LAST YEAR'S CLOSING BALANCE, PER LINE.
+#
+# b12.LASTYEAR at MTH 12 is the account's balance at the END of last year. Without
+# it, the "net result ties to equity" check can only say the two differ by $69,752
+# and leave it there - a number with no owner, which nobody can act on and everyone
+# learns to ignore.
+#
+# With it, the same check can name the account that moved without a P&L entry, and
+# Micah can answer in one sentence whether that was a reserve transfer.
+#
+# It also gives every balance-sheet line a prior-year comparative, which is what a
+# balance sheet is supposed to have.
 $bsRows = Invoke-Rows @"
-SELECT m.ACCNTTYPE, m.GLACCOUNT, m.DESCRIPT, b.BALANCE
-FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+SELECT m.ACCNTTYPE, m.GLACCOUNT, m.DESCRIPT, b.BALANCE, b12.LASTYEAR AS PYBAL
+FROM GLBAL b
+JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+LEFT JOIN GLBAL b12 ON b12.GLACCOUNT = b.GLACCOUNT AND b12.MTH = 12
 WHERE b.MTH = $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y'
   AND m.ACCNTTYPE IN ($bsAllTypes) AND b.BALANCE <> 0
 ORDER BY m.ACCNTTYPE
@@ -665,7 +679,12 @@ function Build-BsSection($def) {
     # pattern-match its NAME, and the Council has bank accounts called "Bank QTC"
     # and "Maxi-Direct" that no sane regex agrees on. The code lets the integrity
     # check compare the Balance Sheet against the Cash Flow's OWN cash accounts.
-    $lines += [ordered]@{ code = ([string]$row.GLACCOUNT).Trim(); label = ([string]$row.DESCRIPT).Trim(); amount = $amt }
+    $lines += [ordered]@{
+      code      = ([string]$row.GLACCOUNT).Trim()
+      label     = ([string]$row.DESCRIPT).Trim()
+      amount    = $amt
+      priorYear = (R2 $row.PYBAL)   # last year's CLOSE, for the comparative + the equity tie-out
+    }
     $total += $amt
   }
   return [ordered]@{ label = $def.label; lines = $lines; total = (R2 $total) }
