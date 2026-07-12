@@ -65,6 +65,25 @@ export default async function BillingPage({
   const neverLoaded = !notReady && invoices.neverLoaded && bills.neverLoaded;
   const empty = !notReady && !neverLoaded && invoices.total === 0 && bills.total === 0;
 
+  /*
+    TWO PAGES OF THE SAME PLATFORM MUST NOT DISAGREE ABOUT WHAT THE COUNCIL IS OWED.
+
+    The ageing panel on /commitments reads DRMST's balance buckets — the debtor's
+    CURRENT total, all history. This page reads DRTRAN, invoice by invoice, and it
+    backfills incrementally: 2,000 rows a run, so a fresh install shows a fraction of
+    the ledger for the first day or two.
+
+    During that window /billing says "$125,011 owed" while /commitments says
+    "$1,917,700". Both are on screen, both are wrong to trust, and nothing tells the
+    reader which. That is worse than showing nothing — it is the platform contradicting
+    itself, and a CEO who catches it stops believing every other number too.
+
+    So: compare against the ageing total, and say so when they don't line up.
+  */
+  const agedTotal = view.snapshot.ageing?.receivables?.total ?? 0;
+  const loadedShare = agedTotal > 0 ? invoices.totalOutstanding / agedTotal : 1;
+  const backfilling = !notReady && !neverLoaded && agedTotal > 0 && loadedShare < 0.9;
+
   return (
     <Content>
       <PageToolbar
@@ -119,6 +138,34 @@ export default async function BillingPage({
         </Panel>
       ) : (
         <>
+          {/* The platform must never let two of its own pages disagree in silence. */}
+          {backfilling && (
+            <Panel className="mb-5 border-amber/30 bg-amber/[0.04]">
+              <div className="flex items-start gap-2.5">
+                <Database className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber" strokeWidth={1.75} />
+                <div className="text-[12px] leading-relaxed text-muted-foreground">
+                  <span className="text-amber">
+                    Still loading — these figures are incomplete. Do not quote them yet.
+                  </span>
+                  <p className="mt-1.5">
+                    This page shows{" "}
+                    <span className="text-foreground">
+                      {formatCompact(invoices.totalOutstanding)}
+                    </span>{" "}
+                    owed to the Council. The ageing report says{" "}
+                    <span className="text-foreground">{formatCompact(agedTotal)}</span>.{" "}
+                    <span className="text-foreground">The ageing report is right.</span>
+                  </p>
+                  <p className="mt-1.5">
+                    Invoices load 2,000 at a time, so a new install takes a day or two of syncs to
+                    catch up. This banner disappears on its own once the two agree — it is here so
+                    nobody reads a partial figure as the whole one.
+                  </p>
+                </div>
+              </div>
+            </Panel>
+          )}
+
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               color="teal"
