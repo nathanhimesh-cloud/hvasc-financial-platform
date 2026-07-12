@@ -9,7 +9,7 @@
       scripts\odbc\probe-invoices.txt
 
   We already know both tables are readable and that CRTRN carries an ORDERNO.
-  What we do NOT know is their column names — and every Practical trap that has
+  What we do NOT know is their column names -- and every Practical trap that has
   cost this project time came from assuming a column instead of looking at it.
 
   Firebird 1.5 rules this script obeys (they are not optional):
