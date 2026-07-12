@@ -145,7 +145,7 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
       <Panel className="overflow-hidden">
         <PanelHeader title="Grant Register" subtitle={`${rows.length} of ${figures.length} grants`} />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] border-collapse">
+          <table className="w-full min-w-[1560px] border-collapse">
             <thead>
               <tr>
                 <Th className="text-left">Grant</Th>
@@ -154,6 +154,14 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
                 <Th>Current income</Th>
                 <Th>Income to date</Th>
                 <Th>Income remaining</Th>
+                {/* The expense side used to show only two of the four columns the
+                    income side had, so a grant could not be read symmetrically:
+                    you could see what had come IN this period but not what had gone
+                    OUT. A grant is meant to be fully spent — budgeted expense IS the
+                    grant total — so the two sides should line up. */}
+                <Th>Budgeted expense</Th>
+                <Th>Opening expense</Th>
+                <Th>Current expense</Th>
                 <Th>Expense to date</Th>
                 <Th>Expense remaining</Th>
                 <Th>% used</Th>
@@ -200,6 +208,9 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
                   <Money v={f.currentIncome} />
                   <Money v={f.incomeToDate} />
                   <Money v={f.incomeRemaining} tone={f.incomeRemaining > 0 ? "warn" : undefined} />
+                  <Money v={f.budgetedExpense} strong />
+                  <Money v={f.openingExpense} muted />
+                  <Money v={f.currentExpense} />
                   <Money v={f.expenseToDate} />
                   <Money v={f.expenseRemaining} tone={f.expenseRemaining < 0 ? "bad" : undefined} />
                   <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right">

@@ -11,8 +11,9 @@ import {
   Lock,
   Table,
   Receipt,
+  ArrowRight,
 } from "lucide-react";
-import type { BrandColor, BalanceSheet, CashFlow, Transaction, DailySpendPoint } from "@/lib/types";
+import type { BrandColor, BalanceSheet, CashFlow, Transaction, DailySpendPoint, PriorYear } from "@/lib/types";
 import type { IntegrityReport } from "@/lib/integrity";
 import type { BudgetReportData } from "@/lib/budget-report";
 import { Panel, PanelHeader } from "@/components/kit/panel";
@@ -53,6 +54,8 @@ export interface ReportDept {
   ytdActual: number;
   ytdBudget: number;
   annualBudget: number;
+  /** What this department ACTUALLY spent last year, in full. */
+  priorYearActual?: number;
 }
 
 type Statement = "pnl" | "budget" | "balance" | "cashflow" | "transactions";
@@ -66,6 +69,7 @@ export function ReportsView({
   periods,
   departments,
   trend,
+  priorYear,
   balanceSheet,
   cashFlow,
   integrity,
@@ -85,6 +89,8 @@ export function ReportsView({
   departments: ReportDept[];
   /** What to plot: months once there are enough, days before that. */
   trend: SpendTrend | null;
+  /** Last COMPLETE financial year, for the year-on-year comparison. */
+  priorYear?: PriorYear;
   balanceSheet?: BalanceSheet;
   cashFlow?: CashFlow;
   integrity: IntegrityReport;
@@ -314,20 +320,56 @@ export function ReportsView({
               />
             </Panel>
 
-            {/* Net result summary */}
+            {/*
+              YEAR ON YEAR — replacing a panel that said nothing.
+
+              This slot used to hold a "Result" card showing Total Income, Total
+              Expenses and Net Result. Those are the three KPI cards directly above
+              it. The same three numbers, twice, in the same viewport — the second
+              time adding no information at all, just taking up the space where a
+              comparison should have been.
+
+              A budget is a plan. Last year is EVIDENCE. Comparing the Council to
+              what it actually did is the question a CFO asks first, and it was the
+              one thing this page couldn't answer.
+            */}
             <Panel className="flex flex-col">
-              <PanelHeader title="Result" subtitle={`Council P&L · ${periodName}`} />
-              <div className="flex flex-1 flex-col justify-center gap-3">
-                <SummaryLine label="Total Income" value={formatCurrency(figures.totalIncome)} tone="pos" />
-                <SummaryLine label="Total Expenses" value={`(${formatCurrency(figures.totalExpenses)})`} tone="neg" />
-                <div className="my-1 border-t border-border" />
-                <SummaryLine
-                  label="Net Result"
-                  value={formatSignedCompact(figures.netResult)}
-                  tone={figures.netResult >= 0 ? "pos" : "neg"}
-                  big
-                />
-              </div>
+              <PanelHeader
+                title="Year on year"
+                subtitle={priorYear ? `${fyLabel} vs ${priorYear.fyLabel} · full year` : "Prior year"}
+              />
+              {priorYear ? (
+                <div className="flex flex-1 flex-col justify-center">
+                  <YoYRow
+                    label="Income"
+                    now={figures.totalIncome}
+                    then={priorYear.income}
+                    good="up"
+                  />
+                  <YoYRow
+                    label="Expenses"
+                    now={figures.totalExpenses}
+                    then={priorYear.expenses}
+                    good="down"
+                  />
+                  <div className="my-1.5 border-t border-border" />
+                  <YoYRow
+                    label="Net result"
+                    now={figures.netResult}
+                    then={priorYear.netResult}
+                    good="up"
+                    big
+                  />
+                  <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted-foreground">
+                    {priorYear.fyLabel} is a FULL year; {fyLabel} is {periodName}. Early in a year the
+                    gap is the year itself, not a change in performance.
+                  </p>
+                </div>
+              ) : (
+                <p className="flex-1 text-[12px] text-muted-foreground">
+                  No prior year in this snapshot yet.
+                </p>
+              )}
             </Panel>
           </div>
 
@@ -347,6 +389,8 @@ export function ReportsView({
                       { label: comparisonLabel === "FY25" ? "FY25 (pro-rata)" : "Budget", align: "right" },
                       { label: "Variance", align: "right" },
                       { label: "% of comp.", align: "right" },
+                      // A budget is a plan. Last year is evidence. Micah asked for both.
+                      { label: "Last year (full)", align: "right" },
                     ].map((h, i) => (
                       <th
                         key={i}
@@ -379,6 +423,7 @@ export function ReportsView({
                           {formatPercent(d.pct)}
                         </span>
                       </td>
+                      <Num muted>{d.priorYearActual ? formatCurrency(d.priorYearActual) : "—"}</Num>
                     </tr>
                   ))}
                   <tr className="font-semibold">
@@ -389,6 +434,11 @@ export function ReportsView({
                       {formatSignedCompact(deptRows.reduce((a, d) => a + d.variance, 0))}
                     </Num>
                     <td />
+                    <Num muted>
+                      {deptRows.some((d) => d.priorYearActual)
+                        ? formatCurrency(deptRows.reduce((a, d) => a + (d.priorYearActual ?? 0), 0))
+                        : "—"}
+                    </Num>
                   </tr>
                 </tbody>
               </table>
@@ -730,3 +780,60 @@ function Num({
   );
 }
 
+
+/**
+ * One year-on-year line: this year, last year, and the change.
+ *
+ * `good` says which direction is the good one, because "expenses up 8%" and
+ * "income up 8%" are not the same news and a chart that colours them the same is
+ * lying by omission.
+ */
+function YoYRow({
+  label,
+  now,
+  then,
+  good,
+  big,
+}: {
+  label: string;
+  now: number;
+  then: number;
+  good: "up" | "down";
+  big?: boolean;
+}) {
+  // A percentage change off a near-zero base is noise, not information.
+  const pct = Math.abs(then) > 1 ? ((now - then) / Math.abs(then)) * 100 : null;
+  const up = now >= then;
+  const isGood = good === "up" ? up : !up;
+
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-1.5">
+      <span className={cn("text-muted-foreground", big ? "text-[13px] font-medium" : "text-[12px]")}>
+        {label}
+      </span>
+      <span className="flex items-baseline gap-3">
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          {formatCompact(then)}
+        </span>
+        <ArrowRight className="h-3 w-3 flex-shrink-0 text-muted-foreground" strokeWidth={2} />
+        <span
+          className={cn(
+            "font-mono tabular-nums",
+            big ? "text-[16px] font-semibold" : "text-[13px]",
+            "text-foreground",
+          )}
+        >
+          {formatSignedCompact(now)}
+        </span>
+        <span
+          className={cn(
+            "w-[4.5rem] text-right font-mono text-[11px] tabular-nums",
+            pct === null ? "text-muted-foreground" : isGood ? "text-green" : "text-red",
+          )}
+        >
+          {pct === null ? "—" : `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`}
+        </span>
+      </span>
+    </div>
+  );
+}

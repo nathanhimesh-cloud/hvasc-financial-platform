@@ -99,6 +99,7 @@ export default async function ReportsPage({
     ytdActual: d.ytdActual,
     ytdBudget: d.ytdBudget,
     annualBudget: d.annualBudget,
+    priorYearActual: d.priorYearActual,
   }));
 
   return (
@@ -135,6 +136,7 @@ export default async function ReportsPage({
         periods={periods}
         departments={departments}
         trend={spendTrend(snapshot)}
+        priorYear={snapshot.priorYear}
         balanceSheet={snapshot.balanceSheet}
         cashFlow={snapshot.cashFlow}
         integrity={integrity}

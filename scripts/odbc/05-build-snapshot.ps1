@@ -297,6 +297,12 @@ foreach ($id in $DEPTS.Keys) {
     annualBudget = $annualBudget
     ytdActual    = $ytdActual
     ytdBudget    = $ytdBudget
+    # Last year's spend for the SAME department. It was already being summed (to
+    # fall back on when no budget is loaded) but never emitted, so the platform
+    # could compare a department to its budget and to nothing else. Micah asked for
+    # a prior-year comparison; the number was sitting in memory the whole time.
+    priorYearActual = R2 $a.lyExp
+    revenue      = $revenue
     status       = $status
     glLines      = $glLines
   }

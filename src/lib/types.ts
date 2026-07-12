@@ -73,6 +73,14 @@ export interface Department {
   ytdActual: number;
   /** Pro-rata budget expected to be spent by the current period. */
   ytdBudget: number;
+  /**
+   * This department's FULL prior-year spend (GLBAL.LASTYEAR). Lets a department be
+   * compared to what it actually did last year, not only to its budget — a budget
+   * is a plan, and a plan is not evidence.
+   */
+  priorYearActual?: number;
+  /** Revenue this department generates, when it does. */
+  revenue?: number;
   status: DepartmentStatus;
   glLines: GLLine[];
 }
