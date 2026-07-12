@@ -11,6 +11,7 @@ import {
   Gauge,
   FileClock,
   Receipt,
+  ReceiptText,
   type LucideIcon,
 } from "lucide-react";
 import { can } from "@/lib/auth/roles";
@@ -45,6 +46,7 @@ export const trackingNav: NavLink[] = [
   { href: "/grants", label: "Grant Tracker", icon: Landmark },
   { href: "/jobs", label: "Job Budgets", icon: Briefcase },
   { href: "/commitments", label: "Commitments & Debtors", icon: FileClock },
+  { href: "/billing", label: "Invoices & Bills", icon: ReceiptText },
 ];
 
 /** Formal statements — the things you'd print, sign, or send to Council. */
@@ -147,6 +149,9 @@ export function getPageMeta(
   }
   if (pathname === "/jobs") {
     return { title: "Job Budgets", subtitle: "Budget vs actual by job" };
+  }
+  if (pathname === "/billing") {
+    return { title: "Invoices & Bills", subtitle: "What the Council is owed, and what it owes" };
   }
   if (pathname === "/commitments") {
     return { title: "Commitments & Debtors", subtitle: "Money in flight" };

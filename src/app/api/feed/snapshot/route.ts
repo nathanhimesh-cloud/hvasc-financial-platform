@@ -6,6 +6,7 @@ import { saveSnapshot } from "@/lib/history";
 import { saveTransactions, type IncomingTransaction } from "@/lib/ledger";
 import { recordSync } from "@/lib/sync-log";
 import { recordIntegrity } from "@/lib/integrity-log";
+import { saveInvoices, saveBills, type IncomingInvoice, type IncomingBill } from "@/lib/billing";
 import { assessIntegrity } from "@/lib/integrity";
 
 /**
@@ -122,8 +123,27 @@ export async function PUT(request: Request) {
   // the snapshot once they're safely stored, so nothing can be lost.
   const incoming = (snapshot.transactions ?? []) as IncomingTransaction[];
   const ingested = await saveTransactions(snapshot.period?.fyLabel ?? "", incoming);
-  const persisted: FinancialSnapshot =
-    ingested > 0 ? { ...snapshot, transactions: [] } : snapshot;
+
+  /*
+    B4 -- invoices (DRTRAN) and supplier bills (CRTRN) go to their own Postgres
+    tables, for the same reason the GL transactions do: a year is ~10,000 rows on
+    each side, and carrying them inside the snapshot would mean re-reading megabytes
+    on every page render, forever.
+
+    Stripped from the persisted payload only AFTER they are safely stored.
+  */
+  const fy = snapshot.period?.fyLabel ?? "";
+  const incomingInvoices = ((snapshot as unknown as { invoices?: IncomingInvoice[] }).invoices ?? []);
+  const incomingBills = ((snapshot as unknown as { supplierBills?: IncomingBill[] }).supplierBills ?? []);
+  const invoicesIngested = await saveInvoices(fy, incomingInvoices);
+  const billsIngested = await saveBills(fy, incomingBills);
+
+  const persisted: FinancialSnapshot = {
+    ...snapshot,
+    ...(ingested > 0 ? { transactions: [] } : {}),
+    ...(invoicesIngested > 0 ? { invoices: [] } : {}),
+    ...(billsIngested > 0 ? { supplierBills: [] } : {}),
+  } as FinancialSnapshot;
 
   // A backfilled period must never become "the latest data".
   let location = "(archive only — runtime store untouched)";
@@ -220,6 +240,13 @@ export async function PUT(request: Request) {
     location,
     archived,
     transactionsIngested: ingested,
+    // 06-push.ps1 holds the billing cursor unless the receipt confirms these landed.
+    // Without them named here, the cursor could never advance and every sync would
+    // re-send the same batch forever.
+    invoicesSent: incomingInvoices.length,
+    invoicesIngested,
+    supplierBillsSent: incomingBills.length,
+    supplierBillsIngested: billsIngested,
     summary: {
       period: snapshot.period?.label,
       departments: snapshot.departments.length,

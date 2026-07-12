@@ -1503,6 +1503,135 @@ $priorYear = [ordered]@{
 # Computed during the department rollup in section 2: active income/expense
 # accounts carrying money that department-map.json couldn't resolve. 0 = all mapped.
 
+# -- 6i. invoices + supplier bills (brief B4) ----------------------------------
+#
+# DRTRAN (123,755 rows) = money the Council is OWED. CRTRN (205,597) = money it OWES.
+#
+# WHAT PROBE 20 SAVED US FROM. The obvious table for an invoice report is DRINV.
+# DRINV has TWO ROWS. One of them literally says SUMMARY=Test, and both are
+# RECACTIVE=N -- it is a data-ENTRY staging table, not history. Building the report
+# on it would have shipped a customer invoice page showing one test invoice. The
+# real table is DRTRAN, one letter from the DRTRN that does not exist.
+#
+# INCREMENTAL, like the GL transactions. A year is ~10,000 rows on each side; shipping
+# them in full three times a day would put ~3 MB on the wire for no reason. Each side
+# has its own cursor because KY is a per-table sequence.
+#
+# THE DATE GUARD IS NOT PARANOIA. CRTRN carries rows dated 2061, 2045 and 2028 --
+# four data-entry typos sitting in the middle of 205,597 good rows. Any query that
+# takes a MAX(date), or an open-ended range, silently inherits them. We bound both
+# ends explicitly.
+$BILL_CAP  = 4000
+$billFrom  = ("{0}-07-01" -f ($yr - 2))                  # two full years of history
+$billTo    = (Get-Date).AddDays(1).ToString('yyyy-MM-dd') # nothing from the future
+
+$billCursorFile = Join-Path $PSScriptRoot 'billing-cursor.json'
+$sinceArKy = 0
+$sinceApKy = 0
+if ((-not $FullResync) -and (Test-Path $billCursorFile)) {
+  try {
+    $bc = Get-Content $billCursorFile -Raw | ConvertFrom-Json
+    $sinceArKy = [int64]$bc.arKy
+    $sinceApKy = [int64]$bc.apKy
+  } catch { $sinceArKy = 0; $sinceApKy = 0 }
+}
+
+Write-Host ""
+Write-Host "Invoices + supplier bills (B4)" -ForegroundColor Cyan
+Write-Host ("  DRTRAN.KY > {0} | CRTRN.KY > {1}" -f $sinceArKy, $sinceApKy) -ForegroundColor DarkGray
+
+# ---- customer invoices (DRTRAN) ----------------------------------------------
+# ORIGINALDR/CR is what was invoiced. CURRENTDR/CR is what is STILL UNPAID -- and
+# that is the number that matters. An invoice raised for $10,000 and paid down to
+# $500 is a $500 problem; reporting the original would overstate what the Council
+# is owed by twentyfold.
+$invoices = @()
+$maxArKy = $sinceArKy
+try {
+  $arRows = Invoke-Rows @"
+SELECT FIRST $BILL_CAP t.KY, t.DEBTOR, m.NAME AS DRNAME, t.REFERENCE, t.TRANTYPE,
+       t.TRANDATE, t.DUEDATE, t.SUMMARY, t.ORDERNO,
+       CAST(t.ORIGINALDR AS DOUBLE PRECISION) AS ODR,
+       CAST(t.ORIGINALCR AS DOUBLE PRECISION) AS OCR,
+       CAST(t.CURRENTDR  AS DOUBLE PRECISION) AS CDR,
+       CAST(t.CURRENTCR  AS DOUBLE PRECISION) AS CCR
+FROM DRTRAN t LEFT JOIN DRMST m ON m.DEBTOR = t.DEBTOR
+WHERE t.KY > $sinceArKy
+  AND t.TRANDATE >= '$billFrom' AND t.TRANDATE <= '$billTo'
+ORDER BY t.KY ASC
+"@
+  foreach ($r in $arRows) {
+    $ky = [int64]$r.KY
+    if ($ky -gt $maxArKy) { $maxArKy = $ky }
+    $invoices += [ordered]@{
+      ky          = $ky
+      debtor      = ([string]$r.DEBTOR).Trim()
+      debtorName  = ([string]$r.DRNAME).Trim()
+      reference   = ([string]$r.REFERENCE).Trim()
+      tranType    = ([string]$r.TRANTYPE).Trim()
+      date        = $(if ($r.TRANDATE) { ([datetime]$r.TRANDATE).ToString('yyyy-MM-dd') } else { '' })
+      dueDate     = $(if ($r.DUEDATE)  { ([datetime]$r.DUEDATE).ToString('yyyy-MM-dd') }  else { '' })
+      summary     = ([string]$r.SUMMARY).Trim()
+      orderNo     = ([string]$r.ORDERNO).Trim()
+      invoiced    = (R2 ((R2 $r.ODR) - (R2 $r.OCR)))
+      outstanding = (R2 ((R2 $r.CDR) - (R2 $r.CCR)))
+    }
+  }
+  Write-Host ("  invoices:       {0} new" -f $invoices.Count) -ForegroundColor Green
+} catch {
+  Write-Host ("  invoices: FAILED - " + $_.Exception.Message.Split("`n")[0]) -ForegroundColor Red
+}
+
+# ---- supplier bills (CRTRN) --------------------------------------------------
+# HOLDPAYMENT is the status: PAID (156,116) / blank (47,690) / CANC (1,634) / HOLD.
+# We ship the code and let the dashboard decide -- but the 1,634 CANC rows are the
+# reason we carry it at all. A report that doesn't know what CANC means will present
+# cancelled cheques as outstanding liabilities.
+$supplierBills = @()
+$maxApKy = $sinceApKy
+try {
+  $apRows = Invoke-Rows @"
+SELECT FIRST $BILL_CAP t.KY, t.CREDITOR, m.NAME AS CRNAME, t.REFERENCE, t.TRNT,
+       t.TRNDATE, t.DUEDATE, t.PAYDATE, t.SUMMARY, t.ORDERNO, t.CHQNO, t.HOLDPAYMENT,
+       CAST(t.DEBIT AS DOUBLE PRECISION) AS DR,
+       CAST(t.CREDIT AS DOUBLE PRECISION) AS CR,
+       CAST(t.GSTRECOVERABLE AS DOUBLE PRECISION) AS GST
+FROM CRTRN t LEFT JOIN CRMST m ON m.CREDITOR = t.CREDITOR
+WHERE t.KY > $sinceApKy
+  AND t.TRNDATE >= '$billFrom' AND t.TRNDATE <= '$billTo'
+ORDER BY t.KY ASC
+"@
+  foreach ($r in $apRows) {
+    $ky = [int64]$r.KY
+    if ($ky -gt $maxApKy) { $maxApKy = $ky }
+    $supplierBills += [ordered]@{
+      ky           = $ky
+      creditor     = ([string]$r.CREDITOR).Trim()
+      creditorName = ([string]$r.CRNAME).Trim()
+      reference    = ([string]$r.REFERENCE).Trim()
+      trnt         = ([string]$r.TRNT).Trim()
+      date         = $(if ($r.TRNDATE) { ([datetime]$r.TRNDATE).ToString('yyyy-MM-dd') } else { '' })
+      dueDate      = $(if ($r.DUEDATE) { ([datetime]$r.DUEDATE).ToString('yyyy-MM-dd') } else { '' })
+      payDate      = $(if ($r.PAYDATE) { ([datetime]$r.PAYDATE).ToString('yyyy-MM-dd') } else { '' })
+      summary      = ([string]$r.SUMMARY).Trim()
+      orderNo      = ([string]$r.ORDERNO).Trim()
+      chequeNo     = ([string]$r.CHQNO).Trim()
+      status       = ([string]$r.HOLDPAYMENT).Trim()
+      debit        = (R2 $r.DR)
+      credit       = (R2 $r.CR)
+      gst          = (R2 $r.GST)
+    }
+  }
+  Write-Host ("  supplier bills: {0} new" -f $supplierBills.Count) -ForegroundColor Green
+} catch {
+  Write-Host ("  supplier bills: FAILED - " + $_.Exception.Message.Split("`n")[0]) -ForegroundColor Red
+}
+
+$billsCapped = ($invoices.Count -ge $BILL_CAP) -or ($supplierBills.Count -ge $BILL_CAP)
+if ($billsCapped) {
+  Write-Host "  (batch capped - the next run picks up where this stopped)" -ForegroundColor DarkYellow
+}
+
 # -- 7. assemble + write ------------------------------------------------------
 $snapshot = [ordered]@{
   period = [ordered]@{
@@ -1531,6 +1660,8 @@ $snapshot = [ordered]@{
   ageing        = $ageing
   assets        = $assets
   priorYear     = $priorYear
+  invoices      = $invoices
+  supplierBills = $supplierBills
   meta = [ordered]@{
     source = "Civica Practical ODBC (live GL) - DSN=Practical_Plus"
     baseline = $(if ($hasRealBudget) { 'fy-budget' } else { 'fy25-actuals' })
@@ -1544,6 +1675,16 @@ $snapshot = [ordered]@{
     # writes maxKy to sync-cursor.json only after the server accepts the push.
     sinceKy = $sinceKy
     maxKy   = $maxKy
+    # B4 billing cursors. DRTRAN and CRTRN each have their OWN KY sequence, so
+    # each needs its own high-water mark. One shared cursor would strand whichever
+    # side of the ledger fell behind the moment the two tables drifted apart.
+    billing = [ordered]@{
+      sinceArKy = $sinceArKy
+      maxArKy   = $maxArKy
+      sinceApKy = $sinceApKy
+      maxApKy   = $maxApKy
+      capped    = $billsCapped
+    }
     transactionsAreIncremental = $true
     moreTransactionsPending = $trnCapped
     notes = @(

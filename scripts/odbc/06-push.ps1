@@ -98,6 +98,42 @@ function Save-SyncCursor([string]$SnapshotPath, $Response) {
   }
 }
 
+# The billing batch (DRTRAN invoices + CRTRN supplier bills) carries its own pair of
+# cursors, because each Practical table has its own KY sequence. Same hold-on-failure
+# rule as the GL cursor above: only advance when the server confirms it STORED them.
+$billCursorFile = Join-Path $scriptDir 'billing-cursor.json'
+function Save-BillingCursor([string]$SnapshotPath, $Response) {
+  try {
+    $s = Get-Content $SnapshotPath -Raw | ConvertFrom-Json
+    if ($null -eq $s.meta.billing) { return }   # older snapshot, nothing to keep
+
+    $r = $(if ($Response -is [string]) { $Response | ConvertFrom-Json } else { $Response })
+
+    $invSent = @($s.invoices).Count
+    $billSent = @($s.supplierBills).Count
+    $invStored  = [int]$r.invoicesIngested
+    $billStored = [int]$r.supplierBillsIngested
+
+    if (($invSent -gt 0 -and $invStored -lt $invSent) -or ($billSent -gt 0 -and $billStored -lt $billSent)) {
+      Write-Output ("BILLING CURSOR HELD: sent $invSent invoices / $billSent bills; server stored $invStored / $billStored.")
+      Write-Output ("                     Cursor left where it was; the next build re-sends them.")
+      return
+    }
+
+    $payload = [ordered]@{
+      arKy     = [int64]$s.meta.billing.maxArKy
+      apKy     = [int64]$s.meta.billing.maxApKy
+      pushedAt = (Get-Date -Format 's')
+    }
+    ($payload | ConvertTo-Json) | Set-Content -Path $billCursorFile -Encoding ASCII
+    Write-Output ("Billing cursor advanced: DRTRAN ky {0}, CRTRN ky {1}; {2} invoice(s), {3} bill(s) stored." -f $payload.arKy, $payload.apKy, $invStored, $billStored)
+  } catch {
+    Write-Output "WARNING: could not write billing-cursor.json: $($_.Exception.Message)"
+    Write-Output "         The next build re-sends this batch. Harmless (upsert), just slower."
+  }
+}
+
+
 if ($curlExe) {
   # --data-binary @file sends the exact bytes (no BOM, no newline munging).
   # -o body-file, -w http_code so we can report status; -sS = quiet but show errors.
@@ -117,6 +153,7 @@ if ($curlExe) {
     Write-Output "PUSH OK (HTTP $status)."
     Write-Output $respBody
     Save-SyncCursor $File $respBody
+  Save-BillingCursor $File $respBody
   } else {
     Write-Output "PUSH FAILED: HTTP $status"
     Write-Output ("RESPONSE BODY: " + $respBody)
@@ -133,6 +170,7 @@ else {
     Write-Output "PUSH OK."
     Write-Output ($resp | ConvertTo-Json -Depth 6)
     Save-SyncCursor $File $resp
+  Save-BillingCursor $File $resp
   } catch {
     $err = $_
     Write-Output "PUSH FAILED: $($err.Exception.Message)"

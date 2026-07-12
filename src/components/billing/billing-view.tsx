@@ -1,0 +1,246 @@
+"use client";
+
+import { useState } from "react";
+import { FileText, Receipt, Ban, CheckCircle2 } from "lucide-react";
+import { Panel, PanelHeader } from "@/components/kit/panel";
+import { ExportButton } from "@/components/kit/export-button";
+import { formatCurrency } from "@/lib/format";
+import type { InvoicePage, BillPage } from "@/lib/billing";
+import { cn } from "@/lib/utils";
+
+type Tab = "owed-to-us" | "owed-by-us";
+
+/**
+ * Invoices and supplier bills (B4).
+ *
+ * The ageing panel on /commitments tells you the TOTAL in each bucket. This tells you
+ * WHICH invoices make up it, and who owes them. "$1.25M is over 90 days" is a fact;
+ * "QBuild owes $306K across these eleven invoices" is a phone call.
+ */
+export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills: BillPage }) {
+  const [tab, setTab] = useState<Tab>("owed-to-us");
+
+  return (
+    <Panel>
+      <PanelHeader
+        title={tab === "owed-to-us" ? "Invoices" : "Supplier bills"}
+        subtitle={
+          tab === "owed-to-us"
+            ? "Money the Council is owed"
+            : "Money the Council owes"
+        }
+        right={
+          tab === "owed-to-us" ? (
+            <ExportButton
+              filename="invoices"
+              sheets={[
+                {
+                  name: "Invoices",
+                  rows: invoices.rows,
+                  columns: [
+                    { header: "Date", value: (r) => r.date, type: "date" },
+                    { header: "Due", value: (r) => r.dueDate, type: "date" },
+                    { header: "Customer", value: (r) => r.debtorName, width: 34 },
+                    { header: "Reference", value: (r) => r.reference },
+                    { header: "Description", value: (r) => r.summary, width: 40 },
+                    { header: "Invoiced", value: (r) => r.invoiced, type: "money" },
+                    { header: "Outstanding", value: (r) => r.outstanding, type: "money" },
+                    { header: "Days overdue", value: (r) => r.daysOverdue, type: "number" },
+                  ],
+                  total: { Outstanding: invoices.totalOutstanding },
+                },
+              ]}
+            />
+          ) : (
+            <ExportButton
+              filename="supplier-bills"
+              sheets={[
+                {
+                  name: "Supplier bills",
+                  rows: bills.rows,
+                  columns: [
+                    { header: "Date", value: (r) => r.date, type: "date" },
+                    { header: "Due", value: (r) => r.dueDate, type: "date" },
+                    { header: "Paid", value: (r) => r.payDate, type: "date" },
+                    { header: "Supplier", value: (r) => r.creditorName, width: 34 },
+                    { header: "Reference", value: (r) => r.reference },
+                    { header: "Description", value: (r) => r.summary, width: 40 },
+                    { header: "Order no", value: (r) => r.orderNo },
+                    { header: "Amount", value: (r) => r.amount, type: "money" },
+                    { header: "GST", value: (r) => r.gst, type: "money" },
+                    { header: "Status", value: (r) => (r.cancelled ? "CANCELLED" : r.paid ? "PAID" : "OPEN") },
+                  ],
+                  total: { Amount: bills.totalOpen },
+                },
+              ]}
+            />
+          )
+        }
+      />
+
+      <div className="mb-4 flex rounded-md border border-border bg-elevated/40 p-0.5">
+        {(
+          [
+            ["owed-to-us", "Owed to the Council", FileText, invoices.total],
+            ["owed-by-us", "Owed by the Council", Receipt, bills.total],
+          ] as const
+        ).map(([id, label, Icon, n]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded px-3 py-2 text-[13px] font-medium transition-colors",
+              tab === id
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+            {label}
+            <span className="font-mono text-[10px] text-muted-foreground">{n}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Wide tables scroll INSIDE their own container. The page body must never
+          scroll sideways. */}
+      <div className="overflow-x-auto">
+        {tab === "owed-to-us" ? (
+          <table className="w-full min-w-[860px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+                <th className="pb-2 pr-4 text-left font-normal">Date</th>
+                <th className="pb-2 pr-4 text-left font-normal">Customer</th>
+                <th className="pb-2 pr-4 text-left font-normal">Description</th>
+                <th className="pb-2 pr-4 text-right font-normal">Invoiced</th>
+                <th className="pb-2 pr-4 text-right font-normal">Outstanding</th>
+                <th className="pb-2 text-right font-normal">Overdue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.rows.map((r) => (
+                <tr key={r.ky} className="border-b border-border/50 last:border-0">
+                  <td className="py-2.5 pr-4 font-mono text-[11px] text-muted-foreground">
+                    {r.date}
+                  </td>
+                  <td className="py-2.5 pr-4 text-foreground">{r.debtorName}</td>
+                  <td className="max-w-[280px] truncate py-2.5 pr-4 text-muted-foreground">
+                    {r.summary}
+                  </td>
+                  <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-muted-foreground">
+                    {formatCurrency(r.invoiced)}
+                  </td>
+                  {/* The one that matters: what is STILL unpaid, not what was billed. */}
+                  <td
+                    className={cn(
+                      "py-2.5 pr-4 text-right font-mono font-medium tabular-nums",
+                      r.outstanding !== 0 ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {r.outstanding === 0 ? "—" : formatCurrency(r.outstanding)}
+                  </td>
+                  <td className="py-2.5 text-right">
+                    {r.outstanding === 0 ? (
+                      <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase text-green">
+                        <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
+                        paid
+                      </span>
+                    ) : r.daysOverdue === null ? (
+                      <span className="font-mono text-[10px] text-muted-foreground">—</span>
+                    ) : (
+                      <span
+                        className={cn(
+                          "font-mono text-[11px] tabular-nums",
+                          r.daysOverdue > 90
+                            ? "text-red"
+                            : r.daysOverdue > 0
+                              ? "text-amber"
+                              : "text-muted-foreground",
+                        )}
+                      >
+                        {r.daysOverdue > 0 ? `${r.daysOverdue}d` : "not due"}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="w-full min-w-[900px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+                <th className="pb-2 pr-4 text-left font-normal">Date</th>
+                <th className="pb-2 pr-4 text-left font-normal">Supplier</th>
+                <th className="pb-2 pr-4 text-left font-normal">Description</th>
+                <th className="pb-2 pr-4 text-left font-normal">Order</th>
+                <th className="pb-2 pr-4 text-right font-normal">Amount</th>
+                <th className="pb-2 text-right font-normal">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bills.rows.map((r) => (
+                <tr
+                  key={r.ky}
+                  className={cn(
+                    "border-b border-border/50 last:border-0",
+                    // A cancelled bill is not a debt. Dim it so it reads as history,
+                    // not as something anyone has to act on.
+                    r.cancelled && "opacity-50",
+                  )}
+                >
+                  <td className="py-2.5 pr-4 font-mono text-[11px] text-muted-foreground">
+                    {r.date}
+                  </td>
+                  <td className="py-2.5 pr-4 text-foreground">{r.creditorName}</td>
+                  <td className="max-w-[260px] truncate py-2.5 pr-4 text-muted-foreground">
+                    {r.summary}
+                  </td>
+                  <td className="py-2.5 pr-4 font-mono text-[11px] text-muted-foreground">
+                    {r.orderNo || "—"}
+                  </td>
+                  <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-foreground">
+                    {formatCurrency(r.amount)}
+                  </td>
+                  <td className="py-2.5 text-right">
+                    {r.cancelled ? (
+                      <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase text-muted-foreground">
+                        <Ban className="h-3 w-3" strokeWidth={2} />
+                        cancelled
+                      </span>
+                    ) : r.paid ? (
+                      <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase text-green">
+                        <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
+                        paid
+                      </span>
+                    ) : (
+                      <span className="font-mono text-[10px] uppercase text-amber">open</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <p className="mt-4 border-t border-border/60 pt-3 text-[11px] leading-relaxed text-muted-foreground">
+        {tab === "owed-to-us" ? (
+          <>
+            <span className="text-foreground">Outstanding</span> is what is still unpaid on each
+            invoice, not what was originally billed. Showing the original would overstate what the
+            Council is owed.
+          </>
+        ) : (
+          <>
+            Supplier <span className="text-foreground">invoices only</span> — payments and journals
+            are excluded. <span className="text-foreground">Cancelled</span> bills are shown but not
+            counted as owed; treating &quot;not paid&quot; as &quot;still owed&quot; would present{" "}
+            {bills.cancelledCount} cancelled cheques as money the Council still has to find.
+          </>
+        )}
+      </p>
+    </Panel>
+  );
+}
