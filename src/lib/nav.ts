@@ -3,6 +3,7 @@ import {
   Landmark,
   LayoutGrid,
   FileText,
+  FileBarChart,
   Tags,
   ShieldCheck,
   Briefcase,
@@ -25,6 +26,7 @@ export const overviewNav: NavLink[] = [
   { href: "/grants", label: "Grant Tracker", icon: Landmark },
   { href: "/jobs", label: "Job Budgets", icon: Briefcase },
   { href: "/reports", label: "Detailed Reports", icon: FileText },
+  { href: "/monthly-report", label: "Monthly Report", icon: FileBarChart },
 ];
 
 /**
@@ -110,6 +112,9 @@ export function getPageMeta(
   }
   if (pathname === "/status") {
     return { title: "Data Status", subtitle: "Provenance & sync history" };
+  }
+  if (pathname === "/monthly-report") {
+    return { title: "Monthly Management Report", subtitle: "Consolidated & departmental packs" };
   }
   if (pathname === "/jobs") {
     return { title: "Job Budgets", subtitle: "Budget vs actual by job" };

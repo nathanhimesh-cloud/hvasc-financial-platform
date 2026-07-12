@@ -60,10 +60,21 @@ export interface IntegrityReport {
   generatedAt?: string;
 }
 
-/** Locate the "cash & cash equivalents" line on the balance sheet, if present. */
+/**
+ * Total cash & cash equivalents on the balance sheet.
+ *
+ * Councils split cash across many named accounts — Bank QTC, Maxi-Direct, ANZ,
+ * floats — and several don't contain the literal word "cash" (e.g. "Bank QTC").
+ * The old version returned the FIRST line matching /cash/, which grabbed a single
+ * $1.5M ANZ line and reported a $59M "mismatch" against the ~$65M cash flow.
+ * Sum every cash/bank/investment line instead, with the same pattern the
+ * liquidity panel uses, so the two statements are compared like for like.
+ */
+const BS_CASH_LINE = /cash|bank|qtc|maxi[\s-]?direct|petty|float/i;
 function findBalanceSheetCash(bs: BalanceSheet): number | undefined {
-  const line = bs.currentAssets.lines.find((l) => /cash/i.test(l.label));
-  return line?.amount;
+  const lines = bs.currentAssets.lines.filter((l) => BS_CASH_LINE.test(l.label));
+  if (!lines.length) return undefined;
+  return lines.reduce((a, l) => a + l.amount, 0);
 }
 
 function pass(
