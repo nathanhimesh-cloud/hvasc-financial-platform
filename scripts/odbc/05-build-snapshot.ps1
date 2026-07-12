@@ -1521,7 +1521,7 @@ $priorYear = [ordered]@{
 # four data-entry typos sitting in the middle of 205,597 good rows. Any query that
 # takes a MAX(date), or an open-ended range, silently inherits them. We bound both
 # ends explicitly.
-$BILL_CAP  = 4000
+$BILL_CAP  = 2000   # per side. Compressed, 2000+2000 is ~1 MB - well inside the 4.5 MB limit.
 $billFrom  = ("{0}-07-01" -f ($yr - 2))                  # two full years of history
 $billTo    = (Get-Date).AddDays(1).ToString('yyyy-MM-dd') # nothing from the future
 
@@ -1718,13 +1718,35 @@ if ($fatal.Count) {
   exit 1
 }
 
-$json = $snapshot | ConvertTo-Json -Depth 12
+# -COMPRESS IS NOT COSMETIC. It is the difference between a push that works and a
+# push that dies.
+#
+# ConvertTo-Json PRETTY-PRINTS by default: every field on its own indented line.
+# On a snapshot carrying thousands of invoice and supplier-bill rows that roughly
+# doubles the payload, and Vercel rejects any request body over 4.5 MB with
+# HTTP 413 FUNCTION_PAYLOAD_TOO_LARGE. Nothing in the file is meant to be read by
+# a human, so the whitespace buys nothing and costs the entire feed.
+$json = $snapshot | ConvertTo-Json -Depth 12 -Compress
 [System.IO.File]::WriteAllText($OutFile, $json, (New-Object System.Text.UTF8Encoding($false)))
 $conn.Close()
 
 # -- validation summary -------------------------------------------------------
 Write-Host ""
 Write-Host "Wrote $OutFile" -ForegroundColor Green
+
+# THE SIZE MUST BE VISIBLE. The 413 that cost an evening was invisible from this
+# script: it built a perfect snapshot, said "Done.", and the failure surfaced two
+# steps later as "push step exited 1" with no hint that size was the reason.
+$sizeMb = [math]::Round((Get-Item $OutFile).Length / 1MB, 2)
+$sizeColour = if ($sizeMb -ge 4.0) { 'Red' } elseif ($sizeMb -ge 3.0) { 'Yellow' } else { 'DarkGray' }
+Write-Host ("  size        : {0} MB  (Vercel rejects anything over 4.5 MB)" -f $sizeMb) -ForegroundColor $sizeColour
+if ($sizeMb -ge 4.0) {
+  Write-Host ""
+  Write-Host "  WARNING: this snapshot is close to Vercel's 4.5 MB request limit." -ForegroundColor Red
+  Write-Host "           The push will fail with HTTP 413 (FUNCTION_PAYLOAD_TOO_LARGE)." -ForegroundColor Red
+  Write-Host "           Lower `$BILL_CAP in section 6i and run again - the cursor means" -ForegroundColor Red
+  Write-Host "           nothing is lost, the backfill simply takes more runs." -ForegroundColor Red
+}
 Write-Host ("  departments : {0}" -f $departments.Count)
 Write-Host ("  accounts    : {0}  (full chart of income/expense accounts, for mapping)" -f $accounts.Count)
 Write-Host ("  grants      : {0}" -f $grants.Count)

@@ -157,6 +157,16 @@ if ($curlExe) {
   } else {
     Write-Output "PUSH FAILED: HTTP $status"
     Write-Output ("RESPONSE BODY: " + $respBody)
+    # 413 is the one failure whose cause is NOT in the response body. Vercel says
+    # FUNCTION_PAYLOAD_TOO_LARGE and stops. The actual size, and the lever that fixes
+    # it, live here.
+    if ([int]$status -eq 413) {
+      $mb = [math]::Round((Get-Item $File).Length / 1MB, 2)
+      Write-Output ""
+      Write-Output "THE SNAPSHOT IS TOO BIG: $mb MB. Vercel rejects any request body over 4.5 MB."
+      Write-Output "  Lower BILL_CAP in 05-build-snapshot.ps1 (section 6i) and build again."
+      Write-Output "  Nothing is lost: the cursor did not advance, so the next run re-sends these rows."
+    }
     exit 1
   }
 }
