@@ -2,8 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, CheckCircle2, AlertTriangle, Loader2, FileJson } from "lucide-react";
-import { Panel, PanelHeader } from "@/components/kit/panel";
+import { Upload, CheckCircle2, AlertTriangle, Loader2, FileJson, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,7 +21,7 @@ interface Result {
   itemCount?: number;
 }
 
-export function ReferenceUpload({
+function UploadBody({
   kind,
   title,
   description,
@@ -70,8 +69,7 @@ export function ReferenceUpload({
   };
 
   return (
-    <Panel>
-      <PanelHeader title={title} subtitle={currentLabel} />
+    <div>
       <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">{description}</p>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -145,6 +143,86 @@ export function ReferenceUpload({
           </div>
         </div>
       )}
-    </Panel>
+    </div>
+  );
+}
+
+/**
+ * The upload, as a BUTTON and a dialog.
+ *
+ * This used to be a full-width panel with a paragraph of explanation, sitting in
+ * the middle of the Grant Tracker between the charts and the register. It is a
+ * thing you do roughly once a year — when the Council issues a new grant register
+ * — and it occupied prime screen space every single day in between.
+ *
+ * A button opens it. The explanation lives inside, where it is read at the moment
+ * it is needed rather than skipped every morning.
+ */
+export function ReferenceUploadButton({
+  kind,
+  title,
+  description,
+  currentLabel,
+  label = "Upload",
+}: {
+  kind: "department-map" | "grant-register";
+  title: string;
+  description: string;
+  currentLabel: string;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="no-print inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-elevated px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:border-[rgba(255,255,255,0.2)] hover:text-foreground"
+      >
+        <Upload className="h-3.5 w-3.5" strokeWidth={1.75} />
+        {label}
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-200 flex items-start justify-center overflow-y-auto bg-black/60 p-6 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="mt-16 w-full max-w-xl rounded-[var(--radius-lg)] border border-border bg-card p-5 shadow-2xl shadow-black/50"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[14px] font-semibold text-foreground">{title}</div>
+                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                  {currentLabel}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <X className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </div>
+
+            <UploadBody
+              kind={kind}
+              title={title}
+              description={description}
+              currentLabel={currentLabel}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -10,6 +10,7 @@ import {
   Activity,
   Gauge,
   FileClock,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import { can } from "@/lib/auth/roles";
@@ -49,6 +50,7 @@ export const trackingNav: NavLink[] = [
 /** Formal statements — the things you'd print, sign, or send to Council. */
 export const reportsNav: NavLink[] = [
   { href: "/reports", label: "Detailed Reports", icon: FileText },
+  { href: "/transactions", label: "Transactions", icon: Receipt },
   { href: "/monthly-report", label: "Monthly Report", icon: FileBarChart },
   { href: "/ratios", label: "Sustainability Ratios", icon: Gauge },
 ];
@@ -151,6 +153,9 @@ export function getPageMeta(
   }
   if (pathname === "/departments") {
     return { title: "Manager View", subtitle: `${ctx?.deptCount ?? "All"} departments` };
+  }
+  if (pathname === "/transactions") {
+    return { title: "Transactions", subtitle: "Every posting in the ledger" };
   }
   if (pathname === "/reports") {
     return { title: "Detailed Reports", subtitle: "Financial statements" };

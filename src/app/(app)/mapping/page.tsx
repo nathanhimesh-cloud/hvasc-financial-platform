@@ -9,7 +9,7 @@ import { GRANT_REGISTER } from "@/lib/grants";
 import { resolveDepartment } from "@/lib/departments";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
 import type { DataIssue } from "@/lib/data-quality";
-import { ReferenceUpload } from "@/components/kit/reference-upload";
+import { ReferenceUploadButton } from "@/components/kit/reference-upload";
 import { referenceMeta } from "@/lib/reference";
 import baseMap from "@/data/department-map.json";
 
@@ -132,8 +132,9 @@ export default async function MappingPage() {
         </span>
       </div>
 
-      <div className="mb-6">
-        <ReferenceUpload
+      <div className="mb-6 flex justify-end">
+        <ReferenceUploadButton
+          label="Upload a new map"
           kind="department-map"
           title="Department Map"
           description="Decides which department each GL account's spend belongs to. Uploading a new map re-classifies every figure on the dashboard, so it's validated first: every account must use a 1234-5678 code and point at a department that exists. A rejected file changes nothing, and the version it replaces is kept."

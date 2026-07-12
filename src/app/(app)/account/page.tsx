@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, KeyRound, ShieldCheck, Check, Activity, Tags, ChevronRight, type LucideIcon } from "lucide-react";
+import { LogOut, KeyRound, ShieldCheck, Check, Activity, Tags, ChevronRight, RefreshCw, FileSpreadsheet, type LucideIcon } from "lucide-react";
 import { getSnapshot } from "@/lib/data";
 import { getSession } from "@/lib/auth/session";
 import { ROLES, can, type Capability } from "@/lib/auth/roles";
@@ -107,6 +107,77 @@ export default async function AccountPage() {
           />
           <Row label="Period on file" value={`${snapshot.period.label} · ${snapshot.period.fyLabel}`} mono />
         </dl>
+      </Panel>
+
+      {/*
+        WHAT NEEDS A HUMAN, AND WHAT DOESN'T.
+        This is the question nobody could answer from anywhere in the product:
+        "which of these numbers keeps itself up to date, and which one is going to
+        go stale when someone forgets?" There is exactly one manual input, and it
+        deserves to be named rather than left for someone to discover in a year.
+      */}
+      <Panel className="mb-4">
+        <PanelHeader title="Data sources" subtitle="What updates itself, and what doesn't" />
+
+        <div className="mb-4 flex items-start gap-2.5 rounded-md border border-green/25 bg-green/[0.03] px-3 py-2.5">
+          <RefreshCw className="mt-0.5 h-4 w-4 flex-shrink-0 text-green" strokeWidth={1.75} />
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            <span className="text-foreground">Everything below is automatic</span> — read from the
+            general ledger three times a day. It needs no attention, and it rolls into a new financial
+            year on its own: the platform reads the current period from Practical, so when the Council
+            closes the year, the reports follow.
+          </p>
+        </div>
+
+        <div className="mb-4 flex flex-col gap-1.5">
+          {[
+            "Profit & loss, balance sheet, cash flow",
+            "Budgets (phased, as Practical holds them)",
+            "Transactions and daily spend",
+            "Job budgets and job costs",
+            "Commitments, from the purchase-order ledger",
+            "Debtor and creditor ageing",
+            "Assets, capital works, and the statutory ratios",
+          ].map((t) => (
+            <div key={t} className="flex items-center gap-2 text-[12px]">
+              <Check className="h-3 w-3 flex-shrink-0 text-green" strokeWidth={3} />
+              <span className="text-muted-foreground">{t}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-md border border-amber/25 bg-amber/[0.04] px-3 py-2.5">
+          <div className="flex items-start gap-2.5">
+            <FileSpreadsheet className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber" strokeWidth={1.75} />
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-medium text-foreground">
+                One thing needs a person: the Grant Register
+              </div>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                Grant names, funders, restricted flags and job codes exist{" "}
+                <span className="text-foreground">nowhere in Practical</span> — the Council keeps them
+                in a spreadsheet. Everything the platform reports about grants hangs off that file, so
+                when a new financial year brings a new register,{" "}
+                <span className="text-foreground">it has to be uploaded</span>. That is the one piece
+                of housekeeping this platform cannot do for itself.
+              </p>
+              <Link
+                href="/grants"
+                className="mt-2 inline-block text-[12px] text-gold-light underline-offset-2 hover:underline"
+              >
+                Update it on the Grant Tracker →
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">
+          <span className="text-foreground">Prior years.</span> Practical keeps{" "}
+          <span className="text-foreground">transaction detail for the current year only</span>. A past
+          year can be rebuilt as monthly totals — P&amp;L, balance sheet, departments, grants — but its
+          individual transactions and daily spend are not in the database and nothing can recover them.
+          Ask SandS to run the backfill.
+        </p>
       </Panel>
 
       {/*

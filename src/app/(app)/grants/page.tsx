@@ -10,7 +10,7 @@ import { GrantRegisterTable } from "@/components/grants/grant-register-table";
 import { GrantMix } from "@/components/dashboard/grant-mix";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
 import { grantIssues } from "@/lib/data-quality";
-import { ReferenceUpload } from "@/components/kit/reference-upload";
+import { ReferenceUploadButton } from "@/components/kit/reference-upload";
 import { referenceMeta } from "@/lib/reference";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,25 @@ export default async function GrantsPage({
       <PageToolbar
         view={view}
         filters={<DataQualityBadge issues={grantIssues(s)} />}
+        /*
+          The register upload is a BUTTON now, not the full-width panel that used to
+          sit between the charts and the table. It is a thing you do roughly once a
+          year — when the Council issues a new register — and it was taking prime
+          screen space every day in between.
+        */
+        actions={
+          <ReferenceUploadButton
+            kind="grant-register"
+            label="Update register"
+            title="Grant Register"
+            description="The Council's register, converted to JSON by scripts/import-grant-register.mjs. It sets each grant's value and the GL/job codes that carry its income and spend. This is the ONE input the platform cannot read from Practical — grant names, funders, restricted flags and job codes exist nowhere in the accounting system. Validated before it replaces anything: ids must be unique, totals numeric, code lists present. A rejected file changes nothing, and the version it replaces is kept."
+            currentLabel={
+              regMeta
+                ? `${regMeta.itemCount} grants · uploaded ${new Date(regMeta.uploadedAt).toLocaleDateString("en-AU")}${regMeta.uploadedBy ? ` by ${regMeta.uploadedBy}` : ""}`
+                : `${GRANT_REGISTER.grants.length} grants · ${GRANT_REGISTER.source}`
+            }
+          />
+        }
         notes={
           <>
             <InfoNote label="The register">
@@ -80,19 +99,6 @@ export default async function GrantsPage({
 
       <div className="mb-6">
         <GrantMix summary={s} periodLabel={snapshot.period.label} />
-      </div>
-
-      <div className="mb-6">
-        <ReferenceUpload
-          kind="grant-register"
-          title="Grant Register"
-          description="The Council's register, converted to JSON by scripts/import-grant-register.mjs. It sets each grant's value and the GL/job codes that carry its income and spend. Validated before it replaces anything: ids must be unique, totals numeric, code lists present. A rejected file changes nothing, and the version it replaces is kept."
-          currentLabel={
-            regMeta
-              ? `${regMeta.itemCount} grants · uploaded ${new Date(regMeta.uploadedAt).toLocaleDateString("en-AU")}${regMeta.uploadedBy ? ` by ${regMeta.uploadedBy}` : ""}`
-              : `${GRANT_REGISTER.grants.length} grants · ${GRANT_REGISTER.source}`
-          }
-        />
       </div>
 
       <GrantRegisterTable figures={figures} />
