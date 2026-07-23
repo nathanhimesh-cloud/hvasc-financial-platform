@@ -283,7 +283,7 @@ export function ReportsView({
       {statement === "budget" ? (
         budgetData ? <BudgetVsActual data={budgetData} /> : <ComingSoon statement="balance" />
       ) : statement === "balance" ? (
-        balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} /> : <ComingSoon statement="balance" />
+        balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} generatedAt={generatedAt} /> : <ComingSoon statement="balance" />
       ) : statement === "cashflow" ? (
         cashFlow ? <CashFlowView cf={cashFlow} fyLabel={fyLabel} /> : <ComingSoon statement="cashflow" />
       ) : statement === "transactions" ? (
@@ -730,11 +730,44 @@ function StatementYearNote({ statementFy, currentFy, kind }: { statementFy: stri
   );
 }
 
-function BalanceSheetView({ bs, fyLabel }: { bs: BalanceSheet; fyLabel: string }) {
+function BalanceSheetView({
+  bs,
+  fyLabel,
+  generatedAt,
+}: {
+  bs: BalanceSheet;
+  fyLabel: string;
+  generatedAt?: string;
+}) {
   const mismatch = fyMismatch(bs.asAt, fyLabel);
+  const syncedAt = generatedAt
+    ? new Date(generatedAt).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : null;
   return (
     <>
       {mismatch && <StatementYearNote statementFy={mismatch} currentFy={fyLabel} kind="Balance Sheet" />}
+
+      {/*
+        POINT-IN-TIME, AND HONEST ABOUT IT.
+
+        An independent reviewer compared this balance sheet to live Practical and found
+        variances on high-churn control accounts (payables, payroll). The cause wasn't a
+        fault — it was that the balance sheet is a snapshot as at the last sync, while
+        those accounts move by millions within a month. Rather than let that be
+        rediscovered as a "bug" each time, the page states it. The line-by-line check
+        that Practical's balances actually tie to its transactions runs every sync and
+        shows on the accuracy banner above.
+      */}
+      <div className="mb-4 flex items-start gap-2 rounded-md border border-border bg-elevated/30 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+        <Scale className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
+        <span>
+          A point-in-time position{syncedAt ? <> — as at the last sync, <span className="text-foreground">{syncedAt}</span></> : ""}. Control
+          accounts (payables, payroll) move within the month, so a line checked against
+          live Practical at a different moment can differ — that is timing, not error. The
+          accuracy checks above confirm every balance ties to its transactions at the sync
+          moment.
+        </span>
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard color="teal" icon={Scale} label="Total Assets" value={formatCompact(bs.totalAssets)} meta={bs.asAt ? `as at ${bs.asAt}` : fyLabel} />
         <KpiCard color="amber" icon={TrendingDown} label="Total Liabilities" value={formatCompact(bs.totalLiabilities)} meta="owed by council" />

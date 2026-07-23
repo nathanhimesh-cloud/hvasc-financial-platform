@@ -270,6 +270,28 @@ export interface BalanceSheet {
   asAt?: string;
 }
 
+/** One account whose balance-table figure disagrees with its transactions. */
+export interface BsReconLine {
+  code: string;
+  account: string;
+  /** GLBAL.BALANCE — what the dashboard shows. */
+  glbal: number;
+  /** Opening + GLTRN movement — what the transactions imply. */
+  expected: number;
+  /** glbal − expected. */
+  diff: number;
+}
+
+export interface BsReconciliation {
+  /** How many balance-sheet accounts were checked. */
+  checked: number;
+  mismatchCount: number;
+  /** The worst offenders (capped). Empty when every line ties. */
+  mismatches: BsReconLine[];
+  asAt?: string;
+  source?: string;
+}
+
 /** A cash-flow activity section (operating/investing/financing) with its net. */
 export interface CashFlowSection {
   label: string;
@@ -310,6 +332,13 @@ export interface FinancialSnapshot {
   monthlyStatements?: MonthlyStatement[];
   /** Statement of Financial Position — from an uploaded Practical export. */
   balanceSheet?: BalanceSheet;
+  /**
+   * Line-by-line reconciliation of the balance sheet to the transactions: for each
+   * account, GLBAL.BALANCE vs opening + GLTRN movement. A mismatch means the balance
+   * table and the ledger disagree — a real data-integrity problem the total-level
+   * checks can't see. Empty `mismatches` = every line ties.
+   */
+  bsReconciliation?: BsReconciliation;
   /** Statement of Cash Flows — from an uploaded Practical export. */
   cashFlow?: CashFlow;
   /** Inputs for the statutory sustainability ratios (B8). */

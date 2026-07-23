@@ -708,6 +708,95 @@ $balanceSheet = [ordered]@{
 }
 $bsGap = R2 ($bsTotalAssets - ($bsTotalLiab + $bsTotalEquity))
 
+# -- 6c-recon. LINE-BY-LINE reconciliation: GLBAL.BALANCE vs the transactions -----
+#
+# WHY THIS EXISTS. An independent reviewer's line-by-line reconciliation found the
+# dashboard's balance sheet ~$42k off Practical's on a handful of high-churn control
+# accounts (AP Control, Payroll Suspense, Accrued Creditors). The probe
+# (22-probe-bs-recon.ps1) proved the cause was NOT a bug: GLBAL.BALANCE and the live
+# transactions agreed to the cent; the variance was snapshot staleness on accounts
+# that move millions within a single month.
+#
+# But our integrity engine tests only the TOTALS (Assets = Liabilities + Equity, and
+# equity ties to the audited close). It never checked whether an individual line's
+# GLBAL.BALANCE actually matches the transactions that produced it -- so a real
+# GLBAL/GLTRN divergence would pass straight through. This closes that gap.
+#
+# For each balance-sheet account:
+#     expected = opening balance (GLBAL at MTH 0) + net movement from GLTRN this FY
+#   * assets (type 7/8) are debit-normal:   movement = DEBIT - CREDIT
+#   * liabilities/equity (9/10/11) credit-normal: movement = CREDIT - DEBIT
+# If GLBAL.BALANCE (what the dashboard reads) and `expected` diverge beyond $1, that
+# is a genuine data-integrity problem and gets surfaced. If they agree, the balance
+# sheet is faithful to the ledger and the check passes silently.
+$bsReconciliation = $null
+try {
+  $bsAcctCodes = @($bsRows | ForEach-Object { ([string]$_.GLACCOUNT).Trim() } | Where-Object { $_ } | Select-Object -Unique)
+
+  # Opening balance per account = GLBAL.BALANCE at MTH 0 (the year's brought-forward).
+  $opening = @{}
+  foreach ($r in (Invoke-Rows "SELECT GLACCOUNT, CAST(BALANCE AS DOUBLE PRECISION) AS BAL FROM GLBAL WHERE MTH = 0")) {
+    $opening[([string]$r.GLACCOUNT).Trim()] = [double]$r.BAL
+  }
+  # Live movement per account, from the transaction ledger, for the current FY.
+  $mvByAcct = @{}
+  foreach ($r in (Invoke-Rows @"
+SELECT t.GLACCOUNT,
+       SUM(CAST(t.DEBIT  AS DOUBLE PRECISION)) AS DR,
+       SUM(CAST(t.CREDIT AS DOUBLE PRECISION)) AS CR
+FROM GLTRN t
+WHERE t.TRNDATE >= '$fyStart' AND t.TRNDATE <= '$fyEnd'
+GROUP BY t.GLACCOUNT
+"@)) {
+    $mvByAcct[([string]$r.GLACCOUNT).Trim()] = @{ dr = [double]$r.DR; cr = [double]$r.CR }
+  }
+
+  $reconChecked = 0
+  $reconMismatch = @()
+  foreach ($r in $bsRows) {
+    $code = ([string]$r.GLACCOUNT).Trim()
+    if (-not $code) { continue }
+    $glbal = R2 $r.BALANCE
+    $type  = [int]$r.ACCNTTYPE
+    $open  = $(if ($opening.ContainsKey($code)) { $opening[$code] } else { 0 })
+    $mv    = $(if ($mvByAcct.ContainsKey($code)) { $mvByAcct[$code] } else { @{ dr = 0.0; cr = 0.0 } })
+    # Sign the movement by the account's normal side.
+    $signed = if ($type -eq 7 -or $type -eq 8) { $mv.dr - $mv.cr } else { $mv.cr - $mv.dr }
+    $expected = R2 ($open + $signed)
+    $diff = R2 ($glbal - $expected)
+    $reconChecked++
+    if ([math]::Abs($diff) -ge 1) {
+      $reconMismatch += [ordered]@{
+        code     = $code
+        account  = ([string]$r.DESCRIPT).Trim()
+        glbal    = $glbal          # what the dashboard shows
+        expected = $expected       # opening + transactions
+        diff     = $diff
+      }
+    }
+  }
+  $reconMismatch = @($reconMismatch | Sort-Object { -[math]::Abs([double]$_.diff) })
+
+  $bsReconciliation = [ordered]@{
+    checked      = $reconChecked
+    mismatchCount = $reconMismatch.Count
+    # The worst 25 only; the point is to flag, not to dump the whole ledger.
+    mismatches   = @($reconMismatch | Select-Object -First 25)
+    asAt         = $periodLabel
+    source       = 'Each balance-sheet account: GLBAL.BALANCE at the current period vs opening (GLBAL MTH 0) plus GLTRN movement this FY, signed by the account normal side. A mismatch means the balance table and the transactions disagree.'
+  }
+  if ($reconMismatch.Count -eq 0) {
+    Write-Host ("BS line reconciliation: all {0} accounts tie to the transactions." -f $reconChecked) -ForegroundColor Green
+  } else {
+    Write-Host ("BS line reconciliation: {0} of {1} accounts DIVERGE from the transactions -" -f $reconMismatch.Count, $reconChecked) -ForegroundColor Red
+    foreach ($m in ($reconMismatch | Select-Object -First 6)) {
+      Write-Host ("    {0}  {1,-30} GLBAL {2,14:N2}  vs txns {3,14:N2}  diff {4,12:N2}" -f $m.code, $m.account, $m.glbal, $m.expected, $m.diff) -ForegroundColor Yellow
+    }
+  }
+} catch {
+  Write-Host ("BS line reconciliation skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
 # -- 6c2. Cash Flow Statement (live, from the FR report definition) ------------
 # The Cash Flow isn't a stored figure - it's report 739 in Practical's Financial
 # Reporting module: which account MOVEMENTS roll into which cash-flow line.
@@ -1769,6 +1858,7 @@ $snapshot = [ordered]@{
   jobCosts      = $jobCosts
   jobBudgets    = $jobBudgets
   balanceSheet  = $balanceSheet
+  bsReconciliation = $bsReconciliation
   cashFlow      = $cashFlow
   statutory     = $statutory
   commitments   = $commitments

@@ -23,6 +23,7 @@
 import type {
   FinancialSnapshot,
   BalanceSheet,
+  BsReconciliation,
   CashFlow,
   IncomeStatement,
 } from "@/lib/types";
@@ -125,6 +126,48 @@ function skip(
   reason: string,
 ): IntegrityCheck {
   return { id, label, description, status: "not-checked", gap: 0, reason };
+}
+
+/**
+ * Check — every balance-sheet LINE ties to the transactions.
+ *
+ * The other checks test the TOTALS (Assets = Liabilities + Equity, equity ties to
+ * the audited close). They cannot see a line whose balance-table figure disagrees
+ * with the transactions that produced it — the exact gap an independent reviewer
+ * found on the Council's high-churn control accounts. This closes it: the feed
+ * compares each account's GLBAL.BALANCE against opening + GLTRN movement, and this
+ * check reports the result.
+ *
+ * A word on why this can pass while a reviewer still sees a variance: the balance
+ * sheet is a point-in-time snapshot. A control account that moves millions within a
+ * month will differ from live Practical checked at a different minute — that is
+ * staleness, not a data fault, and it is NOT what this check is for. This check fires
+ * only when the balance table and the ledger genuinely disagree AT THE SAME MOMENT.
+ */
+function checkBalanceSheetLines(recon?: BsReconciliation): IntegrityCheck {
+  const id = "bs-lines-tie";
+  const label = "Every balance-sheet line ties to the ledger";
+  const description =
+    "Each account's balance must equal its opening balance plus the transactions posted this year.";
+  if (!recon || recon.checked === 0) {
+    return skip(id, label, description, "Line reconciliation not available for this period.");
+  }
+  if (recon.mismatchCount === 0) {
+    return pass(id, label, description, `All ${recon.checked} accounts tie to the transactions.`);
+  }
+  const worst = recon.mismatches[0];
+  const detail = recon.mismatches
+    .slice(0, 4)
+    .map((m) => `${m.account}: shows ${formatCurrency(m.glbal)}, ledger implies ${formatCurrency(m.expected)}`)
+    .join(" · ");
+  return fail(
+    id,
+    label,
+    description,
+    worst.diff,
+    detail,
+    `${recon.mismatchCount} account${recon.mismatchCount === 1 ? "" : "s"} disagree with the transactions — the biggest is ${worst.account} by ${formatCurrency(Math.abs(worst.diff))}. This means Practical's balance table and its ledger don't match for these accounts; it is not a rounding or timing issue. Re-sync and, if it persists, raise it with Fourier.`,
+  );
 }
 
 /** Check 1 — Balance Sheet balances (Assets = Liabilities + Equity). */
@@ -298,6 +341,7 @@ export function assessIntegrity(snapshot: FinancialSnapshot): IntegrityReport {
 
   const checks: IntegrityCheck[] = [
     checkBalanceSheet(balanceSheet),
+    checkBalanceSheetLines(snapshot.bsReconciliation),
     checkCashFlowReconciles(cashFlow),
     checkCashAgrees(balanceSheet, cashFlow),
     // Movement = current equity − prior-year closing equity (from GLBAL.LASTYEAR).
