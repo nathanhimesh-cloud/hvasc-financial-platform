@@ -1154,8 +1154,25 @@ try {
     Write-Host "  NOT EMITTING the statutory ratios this run." -ForegroundColor Red
     Write-Host ("  FR report {0} does not classify the whole general ledger, so any" -f $FR_RPT) -ForegroundColor Red
     Write-Host "  operating/capital split taken from it would be wrong. The dashboard will" -ForegroundColor Red
-    Write-Host "  show 'needs data' rather than a confident, incorrect percentage." -ForegroundColor Red
+    Write-Host "  explain WHY rather than show a confident, incorrect percentage." -ForegroundColor Red
     Write-Host "  Run 17-probe-fr-income.ps1 - it reports which report DOES reconcile." -ForegroundColor Yellow
+
+    # EMIT THE REASON, don't just vanish. Setting a `withheld` block (instead of
+    # leaving $statutory null) lets the ratios page say the TRUTH -- "held back
+    # because last year's figures don't reconcile" -- rather than the misleading
+    # "run the next sync", which would never fix a reconciliation failure. The most
+    # common cause here is a mid-flight year-end roll: last year's depreciation has
+    # dropped out of the GL but not yet out of the FR report.
+    $expGap = R2 ($rptExpenseLy - $glExpenseLy)
+    $statutory = [ordered]@{
+      tier     = 8
+      withheld = $true
+      reason   = ("The operating/capital split comes from Practical's report $FR_RPT, and this run it does not reconcile to the general ledger: last year's expenses are {0:N1}% of the GL (income {1:N1}%), where ~100% is expected. That usually means Practical's year-end roll is still in progress -- last year's depreciation of about {2} has left the ledger but not yet the report. The ratios return automatically once the prior year is finalised in Practical; they are withheld rather than shown wrong." -f $covExp, $covInc, ("`$" + ('{0:N0}' -f [math]::Abs($expGap))))
+      incomeCoverage  = (R2 $covInc)
+      expenseCoverage = (R2 $covExp)
+      asAt     = $periodLabel
+      source   = "FR report $FR_RPT reconciliation guard"
+    }
     throw "FR report $FR_RPT does not reconcile to the GL (income $([math]::Round($covInc,1))%, expenses $([math]::Round($covExp,1))%)"
   }
 

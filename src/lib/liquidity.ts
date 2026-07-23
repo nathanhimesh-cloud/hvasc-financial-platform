@@ -89,7 +89,7 @@ export function totalCash(snapshot: FinancialSnapshot): { total: number; lines: 
 function monthlyOpexOf(snapshot: FinancialSnapshot): number {
   const month = snapshot.period?.monthOfYear ?? 0;
   const ytdCash =
-    (snapshot.incomeTotals?.totalExpenses ?? 0) - (snapshot.statutory?.ytd.depreciation ?? 0);
+    (snapshot.incomeTotals?.totalExpenses ?? 0) - (snapshot.statutory?.ytd?.depreciation ?? 0);
   if (ytdCash > 0 && month > 0) {
     const perMonth = ytdCash / month;
     // Guard against one tiny opening month distorting the run rate.

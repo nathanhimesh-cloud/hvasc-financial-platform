@@ -590,13 +590,23 @@ export interface StatutoryInputs {
   /** Hope Vale is Tier 8 (audited FY2025 Financial Sustainability Statement). */
   tier: number;
   /**
+   * True when the feed deliberately WITHHELD the ratios because the FR report
+   * doesn't reconcile to the ledger (e.g. a mid-flight year-end roll). `ytd` and
+   * `priorYear` are absent in that case; `reason` explains it in plain words.
+   */
+  withheld?: boolean;
+  reason?: string;
+  /** How much of last year's income/expenses the FR report classified (should be ~100%). */
+  incomeCoverage?: number;
+  expenseCoverage?: number;
+  /**
    * Current financial year to date. INDICATIVE ONLY — these ratios are annual
    * measures, and Hope Vale raises its rates and receives most grants late in the
    * year, so an early-year operating revenue near zero makes the ratio explode.
    * The app never benchmarks this.
    */
-  ytd: StatutoryPeriodInputs;
+  ytd?: StatutoryPeriodInputs;
   /** The last COMPLETE financial year. This is what actually gets benchmarked. */
-  priorYear: StatutoryPeriodInputs;
+  priorYear?: StatutoryPeriodInputs;
   source: string;
 }

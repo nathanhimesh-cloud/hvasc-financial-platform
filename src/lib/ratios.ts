@@ -102,6 +102,13 @@ export interface RatioReport {
   failing: number;
   /** True when the feed doesn't carry the statutory inputs yet — needs a resync. */
   needsResync: boolean;
+  /**
+   * True when the feed WITHHELD the ratios because the FR report doesn't reconcile
+   * (distinct from needsResync — a resync will NOT fix this). `withheldReason`
+   * explains it.
+   */
+  withheld: boolean;
+  withheldReason?: string;
   /** True when the flow ratios are reported on last year because this one is incomplete. */
   usingPriorYear: boolean;
   /** The period the flow ratios are measured over. */
@@ -125,7 +132,10 @@ function cashRatioOf(p: StatutoryPeriodInputs | undefined): number | null {
 
 export function assessRatios(snapshot: FinancialSnapshot): RatioReport {
   const s = snapshot.statutory;
-  const needsResync = !s?.priorYear;
+  // Withheld (FR report doesn't reconcile) is NOT the same as never-synced. A resync
+  // fixes the latter; only Practical finalising its prior year fixes the former.
+  const withheld = !!s?.withheld;
+  const needsResync = !withheld && !s?.priorYear;
 
   const grantFigs = allGrantFigures(snapshot);
   const cash = cashBreakdown(snapshot, grantFigs);
@@ -342,6 +352,8 @@ export function assessRatios(snapshot: FinancialSnapshot): RatioReport {
     // Contextual and provisional ratios can never "fail" — that's the whole point.
     failing: ratios.filter((r) => r.status === "fail").length,
     needsResync,
+    withheld,
+    withheldReason: s?.reason,
     usingPriorYear,
     flowBasis,
   };

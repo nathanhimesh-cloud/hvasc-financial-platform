@@ -76,6 +76,28 @@ export default async function RatiosPage({ searchParams }: { searchParams: Promi
         </Panel>
       )}
 
+      {/*
+        WITHHELD IS NOT THE SAME AS NOT-SYNCED, and the reader deserves to know which.
+        The feed deliberately holds the flow ratios back when Practical's report
+        doesn't reconcile to the ledger (typically a mid-flight year-end roll). Saying
+        "run the next sync" there would be a lie — the next sync withholds them again.
+        So we show the real reason, straight from the feed.
+      */}
+      {report.withheld && (
+        <Panel className="mb-4 flex gap-2.5 border-amber/30 bg-amber/5">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber" strokeWidth={1.75} />
+          <div className="text-[12px] leading-relaxed text-muted-foreground">
+            <span className="text-amber">
+              The operating and capital ratios are held back this period — not shown wrong.
+            </span>
+            <p className="mt-1.5">
+              {report.withheldReason ??
+                "Practical's operating/capital report doesn't currently reconcile to the general ledger, so the split it produces can't be trusted. The ratios return automatically once the figures reconcile — most often after the prior year is finalised in Practical."}
+            </p>
+          </div>
+        </Panel>
+      )}
+
       {groups.map((g) => {
         const rows = live.filter((r) => r.group === g);
         if (!rows.length) return null;
