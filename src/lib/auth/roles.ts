@@ -10,11 +10,22 @@
  * so adding a role never means hunting for scattered `role === "admin"` checks.
  */
 
-export type Role = "admin" | "finance" | "ceo" | "manager" | "grant-manager";
+/*
+  FOUR ACCESS TIERS (Developer Checklist item 62, confirmed by Shaun).
+
+  The build brief once described a separate "admin" role for SandS support. The
+  agreed model is four client tiers, with CFO / Finance as the full-access role —
+  "full + mapping admin" in the checklist's words. So `finance` now carries user
+  management and the audit log too; there is no longer a distinct `admin` tier.
+
+  SandS support simply uses a CFO / Finance account: "full" is full. (If a
+  visibly-separate SandS admin login is ever wanted — checklist item 66 mentions
+  one for audit visibility — it is a one-line addition back.)
+*/
+export type Role = "finance" | "ceo" | "manager" | "grant-manager";
 
 export const ROLES: { id: Role; label: string; description: string }[] = [
-  { id: "admin", label: "Administrator", description: "SandS support — everything, plus the audit log and user access" },
-  { id: "finance", label: "CFO / Finance", description: "All reports, plus admin of account mappings" },
+  { id: "finance", label: "CFO / Finance", description: "Full access — all reports, account mapping, user management and the audit log" },
   { id: "ceo", label: "CEO", description: "Executive view — dashboard, KPIs, statements" },
   { id: "manager", label: "Department head", description: "Their department, plus whole-of-council read" },
   { id: "grant-manager", label: "Grant manager", description: "Grants — may edit grant metadata, never the GL figures" },
@@ -31,8 +42,8 @@ export type Capability =
   | "users.manage";
 
 const CAPABILITIES: Record<Role, Capability[]> = {
-  admin: ["audit.view", "mapping.edit", "grants.edit", "users.manage"],
-  finance: ["mapping.edit", "grants.edit"],
+  // CFO / Finance is the full-access tier — mapping, grants, users AND the audit log.
+  finance: ["audit.view", "mapping.edit", "grants.edit", "users.manage"],
   ceo: [],
   manager: [],
   "grant-manager": ["grants.edit"],

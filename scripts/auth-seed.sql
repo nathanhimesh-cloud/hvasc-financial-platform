@@ -14,26 +14,32 @@
 -- then INSERT a row like the admin one below. New users get must_change_password = true,
 -- so they are forced to set their own password on first login.
 --
--- ROLES (see src/lib/auth/roles.ts):
---   admin          SandS support - everything, incl. the audit log and user access
---   finance        CFO / Finance - all reports + account-mapping admin
+-- ROLES — FOUR tiers (see src/lib/auth/roles.ts; Developer Checklist item 62):
+--   finance        CFO / Finance - FULL access: all reports, account mapping,
+--                  user management AND the audit log. This is the top role;
+--                  SandS support uses a finance account.
 --   ceo            Executive view (read-only)
 --   manager        Department head (read-only)
 --   grant-manager  Grants - may edit grant metadata, never GL figures
 --
+-- The old "admin" role was folded into "finance" when the model collapsed from
+-- five roles to four. IF YOUR DATABASE STILL HAS A USER WITH role='admin', it
+-- must be migrated or that account loses all access (an unknown role gets nothing):
+--     UPDATE users SET role = 'finance' WHERE role = 'admin';
+--
 -- Financial actuals are read-only from the General Ledger for EVERY role.
 -- Only reporting metadata (names, department assignment, grant milestones) is editable.
 --
--- To give Micah his own admin account (per the 9 Jul review), generate a hash and run:
+-- To give Micah his own full-access account, generate a hash and run:
 --     INSERT INTO users (username, password_hash, role, must_change_password)
---     VALUES ('micah', '<hash from hash-password.mjs>', 'admin', TRUE)
+--     VALUES ('micah', '<hash from hash-password.mjs>', 'finance', TRUE)
 --     ON CONFLICT (username) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS users (
   id                   SERIAL PRIMARY KEY,
   username             TEXT UNIQUE NOT NULL,
   password_hash        TEXT NOT NULL,
-  role                 TEXT NOT NULL DEFAULT 'admin',
+  role                 TEXT NOT NULL DEFAULT 'finance',
   must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -53,13 +59,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS audit_log_created_idx ON audit_log (created_at DESC);
 
--- Seed admin - username: admin - password: Pass@123
+-- Seed full-access user - username: admin - role: finance - password: Pass@123
 -- Forced to change the password on first login. CHANGE IT.
 INSERT INTO users (username, password_hash, role, must_change_password)
 VALUES (
   'admin',
   'b6d2ad44775ef63bb96598e48d4af831:c796a422401b87123c8f5752f566dd7d1dcdc7cd1da0122bb8d48e7b42679b139a5572318747e8d8005d8946ed4832680638f426f0b192714e8fdcb793a4c872',
-  'admin',
+  'finance',
   TRUE
 )
 ON CONFLICT (username) DO NOTHING;
@@ -76,7 +82,7 @@ ON CONFLICT (username) DO NOTHING;
 --     id SERIAL PRIMARY KEY,
 --     username TEXT UNIQUE NOT NULL,
 --     password_hash TEXT NOT NULL,
---     role TEXT NOT NULL DEFAULT 'admin',
+--     role TEXT NOT NULL DEFAULT 'finance',
 --     must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
 --     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 --   );
@@ -90,6 +96,6 @@ ON CONFLICT (username) DO NOTHING;
 --   );
 --   CREATE INDEX IF NOT EXISTS audit_log_created_idx ON audit_log (created_at DESC);
 --   INSERT INTO users (username, password_hash, role, must_change_password)
---   VALUES ('admin', 'b6d2ad44775ef63bb96598e48d4af831:c796a422401b87123c8f5752f566dd7d1dcdc7cd1da0122bb8d48e7b42679b139a5572318747e8d8005d8946ed4832680638f426f0b192714e8fdcb793a4c872', 'admin', TRUE)
+--   VALUES ('admin', 'b6d2ad44775ef63bb96598e48d4af831:c796a422401b87123c8f5752f566dd7d1dcdc7cd1da0122bb8d48e7b42679b139a5572318747e8d8005d8946ed4832680638f426f0b192714e8fdcb793a4c872', 'finance', TRUE)
 --   ON CONFLICT (username) DO NOTHING;
 -- END $$;

@@ -94,14 +94,15 @@ export async function changeRole(userId: number, role: string): Promise<void> {
   const admin = await requireAdmin();
   if (!ROLES.some((r) => r.id === role)) throw new Error("Unknown role.");
   /*
-    An admin must not be able to demote themselves.
+    A full-access user must not be able to demote themselves.
 
-    Not because it's rude — because it's a one-way door. Demote the only admin and
-    nobody can promote anyone back, and the platform needs a database edit to
-    recover. The rule is cheap; the failure isn't.
+    Not because it's rude — because it's a one-way door. Demote the last CFO / Finance
+    user and nobody can manage users or promote anyone back; recovery needs a direct
+    database edit. The rule is cheap; the failure isn't. ("finance" is the full-access
+    tier now that the roles collapsed to four — see roles.ts.)
   */
-  if (admin.id === userId && role !== "admin") {
-    throw new Error("You cannot remove your own admin role — you would lock yourself out.");
+  if (admin.id === userId && role !== "finance") {
+    throw new Error("You cannot change your own role away from CFO / Finance — you would lock yourself out.");
   }
   await setRole(userId, role);
   await logAudit(admin, "user.role_changed", `user id ${userId} → ${role}`);
