@@ -59,18 +59,12 @@ export function DeadlinePanel({ report }: { report: DeadlineReport }) {
       {noDates ? (
         <div className="flex items-start gap-2.5 rounded-md border border-amber/30 bg-amber/[0.05] px-3.5 py-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber" strokeWidth={1.75} />
-          <div className="text-[12px] leading-relaxed text-muted-foreground">
-            <span className="text-amber">
-              The grant register has no dates, so no deadline can be tracked.
-            </span>{" "}
-            Start dates, end dates and report dates are empty on{" "}
-            <span className="text-foreground">every one of the {undatedCount} active grants</span>.
-            <span className="mt-1.5 block">
-              This panel is not saying nothing is due — it is saying{" "}
-              <span className="text-foreground">we cannot tell you</span>. It starts working the day
-              those columns are filled in; nothing else has to change.
-            </span>
-          </div>
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            <span className="text-amber">No dates in the register yet</span> — so this shows{" "}
+            <span className="text-foreground">&ldquo;we can&rsquo;t tell&rdquo;</span>, not
+            &ldquo;nothing due&rdquo;. Tracking starts the day the Council adds report and acquittal
+            dates ({undatedCount} active grants).
+          </p>
         </div>
       ) : deadlines.length === 0 ? (
         <p className="flex items-start gap-2 rounded-md border border-green/25 bg-green/[0.04] px-3 py-2.5 text-[13px] text-green">
@@ -117,11 +111,8 @@ export function DeadlinePanel({ report }: { report: DeadlineReport }) {
         </ul>
       )}
 
-      <p className="mt-4 border-t border-border/60 pt-3 text-[11px] leading-relaxed text-muted-foreground">
-        A deadline on a <span className="text-foreground">fully acquitted</span> grant is a form to
-        fill in, not money at risk — those are only listed once they&apos;re within 30 days, so this
-        list stays worth reading. Email delivery of this same list needs a mail provider the Council
-        doesn&apos;t have yet.
+      <p className="mt-4 border-t border-border/60 pt-3 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+        Email alerts need a mail provider · not set up yet
       </p>
     </Panel>
   );

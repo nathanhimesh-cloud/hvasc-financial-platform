@@ -33,15 +33,10 @@ export function CostRecoveryPanel({ recovery }: { recovery: CostRecovery }) {
       {recovery.tooEarly ? (
         <div className="flex items-start gap-2.5 rounded-md border border-border bg-elevated/40 px-3.5 py-3">
           <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
-          <div className="text-[12px] leading-relaxed text-muted-foreground">
-            <span className="text-foreground">Too early in the year to measure.</span> At the start of
-            a financial year, last year&apos;s accruals reverse before this year&apos;s invoices land,
-            so year-to-date cost can sit below zero. A recovery ratio against a negative cost is not a
-            small error — it is a number with the wrong sign, and it would look like a finding.
-            <span className="mt-1.5 block">
-              These figures populate once each trading department has real spend on the ledger.
-            </span>
-          </div>
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            <span className="text-foreground">Too early in the year to measure.</span> Populates once
+            each trading department has real spend on the ledger.
+          </p>
         </div>
       ) : (
         <>

@@ -64,6 +64,17 @@ export default async function IntegrationsPage() {
       how: "A private store. Files are not publicly addressable.",
       env: "BLOB_READ_WRITE_TOKEN",
     },
+    {
+      name: "Microsoft single sign-on",
+      what: "Lets staff sign in with their existing Council Microsoft account instead of a Vantage password.",
+      // Requires all three; the app treats SSO as off unless the trio is present.
+      configured:
+        !!process.env.AZURE_AD_TENANT_ID?.trim() &&
+        !!process.env.AZURE_AD_CLIENT_ID?.trim() &&
+        !!process.env.AZURE_AD_CLIENT_SECRET?.trim(),
+      how: "OpenID Connect against the Council's Microsoft tenant. A person is matched to a Vantage user by their email; password login keeps working alongside it. Register the app in Azure → App registrations, redirect URI /api/auth/sso/callback.",
+      env: "AZURE_AD_TENANT_ID · AZURE_AD_CLIENT_ID · AZURE_AD_CLIENT_SECRET",
+    },
   ];
 
   return (

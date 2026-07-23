@@ -1,6 +1,7 @@
 import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import type { MonthlyReport } from "@/lib/monthly-report";
 import { formatCurrency, formatCompact, formatPercent } from "@/lib/format";
+import { YoY } from "@/components/kit/yoy";
 import { ragText } from "@/lib/rag";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +33,21 @@ export function MonthlyReportView({ report }: { report: MonthlyReport }) {
       {/* 1. Executive summary */}
       <Section n="1" title="Executive summary">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Stat label="Total income (YTD)" value={formatCompact(report.income)} />
-          <Stat label="Total expenses (YTD)" value={formatCompact(report.expenses)} />
+          <Stat
+            label="Total income (YTD)"
+            value={formatCompact(report.income)}
+            sub={<YoY now={report.income} then={report.prior?.income} good="up" suffix={report.prior?.periodLabel ?? "last year"} />}
+          />
+          <Stat
+            label="Total expenses (YTD)"
+            value={formatCompact(report.expenses)}
+            sub={<YoY now={report.expenses} then={report.prior?.expenses} good="down" suffix={report.prior?.periodLabel ?? "last year"} />}
+          />
           <Stat
             label={report.surplus ? "Net surplus (YTD)" : "Net deficit (YTD)"}
             value={formatCompact(Math.abs(report.netResult))}
             tone={report.surplus ? "pos" : "neg"}
+            sub={<YoY now={report.netResult} then={report.prior?.netResult} good="up" suffix={report.prior?.periodLabel ?? "last year"} />}
           />
           <Stat
             label={report.hasBudget ? "Budget used (YTD)" : "vs prior year"}
@@ -222,13 +232,14 @@ function Section({ n, title, children }: { n: string; title: string; children: R
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
+function Stat({ label, value, tone, sub }: { label: string; value: string; tone?: "pos" | "neg"; sub?: React.ReactNode }) {
   return (
     <div className="rounded-md border border-border bg-elevated/30 px-3 py-2.5">
       <div className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
       <div className={cn("mt-1 font-heading text-[19px] font-semibold tabular-nums", tone === "pos" ? "text-green" : tone === "neg" ? "text-red" : "text-foreground")}>
         {value}
       </div>
+      {sub && <div className="mt-1">{sub}</div>}
     </div>
   );
 }

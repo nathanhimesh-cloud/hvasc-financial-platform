@@ -91,21 +91,15 @@ export default async function BillingPage({
         notes={
           <>
             <InfoNote label="Where these come from">
-              Invoices are read from Practical&apos;s DRTRAN (123,755 rows); supplier bills from
-              CRTRN (205,597). Both are read-only and land in the platform&apos;s own database, keyed
-              on Practical&apos;s record number, so each sync ships only what is new.
+              Invoices from Practical&apos;s DRTRAN, supplier bills from CRTRN — read-only, keyed on the
+              record number so each sync ships only what&apos;s new.
             </InfoNote>
             <InfoNote label="Outstanding, not invoiced">
-              An invoice&apos;s <span className="text-foreground">outstanding</span> figure is what is
-              still unpaid on it — not what was originally billed. An invoice raised for $10,000 and
-              paid down to $500 is a $500 problem, and showing the $10,000 would overstate what the
-              Council is owed twentyfold.
+              &quot;Outstanding&quot; is what&apos;s still unpaid, not the original bill — a $10,000
+              invoice paid down to $500 is a $500 debt.
             </InfoNote>
             <InfoNote label="Cancelled cheques are not debts">
-              Practical carries <span className="text-foreground">1,634 cancelled</span> supplier
-              transactions. They are excluded from what the Council owes. Treating &quot;not
-              paid&quot; as &quot;still owed&quot; would present every one of them as money that
-              still has to be found.
+              Cancelled supplier transactions are excluded from what the Council owes.
             </InfoNote>
           </>
         }

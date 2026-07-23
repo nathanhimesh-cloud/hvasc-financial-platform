@@ -154,3 +154,58 @@ export async function clearMfaTicket(): Promise<void> {
   const jar = await cookies();
   jar.delete(MFA_COOKIE);
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   THE SSO HAND-OFF COOKIE — CSRF protection for the Microsoft round-trip.
+
+   When we send someone to Microsoft to sign in, they come back to /callback with
+   a `code` and a `state`. Two things must be true when they return, and neither
+   can be trusted to the URL alone:
+
+     1. This callback answers a sign-in WE started, not one an attacker started in
+        the victim's browser (login CSRF). We prove it by generating a random
+        `state`, stashing it in this cookie, and refusing any callback whose
+        `state` doesn't match the cookie.
+
+     2. The id_token Microsoft returns is the one for THIS request, not a replay.
+        We generate a random `nonce`, send it to Microsoft, and check the token
+        comes back carrying the same nonce.
+
+   Same mechanism as the MFA ticket: a short-lived signed cookie that grants no
+   access, only ties the two halves of one flow together. Ten minutes is enough
+   to type a password and clear an MFA prompt on Microsoft's side.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const SSO_COOKIE = "hv_sso";
+const SSO_MAX_AGE = 60 * 10; // ten minutes to complete sign-in at Microsoft
+
+export async function createSsoState(state: string, nonce: string): Promise<void> {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET is not set.");
+  const exp = Math.floor(Date.now() / 1000) + SSO_MAX_AGE;
+  const token = sign({ state, nonce, exp, kind: "sso" }, secret);
+  const jar = await cookies();
+  jar.set(SSO_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax", // must survive the top-level redirect back from Microsoft
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SSO_MAX_AGE,
+  });
+}
+
+/** The state+nonce this browser started with, or null if missing/expired/forged. */
+export async function readSsoState(): Promise<{ state: string; nonce: string } | null> {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) return null;
+  const token = (await cookies()).get(SSO_COOKIE)?.value;
+  if (!token) return null;
+  const payload = unsign(token, secret);
+  if (!payload || payload.kind !== "sso") return null;
+  if (typeof payload.state !== "string" || typeof payload.nonce !== "string") return null;
+  return { state: payload.state, nonce: payload.nonce };
+}
+
+export async function clearSsoState(): Promise<void> {
+  (await cookies()).delete(SSO_COOKIE);
+}

@@ -4,6 +4,8 @@ import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { allGrantFigures, grantSummary, GRANT_REGISTER } from "@/lib/grants";
 import { formatCompact, formatPercent } from "@/lib/format";
+import { loadPriorYear, previousFyLabel } from "@/lib/prior-year";
+import { YoY } from "@/components/kit/yoy";
 import { Content } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { GrantRegisterTable } from "@/components/grants/grant-register-table";
@@ -38,6 +40,13 @@ export default async function GrantsPage({
   const session = await getSession();
   const mayDraft = can(session?.role, "grants.edit");
   const utilisation = s.totalBudgetedExpense > 0 ? s.expenseToDate / s.totalBudgetedExpense : 0;
+
+  // Income received and spend to date are year-to-date FLOWS, so they only compare
+  // fairly to the SAME month last year — not to a full prior year. The label is kept
+  // even when the archive is empty, so the "vs …—" line shows and fills in later.
+  const prior = await loadPriorYear(snapshot);
+  const priorS = prior?.sameMonth ? grantSummary(allGrantFigures(prior.snapshot)) : null;
+  const priorLabel = prior?.periodLabel ?? previousFyLabel(snapshot.period.fyLabel) ?? "last year";
 
   return (
     <Content>
@@ -84,7 +93,12 @@ export default async function GrantsPage({
           icon={Banknote}
           label="Total Grant Income"
           value={formatCompact(s.totalGrantIncome)}
-          meta={`${formatCompact(s.incomeToDate)} received to date`}
+          meta={
+            <span className="flex flex-col gap-0.5">
+              <span>{formatCompact(s.incomeToDate)} received to date</span>
+              <YoY now={s.incomeToDate} then={priorS?.incomeToDate} good="up" suffix={priorLabel} />
+            </span>
+          }
         />
         <KpiCard
           color="blue"
@@ -98,7 +112,12 @@ export default async function GrantsPage({
           icon={Send}
           label="Spent to Date"
           value={formatCompact(s.expenseToDate)}
-          meta={`${formatPercent(utilisation)} of budgeted expense`}
+          meta={
+            <span className="flex flex-col gap-0.5">
+              <span>{formatPercent(utilisation)} of budgeted expense</span>
+              <YoY now={s.expenseToDate} then={priorS?.expenseToDate} good="neutral" suffix={priorLabel} />
+            </span>
+          }
         />
         <KpiCard
           color={s.needsAttention > 0 ? "red" : "green"}

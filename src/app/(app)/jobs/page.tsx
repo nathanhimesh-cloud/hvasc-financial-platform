@@ -9,6 +9,8 @@ import { JobBudgetTable } from "@/components/jobs/job-budget-table";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
 import { jobIssues } from "@/lib/data-quality";
 import { formatCompact, formatPercent } from "@/lib/format";
+import { loadPriorYear, previousFyLabel } from "@/lib/prior-year";
+import { YoY } from "@/components/kit/yoy";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,11 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const view = await resolvePeriodView(await searchParams);
   const groups = jobBudgetGroups(view.snapshot);
   const s = jobBudgetSummary(groups);
+
+  // Actual job spend is a year-to-date flow → compare only to the same month last year.
+  const prior = await loadPriorYear(view.snapshot);
+  const priorS = prior?.sameMonth ? jobBudgetSummary(jobBudgetGroups(prior.snapshot)) : null;
+  const priorLabel = prior?.periodLabel ?? previousFyLabel(view.snapshot.period.fyLabel) ?? "last year";
 
 
   return (
@@ -63,7 +70,14 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               icon={Activity}
               label="Actual"
               value={formatCompact(s.totalGlActual)}
-              meta={s.totalBudgetYtd > 0 ? `${formatPercent(s.totalGlActual / s.totalBudgetYtd)} of budget to date` : "No budget loaded"}
+              meta={
+                <span className="flex flex-col gap-0.5">
+                  <span>
+                    {s.totalBudgetYtd > 0 ? `${formatPercent(s.totalGlActual / s.totalBudgetYtd)} of budget to date` : "No budget loaded"}
+                  </span>
+                  <YoY now={s.totalGlActual} then={priorS?.totalGlActual} good="neutral" suffix={priorLabel} />
+                </span>
+              }
             />
             <KpiCard
               color={s.overBudget > 0 ? "red" : "green"}

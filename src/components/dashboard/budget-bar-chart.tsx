@@ -111,7 +111,18 @@ export function BudgetBarChart({
           isFy25={isFy25}
         />
       ) : trend ? (
-        <div>
+        <div className="mt-6 border-t border-border pt-[18px]">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+              Daily spend
+            </span>
+            {/* Budget/phasing reference for the daily view — the straight-lined pace
+                the monthly Sparkline shows as a dashed line, expressed per day. */}
+            <span className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+              <span className="h-px w-3 border-t border-dashed border-muted-foreground" />
+              Budget pace ≈ {formatCompact(monthlyBudget / 30)}/day
+            </span>
+          </div>
           <TrendBars data={trend.points} labelEvery={trend.labelEvery} height={96} />
           <p className="mt-2 font-mono text-[9px] text-muted-foreground">{trend.subtitle}</p>
         </div>

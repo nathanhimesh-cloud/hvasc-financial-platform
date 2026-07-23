@@ -14,7 +14,9 @@ import {
 } from "@/lib/format";
 import { Content, Panel, PanelHeader } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
+import { YoY } from "@/components/kit/yoy";
 import { AlertChip, StatusPill } from "@/components/kit/pills";
+import { loadPriorYear } from "@/lib/prior-year";
 import { cn } from "@/lib/utils";
 
 export async function generateStaticParams() {
@@ -35,6 +37,17 @@ export default async function DepartmentPage(
   const revenue = snapshot.revenueLines.filter((r) => r.departmentId === d.id);
   const totalRevenue = revenue.reduce((acc, r) => acc + r.ytd, 0);
   const grantsNeedingAction = d.grants.filter(grantNeedsAction).length;
+
+  // Prior-year, same month if the archive holds it — a fair year-to-date basis.
+  // (When only last year's close is available we don't show a spend %, because
+  //  this-month-so-far vs a full year is not a like-for-like comparison.)
+  const prior = await loadPriorYear(snapshot);
+  const priorDept = prior?.sameMonth
+    ? prior.snapshot.departments.find((p) => p.slug === slug)
+    : undefined;
+  const priorRevenue = priorDept
+    ? prior!.snapshot.revenueLines.filter((r) => r.departmentId === priorDept.id).reduce((a, r) => a + r.ytd, 0)
+    : undefined;
   const kindLabel =
     d.kind === "cost-revenue" ? "Cost & Revenue Centre" : "Cost Centre";
 
@@ -83,7 +96,18 @@ export default async function DepartmentPage(
           icon={TrendingUp}
           label="YTD Actual Spend"
           value={formatCompact(d.ytdActual)}
-          meta={`${formatPercent(d.pctSpent)} of annual budget`}
+          meta={
+            <span className="flex flex-col gap-0.5">
+              <span>{formatPercent(d.pctSpent)} of annual budget</span>
+              {priorDept ? (
+                <YoY now={d.ytdActual} then={priorDept.ytdActual} good="neutral" suffix={prior!.periodLabel} />
+              ) : d.priorYearActual ? (
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  last yr (full) {formatCompact(d.priorYearActual)}
+                </span>
+              ) : null}
+            </span>
+          }
         />
         <KpiCard
           color={d.variance >= 0 ? "green" : "red"}
@@ -231,8 +255,13 @@ export default async function DepartmentPage(
                   <span className="text-[13px] font-semibold text-foreground">
                     Total Revenue YTD
                   </span>
-                  <span className="font-mono text-[13px] font-semibold tabular-nums text-green">
-                    {formatCurrency(totalRevenue)}
+                  <span className="flex flex-col items-end gap-0.5">
+                    <span className="font-mono text-[13px] font-semibold tabular-nums text-green">
+                      {formatCurrency(totalRevenue)}
+                    </span>
+                    {priorRevenue !== undefined && priorRevenue > 0 && (
+                      <YoY now={totalRevenue} then={priorRevenue} good="up" suffix={prior!.periodLabel} />
+                    )}
                   </span>
                 </div>
               </div>

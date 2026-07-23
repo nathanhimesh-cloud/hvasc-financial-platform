@@ -44,6 +44,7 @@ import { cashBreakdown, MIN_MONTHS_COVER } from "@/lib/liquidity";
 import { grantDependencyRag } from "@/lib/rag";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { CountUp } from "@/components/kit/count-up";
+import { YoY } from "@/components/kit/yoy";
 import { OperatingPosition } from "./operating-position";
 import { BudgetBarChart } from "./budget-bar-chart";
 import { AllocationDonut } from "./allocation-donut";
@@ -128,7 +129,24 @@ interface PeriodPoint {
   netResult: number;
 }
 
-export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot }) {
+/** Metrics that carry a "vs this time last year" line, and which way is good. */
+const YOY_KEYS: Record<string, "up" | "down" | "neutral"> = {
+  "total-income": "up",
+  "total-expenses": "down",
+  "net-result": "up",
+  "grant-funding": "neutral",
+  "revenue-centres": "up",
+  "ytd-spend": "neutral",
+};
+
+export function DashboardController({
+  snapshot,
+  prior,
+}: {
+  snapshot: FinancialSnapshot;
+  /** Same-month prior-year values keyed by metric key, + a label. Empty stats = not archived yet. */
+  prior?: { label: string; stats: Record<string, number> };
+}) {
   const allDepts = useMemo(() => deriveDepartments(snapshot), [snapshot]);
   const allDeptIds = useMemo(() => allDepts.map((d) => d.id), [allDepts]);
   const integrity = useMemo(() => assessIntegrity(snapshot), [snapshot]);
@@ -463,9 +481,22 @@ export function DashboardController({ snapshot }: { snapshot: FinancialSnapshot 
       {/* Stats */}
       {shownStats.length > 0 && (
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {shownStats.map((m, i) => (
-            <KpiCard key={m.key} color={m.color} icon={ICONS[m.icon] ?? Activity} label={m.label} value={<CountUp value={m.value} format={m.format} />} meta={m.meta} delay={i * 70} />
-          ))}
+          {shownStats.map((m, i) => {
+            // "vs this time last year" — only in the default council-wide YTD view,
+            // where the same-month prior figure is a like-for-like comparison.
+            const showYoY = prior && !filtered && m.key in YOY_KEYS;
+            const meta = showYoY ? (
+              <span className="flex flex-col gap-0.5">
+                {m.meta && <span>{m.meta}</span>}
+                <YoY now={m.value} then={prior!.stats[m.key]} good={YOY_KEYS[m.key]} suffix={prior!.label} />
+              </span>
+            ) : (
+              m.meta
+            );
+            return (
+              <KpiCard key={m.key} color={m.color} icon={ICONS[m.icon] ?? Activity} label={m.label} value={<CountUp value={m.value} format={m.format} />} meta={meta} delay={i * 70} />
+            );
+          })}
         </div>
       )}
 

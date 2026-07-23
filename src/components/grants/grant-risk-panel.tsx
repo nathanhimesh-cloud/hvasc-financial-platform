@@ -65,15 +65,11 @@ export function GrantRiskPanel({ risk }: { risk: RiskSummary }) {
       </div>
 
       <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
-        Money the Council has been <span className="text-foreground">promised</span> cannot be clawed
-        back — there is nothing to return. What can be clawed back is cash{" "}
-        <span className="text-foreground">already received and not yet spent</span>. That is what this
-        ranks.
+        Ranks cash <span className="text-foreground">received and not yet spent</span> — the only part
+        a funder can claw back.
         {!risk.datesKnown && (
           <span className="mt-1.5 block text-amber">
-            Ranked on spend alone. The register has no end dates, so we cannot tell how much of any
-            grant&apos;s term is left — and a grant 40% spent is healthy in year one and a crisis in
-            its final month. Fill in the dates and this ranking gets substantially sharper.
+            Ranked on spend alone — the register has no end dates. Adding them sharpens this.
           </span>
         )}
       </p>
@@ -121,10 +117,8 @@ export function GrantRiskPanel({ risk }: { risk: RiskSummary }) {
         <div className="mt-4 flex items-start gap-2 rounded-md border border-amber/25 bg-amber/[0.04] px-3 py-2.5">
           <HelpCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber" strokeWidth={1.75} />
           <p className="text-[12px] leading-relaxed text-muted-foreground">
-            <span className="text-amber">{risk.unknownCount} grants cannot be assessed.</span> Their
-            register codes don&apos;t resolve to the ledger, so their spend is{" "}
-            <span className="text-foreground">unknown, not zero</span> — showing them as &quot;nothing
-            spent&quot; would be a fabrication. Fix the codes in{" "}
+            <span className="text-amber">{risk.unknownCount} grants can&rsquo;t be assessed</span> —
+            their register codes don&rsquo;t resolve, so spend is unknown (not zero). Fix them in{" "}
             <Link href="/mapping" className="text-foreground underline decoration-border underline-offset-2">
               Account Mapping
             </Link>

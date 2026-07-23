@@ -44,23 +44,19 @@ export default async function RatiosPage({ searchParams }: { searchParams: Promi
         notes={
           <>
             <InfoNote label="Tier 8">
-              Hope Vale is Tier 8 under the Financial Management (Sustainability) Guideline 2024 —
-              confirmed from the Council&apos;s audited FY2025 Financial Sustainability Statement.
-              Benchmarks differ by tier. The <span className="text-foreground">Operating Surplus Ratio
-              is contextual for Tier 8: it has no benchmark</span>, so it is reported but never flagged.
+              Hope Vale is Tier 8 (2024 Sustainability Guideline). The Operating Surplus Ratio is{" "}
+              <span className="text-foreground">contextual for Tier 8 — no benchmark</span>, so it&apos;s
+              reported but never flagged.
             </InfoNote>
             <InfoNote label="Why last year&apos;s figures?">
-              These are <span className="text-foreground">annual</span> measures. The Council raises its
-              rates once a year and receives most grant income late, so a surplus ratio calculated from
-              July alone would be wildly negative and would tell you nothing. Flow ratios are reported on{" "}
-              {report.flowBasis}; the cash cover and asset ratios are point-in-time and are current.
+              These are annual measures; a July-only surplus ratio would be meaningless. Flow ratios use{" "}
+              {report.flowBasis}; cash-cover and asset ratios are current.
             </InfoNote>
             <InfoNote label="No leverage ratio">
-              Omitted — the Council holds no debt. The Cash Flow&apos;s financing section is empty, which
-              corroborates it.
+              Omitted — the Council holds no debt.
             </InfoNote>
             <InfoNote label="Reference figures">
-              &quot;Audited FY25&quot; is the Council&apos;s own published actual, for comparison.
+              &quot;Audited FY25&quot; is the Council&apos;s own published actual.
             </InfoNote>
           </>
         }

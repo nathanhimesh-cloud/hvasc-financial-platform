@@ -6,6 +6,8 @@ import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { assessWorkingCapital, commitmentsBySupplier, type AgeingInsight } from "@/lib/working-capital";
 import { formatCurrency, formatCompact, formatPercent } from "@/lib/format";
+import { loadPriorYear, previousFyLabel } from "@/lib/prior-year";
+import { YoY } from "@/components/kit/yoy";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,12 @@ export default async function CommitmentsPage({
   const wc = assessWorkingCapital(view.snapshot);
   const c = wc.commitments;
 
+  // Commitments and ageing are point-in-time, so comparing to any earlier stored
+  // period (same month or last year's close) is a fair like-for-like.
+  const prior = await loadPriorYear(view.snapshot);
+  const wcPrior = prior ? assessWorkingCapital(prior.snapshot) : null;
+  const priorLabel = prior?.periodLabel ?? previousFyLabel(view.snapshot.period.fyLabel) ?? "last year";
+
   const suppliers = c ? commitmentsBySupplier(c.lines).slice(0, 8) : [];
 
   return (
@@ -38,26 +46,21 @@ export default async function CommitmentsPage({
         notes={
           <>
             <InfoNote label="What a commitment is">
-              Value ordered on a purchase order but not yet invoiced. It has left the Council in every
-              sense that matters, but it hasn&apos;t touched the general ledger yet — so it is invisible
-              in every other report.
+              Value ordered on a purchase order but not yet invoiced — real, but not yet in the general
+              ledger, so it&apos;s invisible on every other report.
             </InfoNote>
             <InfoNote label="How it&apos;s measured">
-              Practical&apos;s own <span className="font-mono">COMMITBAL</span> field is unused at this
-              site (zero on all 8,919 order lines), so the commitment is derived as ordered less
-              invoiced — per line, floored at zero, on lines not yet fully invoiced and raised in the
-              last 12 months. Capital vs operating comes from the GL account each line posts to.
+              Ordered less invoiced, per line, on orders raised in the last 12 months. Capital vs
+              operating comes from the GL account each line posts to.
             </InfoNote>
             {c?.staleCount ? (
               <InfoNote label="Excluded from the total">
-                A further {formatCurrency(c.stale ?? 0)} sits on {c.staleCount} order lines raised over a
-                year ago and never invoiced or closed off. Excluded — an order nobody has actioned in a
-                year is more likely an untidy ledger than a live obligation. Worth a clean-up either way.
+                {formatCurrency(c.stale ?? 0)} on {c.staleCount} order lines over a year old is left out
+                — likely untidy ledger, not live obligations. Worth a clean-up.
               </InfoNote>
             ) : null}
             <InfoNote label="Ageing">
-              Straight from Practical&apos;s own end-of-month ageing buckets (
-              <span className="font-mono">DRMST / CRMST</span>) — nothing is recomputed here.
+              Straight from Practical&apos;s own end-of-month buckets — nothing recomputed.
             </InfoNote>
           </>
         }
@@ -80,14 +83,24 @@ export default async function CommitmentsPage({
               icon={FileClock}
               label="Committed — Capital"
               value={formatCompact(c?.capital ?? 0)}
-              meta="Ordered, not yet invoiced"
+              meta={
+                <span className="flex flex-col gap-0.5">
+                  <span>Ordered, not yet invoiced</span>
+                  <YoY now={c?.capital ?? 0} then={wcPrior?.commitments?.capital} good="neutral" suffix={priorLabel} />
+                </span>
+              }
             />
             <KpiCard
               color="teal"
               icon={FileClock}
               label="Committed — Operating"
               value={formatCompact(c?.operating ?? 0)}
-              meta={c ? `${c.orderCount} open order lines` : "—"}
+              meta={
+                <span className="flex flex-col gap-0.5">
+                  <span>{c ? `${c.orderCount} open order lines` : "—"}</span>
+                  <YoY now={c?.operating ?? 0} then={wcPrior?.commitments?.operating} good="neutral" suffix={priorLabel} />
+                </span>
+              }
               delay={60}
             />
             <KpiCard
@@ -95,7 +108,12 @@ export default async function CommitmentsPage({
               icon={HardHat}
               label="Capital Works in Progress"
               value={formatCompact(wc.workInProgressTotal)}
-              meta={`${wc.workInProgress.length} projects underway`}
+              meta={
+                <span className="flex flex-col gap-0.5">
+                  <span>{wc.workInProgress.length} projects underway</span>
+                  <YoY now={wc.workInProgressTotal} then={wcPrior?.workInProgressTotal} good="neutral" suffix={priorLabel} />
+                </span>
+              }
               delay={120}
             />
             <KpiCard
@@ -104,9 +122,19 @@ export default async function CommitmentsPage({
               label="Owed to the Council"
               value={formatCompact(wc.receivables?.schedule.total ?? 0)}
               meta={
-                wc.receivables?.overdueShare != null
-                  ? `${formatPercent(wc.receivables.overdueShare, 0)} over 90 days`
-                  : "—"
+                <span className="flex flex-col gap-0.5">
+                  <span>
+                    {wc.receivables?.overdueShare != null
+                      ? `${formatPercent(wc.receivables.overdueShare, 0)} over 90 days`
+                      : "—"}
+                  </span>
+                  <YoY
+                    now={wc.receivables?.schedule.total ?? 0}
+                    then={wcPrior?.receivables?.schedule.total}
+                    good="neutral"
+                    suffix={priorLabel}
+                  />
+                </span>
               }
               delay={180}
             />

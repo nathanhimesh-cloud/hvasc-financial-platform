@@ -3,14 +3,19 @@ import { bgDim, hex, statusToColor, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
 import { formatCompact, formatCurrency, formatPercent, formatSignedCompact } from "@/lib/format";
 import { AlertChip, StatusPill } from "@/components/kit/pills";
+import { YoY } from "@/components/kit/yoy";
 import { cn } from "@/lib/utils";
 
 interface Props {
   department: DepartmentDerived;
   period: ReportingPeriod;
+  /** Same-month spend last year, when the archive holds it — for a fair YTD delta. */
+  priorYtd?: number;
+  /** Label of the prior period, e.g. "July 2025". */
+  priorLabel?: string;
 }
 
-export function ManagerCard({ department: d, period }: Props) {
+export function ManagerCard({ department: d, period, priorYtd, priorLabel }: Props) {
   const ytdTone =
     d.status === "over-budget"
       ? "text-red"
@@ -44,7 +49,12 @@ export function ManagerCard({ department: d, period }: Props) {
       {/* Metrics */}
       <div className="mb-[18px] grid grid-cols-3 gap-2.5">
         <Metric label="Annual Budget" value={formatCompact(d.annualBudget)} />
-        <Metric label="YTD Spent" value={formatCompact(d.ytdActual)} tone={ytdTone} />
+        <Metric
+          label="YTD Spent"
+          value={formatCompact(d.ytdActual)}
+          tone={ytdTone}
+          sub={<YoY now={d.ytdActual} then={priorYtd} good="neutral" suffix={priorLabel ?? "last year"} />}
+        />
         <Metric
           label="Variance"
           value={formatSignedCompact(d.variance)}
@@ -116,10 +126,12 @@ function Metric({
   label,
   value,
   tone = "text-white",
+  sub,
 }: {
   label: string;
   value: React.ReactNode;
   tone?: string;
+  sub?: React.ReactNode;
 }) {
   return (
     <div className="rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.05)] bg-elevated p-3">
@@ -129,6 +141,7 @@ function Metric({
       <div className={cn("font-heading text-[18px] font-extrabold tabular-nums tracking-[-0.02em]", tone)}>
         {value}
       </div>
+      {sub && <div className="mt-1">{sub}</div>}
     </div>
   );
 }

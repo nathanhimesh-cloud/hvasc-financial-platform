@@ -88,15 +88,12 @@ export default async function TransactionsPage({
               three times a day. Nothing is summarised or rounded — this is the ledger itself.
             </InfoNote>
             <InfoNote label="The search runs in the database">
-              The date range and search are applied by the database across the whole financial year,
-              not to the rows already on screen. A search finds transactions that were never sent to
-              this page.
+              Search and date range apply across the whole year in the database — they find rows never
+              sent to this page.
             </InfoNote>
             <InfoNote label="Current year only">
-              Practical keeps transaction detail for the <span className="text-foreground">current
-              financial year only</span>. Prior years hold monthly totals but no individual
-              transactions, and nothing can recover them — so there is no drill-down or daily spend
-              for an archived year.
+              Transaction detail is kept for the <span className="text-foreground">current year
+              only</span>. Prior years hold monthly totals, not individual postings.
             </InfoNote>
           </>
         }

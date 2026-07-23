@@ -26,6 +26,8 @@ import { TrendBars } from "@/components/kit/trend-bars";
 import { DrillLink } from "@/components/kit/drill-link";
 import { MultiPeriod } from "./multi-period";
 import { RevenueVsBudget } from "./revenue-vs-budget";
+import { RevenueMixTrend } from "./revenue-mix-trend";
+import { OperatingResultTrend } from "./operating-result-trend";
 import type { RevenueTrend } from "@/lib/revenue-trend";
 import type { SpendTrend } from "@/lib/trend";
 import { BudgetVsActual } from "./budget-vs-actual";
@@ -216,6 +218,21 @@ export function ReportsView({
   }, [departments, figures.totalExpenses, isLatestYtd, totalDeptYtd, monthsCovered, monthsInYear]);
 
   const estimated = !isLatestYtd; // breakdown is allocated, not real, for past periods
+
+  // Full-year budgeted operating result (revenue budget − expense budget), summed
+  // from the loaded budget. Undefined when no budget is loaded, so the operating-
+  // result chart simply omits its budget-pace line rather than inventing one.
+  const annualBudgetNet = useMemo(() => {
+    if (!budgetData) return undefined;
+    let rev = 0, exp = 0;
+    for (const g of budgetData.groups) {
+      for (const leaf of g.leaves) {
+        if (leaf.kind === "revenue") rev += leaf.budget;
+        else exp += leaf.budget;
+      }
+    }
+    return rev - exp;
+  }, [budgetData]);
 
   const QUARTER = ["Q1 (Jul-Sep)", "Q2 (Oct-Dec)", "Q3 (Jan-Mar)", "Q4 (Apr-Jun)"];
   const periodName =
@@ -559,6 +576,18 @@ export function ReportsView({
             <RevenueVsBudget points={revenue.points} annualBudget={revenue.annualBudget} />
           )}
 
+          {/* B6 (#51) — the operating result itself, month by month vs budget pace. */}
+          <OperatingResultTrend
+            periods={periods.map((p) => ({ idx: p.idx, month: p.month, netResult: p.netResult }))}
+            annualBudgetNet={annualBudgetNet}
+            monthsInYear={monthsInYear}
+          />
+
+          {/* B6 (#53) — grants vs own-source revenue over time. */}
+          <RevenueMixTrend
+            periods={periods.map((p) => ({ month: p.month, totalIncome: p.totalIncome, revenueLines: p.revenueLines }))}
+          />
+
           {/* B1 — months side by side. The shape of the year, which no single-period
               view can show. */}
           <MultiPeriod periods={periods} />
@@ -761,11 +790,9 @@ function BalanceSheetView({
       <div className="mb-4 flex items-start gap-2 rounded-md border border-border bg-elevated/30 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
         <Scale className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
         <span>
-          A point-in-time position{syncedAt ? <> — as at the last sync, <span className="text-foreground">{syncedAt}</span></> : ""}. Control
-          accounts (payables, payroll) move within the month, so a line checked against
-          live Practical at a different moment can differ — that is timing, not error. The
-          accuracy checks above confirm every balance ties to its transactions at the sync
-          moment.
+          Point-in-time{syncedAt ? <> — as at <span className="text-foreground">{syncedAt}</span></> : ""}. Control
+          accounts move within the month, so a line checked against Practical at another moment can
+          differ — timing, not error.
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

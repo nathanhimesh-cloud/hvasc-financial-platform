@@ -5,6 +5,7 @@ import { MonthlyReportView } from "@/components/reports/monthly-report-view";
 import { MonthlyReportPicker } from "@/components/reports/monthly-report-picker";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { buildMonthlyReport, reportScopes } from "@/lib/monthly-report";
+import { loadPriorYear } from "@/lib/prior-year";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,9 @@ export default async function MonthlyReportPage({
   const requested = Array.isArray(sp.report) ? sp.report[0] : sp.report;
   const selected = scopes.some((s) => s.id === requested) ? (requested as string) : "consolidated";
 
-  const report = buildMonthlyReport(view.snapshot, selected);
+  // Same month last year (when archived) gives a like-for-like YTD comparison.
+  const prior = await loadPriorYear(view.snapshot);
+  const report = buildMonthlyReport(view.snapshot, selected, prior?.sameMonth ? prior.snapshot : undefined);
 
   return (
     <Content>

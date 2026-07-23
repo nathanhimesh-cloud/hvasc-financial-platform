@@ -67,6 +67,13 @@ export interface MonthlyReport {
   cash: CashBreakdown | null;
   integrity: IntegrityReport | null;
 
+  /**
+   * Same-month prior-year headline figures, when the archive holds that period.
+   * Present only for a like-for-like year-to-date basis (July vs July), never a
+   * full prior year against a part-year.
+   */
+  prior?: { income: number; expenses: number; netResult: number; periodLabel: string };
+
   /** Plain-language notes: caveats a reader should see. */
   notes: string[];
 }
@@ -77,11 +84,27 @@ function line(label: string, budget: number, actual: number, ytdBudget: number):
   return { label, budget, actual, variance: varToDate, utilisation: util, rag: budgetRag(util) };
 }
 
-export function buildMonthlyReport(snapshot: FinancialSnapshot, scope: ReportScope): MonthlyReport {
+export function buildMonthlyReport(
+  snapshot: FinancialSnapshot,
+  scope: ReportScope,
+  priorSnapshot?: FinancialSnapshot,
+): MonthlyReport {
   const depts = deriveDepartments(snapshot);
   const { period } = snapshot;
   const hasBudget = (snapshot.period.comparisonLabel ?? "Budget") === "Budget";
   const comparisonLabel = snapshot.period.comparisonLabel ?? "Budget";
+
+  // Same-scope prior-year headline, via recursion so the figures are computed
+  // exactly the same way. The prior report is built without its own prior.
+  const priorReport = priorSnapshot ? buildMonthlyReport(priorSnapshot, scope) : null;
+  const prior = priorReport
+    ? {
+        income: priorReport.income,
+        expenses: priorReport.expenses,
+        netResult: priorReport.netResult,
+        periodLabel: priorReport.periodLabel,
+      }
+    : undefined;
 
   const grantFigs = allGrantFigures(snapshot);
   const notes: string[] = [];
@@ -133,6 +156,7 @@ export function buildMonthlyReport(snapshot: FinancialSnapshot, scope: ReportSco
       grantRows: grantFigs.filter((g) => g.entry.active).slice(0, 12),
       cash: cashBreakdown(snapshot, grantFigs),
       integrity: assessIntegrity(snapshot),
+      prior,
       notes,
     };
   }
@@ -187,6 +211,7 @@ export function buildMonthlyReport(snapshot: FinancialSnapshot, scope: ReportSco
     grantRows: deptGrants,
     cash: null,
     integrity: null,
+    prior,
     notes,
   };
 }

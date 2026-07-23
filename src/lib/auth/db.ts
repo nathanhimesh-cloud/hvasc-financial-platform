@@ -1,4 +1,5 @@
 import "server-only";
+import crypto from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 import { databaseUrl } from "./session";
 import type { SessionUser } from "./session";
@@ -51,6 +52,79 @@ export async function getUserByUsername(username: string): Promise<DbUser | null
     // session to expire, no cache to wait out.
     suspendedAt: r.suspended_at ? String(r.suspended_at) : null,
   };
+}
+
+/**
+ * Look a user up by the email their identity provider vouches for (Microsoft SSO).
+ * Case-insensitive: "Micah@…" and "micah@…" are the same person.
+ */
+export async function getUserByEmail(email: string): Promise<DbUser | null> {
+  const sql = sqlClient();
+  if (!sql) return null;
+  const rows = (await sql`
+    SELECT id, username, role, password_hash, must_change_password,
+           totp_enabled, suspended_at
+    FROM users WHERE LOWER(email) = LOWER(${email}) LIMIT 1
+  `) as Array<{
+    id: number;
+    username: string;
+    role: string;
+    password_hash: string;
+    must_change_password: boolean;
+    totp_enabled: boolean | null;
+    suspended_at: string | null;
+  }>;
+  if (!rows.length) return null;
+  const r = rows[0];
+  return {
+    id: r.id,
+    username: r.username,
+    role: r.role,
+    // SSO users never set a Vantage password and are never forced to — Microsoft is
+    // their password. The forced-change flow is only for password accounts.
+    mustChangePassword: false,
+    passwordHash: r.password_hash,
+    mfaEnabled: !!r.totp_enabled,
+    suspendedAt: r.suspended_at ? String(r.suspended_at) : null,
+  };
+}
+
+/**
+ * Provision a user the first time they arrive via SSO from an allowed domain.
+ *
+ * DELIBERATELY the lowest-privilege role. An auto-provisioned account gets read-only
+ * access; a person who needs to manage mappings, grants or users has that granted
+ * explicitly by an administrator afterwards. Auto-granting anything more than "look"
+ * to anyone in the tenant would be an access-control hole.
+ *
+ * The random password_hash is a placeholder they can never use (there's no password
+ * login for them) — it just satisfies the NOT NULL column.
+ */
+export async function provisionSsoUser(
+  email: string,
+  role: string,
+): Promise<DbUser | null> {
+  const sql = sqlClient();
+  if (!sql) return null;
+  // A username from the email local-part, de-duped if taken.
+  const base = email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "") || "user";
+  const placeholder = `sso:${crypto.randomUUID()}`;
+  try {
+    await sql`
+      INSERT INTO users (username, email, password_hash, role, must_change_password, created_by)
+      VALUES (${base}, ${email}, ${placeholder}, ${role}, FALSE, 'sso')
+      ON CONFLICT DO NOTHING
+    `;
+  } catch {
+    // Username clash (base already taken by a different person) — fall back to a
+    // unique one. The email unique index still protects against a duplicate person.
+    await sql`
+      INSERT INTO users (username, email, password_hash, role, must_change_password, created_by)
+      VALUES (${base + "-" + Math.floor(Date.now() / 1000)}, ${email}, ${placeholder}, ${role}, FALSE, 'sso')
+      ON CONFLICT DO NOTHING
+    `;
+  }
+  return getUserByEmail(email);
 }
 
 /** Set a new password and clear the forced-change flag. */
