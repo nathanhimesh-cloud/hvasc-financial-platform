@@ -283,8 +283,10 @@ export interface BsReconLine {
 }
 
 export interface BsReconciliation {
-  /** How many balance-sheet accounts were checked. */
+  /** How many transaction-fed balance-sheet accounts were checked. */
   checked: number;
+  /** Calculated roll-ups (e.g. Current Surplus) skipped — validated by the total checks. */
+  calculated?: number;
   mismatchCount: number;
   /** The worst offenders (capped). Empty when every line ties. */
   mismatches: BsReconLine[];

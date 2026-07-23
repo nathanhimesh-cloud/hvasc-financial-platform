@@ -153,7 +153,10 @@ function checkBalanceSheetLines(recon?: BsReconciliation): IntegrityCheck {
     return skip(id, label, description, "Line reconciliation not available for this period.");
   }
   if (recon.mismatchCount === 0) {
-    return pass(id, label, description, `All ${recon.checked} accounts tie to the transactions.`);
+    const rollups = recon.calculated
+      ? ` (${recon.calculated} calculated roll-up${recon.calculated === 1 ? "" : "s"}, e.g. Current Surplus, validated by the total checks)`
+      : "";
+    return pass(id, label, description, `All ${recon.checked} accounts tie to the transactions${rollups}.`);
   }
   const worst = recon.mismatches[0];
   const detail = recon.mismatches

@@ -752,12 +752,27 @@ GROUP BY t.GLACCOUNT
   }
 
   $reconChecked = 0
+  $reconCalculated = 0
   $reconMismatch = @()
   foreach ($r in $bsRows) {
     $code = ([string]$r.GLACCOUNT).Trim()
     if (-not $code) { continue }
     $glbal = R2 $r.BALANCE
     $type  = [int]$r.ACCNTTYPE
+    $desc  = ([string]$r.DESCRIPT).Trim()
+
+    # SKIP THE CURRENT-SURPLUS ROLL-UP. It is NOT fed by transactions posted to itself;
+    # Practical CALCULATES it as this year's income less expenses across the whole P&L.
+    # So it has no GLTRN of its own, and "opening + transactions" is always 0 for it
+    # while its balance is the accumulating surplus. Checking it against transactions is
+    # a category error -- it produced a false "diff 887,803.71" on the first run. It is
+    # instead validated by the two total-level checks: Assets = Liabilities + Equity, and
+    # the net result ties to the movement in equity.
+    if ($type -eq 11 -and $desc -match 'current\s+surplus|current\s+year|current\s+earning|net\s+result|operating\s+result|surplus.*deficit') {
+      $reconCalculated++
+      continue
+    }
+
     $open  = $(if ($opening.ContainsKey($code)) { $opening[$code] } else { 0 })
     $mv    = $(if ($mvByAcct.ContainsKey($code)) { $mvByAcct[$code] } else { @{ dr = 0.0; cr = 0.0 } })
     # Sign the movement by the account's normal side.
@@ -779,6 +794,7 @@ GROUP BY t.GLACCOUNT
 
   $bsReconciliation = [ordered]@{
     checked      = $reconChecked
+    calculated   = $reconCalculated
     mismatchCount = $reconMismatch.Count
     # The worst 25 only; the point is to flag, not to dump the whole ledger.
     mismatches   = @($reconMismatch | Select-Object -First 25)
@@ -786,7 +802,7 @@ GROUP BY t.GLACCOUNT
     source       = 'Each balance-sheet account: GLBAL.BALANCE at the current period vs opening (GLBAL MTH 0) plus GLTRN movement this FY, signed by the account normal side. A mismatch means the balance table and the transactions disagree.'
   }
   if ($reconMismatch.Count -eq 0) {
-    Write-Host ("BS line reconciliation: all {0} accounts tie to the transactions." -f $reconChecked) -ForegroundColor Green
+    Write-Host ("BS line reconciliation: all {0} transaction-fed accounts tie ({1} calculated roll-up(s) skipped)." -f $reconChecked, $reconCalculated) -ForegroundColor Green
   } else {
     Write-Host ("BS line reconciliation: {0} of {1} accounts DIVERGE from the transactions -" -f $reconMismatch.Count, $reconChecked) -ForegroundColor Red
     foreach ($m in ($reconMismatch | Select-Object -First 6)) {
