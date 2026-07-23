@@ -173,6 +173,53 @@ function checkBalanceSheetLines(recon?: BsReconciliation): IntegrityCheck {
   );
 }
 
+/**
+ * Check — every stated total equals the sum of its own lines.
+ *
+ * The reviewer's reconciliation (action item 8) found a section whose displayed
+ * TOTAL exceeded the sum of its displayed LINES by $3, and asked for this to be a
+ * standing check. A card that doesn't equal its own detail is the most corrosive
+ * kind of error — it makes a reader distrust every other number on the page — so it
+ * gets its own tie-out, on the balance sheet's five sections.
+ */
+function checkTotalsTieToLines(bs?: BalanceSheet): IntegrityCheck {
+  const id = "bs-totals-tie";
+  const label = "Every total equals its detail";
+  const description = "Each section's stated total must equal the sum of the lines shown beneath it.";
+  if (!bs) return skip(id, label, description, "Balance Sheet not loaded for this period.");
+
+  const sections: { name: string; section: { lines: { amount: number }[]; total: number } }[] = [
+    { name: "Current assets", section: bs.currentAssets },
+    { name: "Non-current assets", section: bs.nonCurrentAssets },
+    { name: "Current liabilities", section: bs.currentLiabilities },
+    { name: "Non-current liabilities", section: bs.nonCurrentLiabilities },
+    { name: "Community equity", section: bs.equity },
+  ];
+
+  let worstName = "";
+  let worstGap = 0;
+  for (const { name, section } of sections) {
+    const sum = section.lines.reduce((a, l) => a + l.amount, 0);
+    const gap = section.total - sum;
+    if (Math.abs(gap) > Math.abs(worstGap)) {
+      worstGap = gap;
+      worstName = name;
+    }
+  }
+
+  if (Math.abs(worstGap) <= INTEGRITY_TOLERANCE) {
+    return pass(id, label, description, `All ${sections.length} sections match their line detail.`);
+  }
+  return fail(
+    id,
+    label,
+    description,
+    worstGap,
+    `${worstName}: total is out from the sum of its lines by ${formatCurrency(Math.abs(worstGap))}`,
+    `The ${worstName} card doesn't equal the sum of the lines shown under it (by ${formatCurrency(Math.abs(worstGap))}). A total that disagrees with its own detail must be fixed before the report is presented.`,
+  );
+}
+
 /** Check 1 — Balance Sheet balances (Assets = Liabilities + Equity). */
 function checkBalanceSheet(bs?: BalanceSheet): IntegrityCheck {
   const id = "bs-balances";
@@ -344,6 +391,7 @@ export function assessIntegrity(snapshot: FinancialSnapshot): IntegrityReport {
 
   const checks: IntegrityCheck[] = [
     checkBalanceSheet(balanceSheet),
+    checkTotalsTieToLines(balanceSheet),
     checkBalanceSheetLines(snapshot.bsReconciliation),
     checkCashFlowReconciles(cashFlow),
     checkCashAgrees(balanceSheet, cashFlow),
