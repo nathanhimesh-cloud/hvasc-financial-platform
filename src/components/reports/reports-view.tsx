@@ -531,9 +531,35 @@ export function ReportsView({
                       <Num muted>{d.priorYearActual ? formatCurrency(d.priorYearActual) : "—"}</Num>
                     </tr>
                   ))}
+                  {/* Expenses not yet mapped to a department, so the Actual column
+                      ties to the Total Expenses headline (same as the dashboard). */}
+                  {(() => {
+                    const deptActualSum = deptRows.reduce((a, d) => a + d.actual, 0);
+                    const unassigned = figures.totalExpenses - deptActualSum;
+                    return Math.abs(unassigned) >= 1 ? (
+                      <tr className="hover:bg-[rgba(255,255,255,0.03)]">
+                        <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3 text-[13px]">
+                          <span className="flex items-center gap-2.5 text-muted-foreground">
+                            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-border text-[11px]">
+                              —
+                            </span>
+                            Unassigned
+                            <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground/70">
+                              not yet mapped
+                            </span>
+                          </span>
+                        </td>
+                        <Num>{formatCurrency(unassigned)}</Num>
+                        <Num muted>—</Num>
+                        <Num muted>—</Num>
+                        <td />
+                        <Num muted>—</Num>
+                      </tr>
+                    ) : null;
+                  })()}
                   <tr className="font-semibold">
                     <td className="px-3.5 py-3 text-[13px] text-foreground">Total Expenses</td>
-                    <Num>{formatCurrency(deptRows.reduce((a, d) => a + d.actual, 0))}</Num>
+                    <Num>{formatCurrency(figures.totalExpenses)}</Num>
                     <Num muted>{formatCurrency(deptRows.reduce((a, d) => a + d.comparison, 0))}</Num>
                     <Num tone={deptRows.reduce((a, d) => a + d.variance, 0) >= 0 ? "pos" : "neg"}>
                       {formatSignedCompact(deptRows.reduce((a, d) => a + d.variance, 0))}
