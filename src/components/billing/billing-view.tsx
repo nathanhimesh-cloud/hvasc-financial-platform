@@ -9,6 +9,23 @@ import type { InvoicePage, BillPage } from "@/lib/billing";
 import { cn } from "@/lib/utils";
 
 type Tab = "owed-to-us" | "owed-by-us";
+type AgeFilter = "all" | "current" | "d30" | "d60" | "d90" | "d90plus";
+type BillFilter = "all" | "open" | "paid" | "cancelled";
+
+const AGE_OPTIONS: [AgeFilter, string, "default" | "amber" | "red"][] = [
+  ["all", "All", "default"],
+  ["current", "Not overdue", "default"],
+  ["d30", "1–30 days", "default"],
+  ["d60", "31–60 days", "amber"],
+  ["d90", "61–90 days", "amber"],
+  ["d90plus", "90+ days", "red"],
+];
+const BILL_OPTIONS: [BillFilter, string][] = [
+  ["all", "All"],
+  ["open", "Open"],
+  ["paid", "Paid"],
+  ["cancelled", "Cancelled"],
+];
 
 /**
  * Invoices and supplier bills (B4).
@@ -19,6 +36,31 @@ type Tab = "owed-to-us" | "owed-by-us";
  */
 export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills: BillPage }) {
   const [tab, setTab] = useState<Tab>("owed-to-us");
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>("all");
+  const [billFilter, setBillFilter] = useState<BillFilter>("all");
+
+  // Age filter on the invoices (debtors), by days overdue. Client-side over the
+  // loaded rows — the ageing summary above shows the authoritative bucket totals.
+  const invoiceRows = invoices.rows.filter((r) => {
+    if (ageFilter === "all") return true;
+    const d = r.daysOverdue;
+    if (ageFilter === "current") return r.outstanding !== 0 && (d === null || d <= 0);
+    if (d === null || d <= 0) return false;
+    if (ageFilter === "d30") return d <= 30;
+    if (ageFilter === "d60") return d > 30 && d <= 60;
+    if (ageFilter === "d90") return d > 60 && d <= 90;
+    return d > 90; // d90plus
+  });
+
+  // Status filter on the supplier bills.
+  const billRows = bills.rows.filter((r) => {
+    if (billFilter === "all") return true;
+    if (billFilter === "open") return !r.paid && !r.cancelled;
+    if (billFilter === "paid") return r.paid;
+    return r.cancelled; // cancelled
+  });
+
+  const shownCount = tab === "owed-to-us" ? invoiceRows.length : billRows.length;
 
   return (
     <Panel>
@@ -103,6 +145,24 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
         ))}
       </div>
 
+      {/* Filter the list — by age on the invoices, by status on the bills */}
+      <div className="no-print mb-4 flex flex-wrap items-center gap-1.5">
+        {tab === "owed-to-us"
+          ? AGE_OPTIONS.map(([id, label, tone]) => (
+              <FilterPill key={id} active={ageFilter === id} onClick={() => setAgeFilter(id)} tone={tone}>
+                {label}
+              </FilterPill>
+            ))
+          : BILL_OPTIONS.map(([id, label]) => (
+              <FilterPill key={id} active={billFilter === id} onClick={() => setBillFilter(id)}>
+                {label}
+              </FilterPill>
+            ))}
+        <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+          {shownCount} shown
+        </span>
+      </div>
+
       {/* Wide tables scroll INSIDE their own container. The page body must never
           scroll sideways. */}
       <div className="overflow-x-auto">
@@ -119,7 +179,7 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
               </tr>
             </thead>
             <tbody>
-              {invoices.rows.map((r) => (
+              {invoiceRows.map((r) => (
                 <tr key={r.ky} className="border-b border-border/50 last:border-0">
                   <td className="py-2.5 pr-4 font-mono text-[11px] text-muted-foreground">
                     {r.date}
@@ -180,7 +240,7 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
               </tr>
             </thead>
             <tbody>
-              {bills.rows.map((r) => (
+              {billRows.map((r) => (
                 <tr
                   key={r.ky}
                   className={cn(
