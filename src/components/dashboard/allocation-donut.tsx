@@ -9,6 +9,7 @@ interface Props {
   allocation: { department: Department; share: number }[];
   totalBudget: number;
   revenueLines: RevenueLine[];
+  /** Total income headline — the revenue lines are reconciled up to this. */
   totalRevenue: number;
   /** Budget figures are an estimate (FY26 budget not loaded). */
   budgetEstimated?: boolean;
@@ -24,6 +25,15 @@ export function AllocationDonut({
   budgetEstimated,
   comparisonLabel = "Budget",
 }: Props) {
+  // MAKE THE BREAKDOWN TIE TO THE HEADLINE.
+  // The revenue lines cover grants + revenue mapped to a department. `totalRevenue`
+  // is the Total Income headline (every revenue account). Any difference is revenue
+  // not yet assigned to a department — show it as its own line so the list always
+  // sums to the headline, rather than sitting silently ~$18K short.
+  const listed = revenueLines.reduce((a, r) => a + r.ytd, 0);
+  const other = totalRevenue - listed;
+  const showOther = other >= 1;
+  const reconciledTotal = showOther ? totalRevenue : listed;
   const isFy25 = comparisonLabel === "FY25";
   const r = 42;
   const circ = 2 * Math.PI * r;
@@ -116,12 +126,25 @@ export function AllocationDonut({
               </span>
             </div>
           ))}
+          {showOther && (
+            <div
+              className="flex items-center justify-between"
+              title="Revenue in accounts not yet assigned to a department. Included so the breakdown ties to Total Income."
+            >
+              <span className="text-[13px] font-medium text-muted-foreground">
+                Other revenue
+              </span>
+              <span className="font-mono text-[13px] font-bold text-muted-foreground">
+                {formatCurrency(other)}
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between border-t border-border pt-2.5">
             <span className="text-[13px] font-bold text-white">
               Total Revenue YTD
             </span>
             <span className="font-mono text-sm font-bold text-green">
-              {formatCurrency(totalRevenue)}
+              {formatCurrency(reconciledTotal)}
             </span>
           </div>
         </div>

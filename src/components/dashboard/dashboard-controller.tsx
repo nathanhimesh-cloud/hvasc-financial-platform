@@ -274,7 +274,7 @@ export function DashboardController({
     "cash-position": <CashPosition cash={cash} periodLabel={snapshot.period.label} />,
     "grant-mix": <GrantMix summary={grantMix} periodLabel={snapshot.period.label} />,
     "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} trend={spendTrend(snapshot)} monthLabel={`Month ${snapshot.period.monthOfYear}`} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
-    "allocation-donut": <AllocationDonut allocation={allocation} totalBudget={totalBudget} revenueLines={snapshot.revenueLines} totalRevenue={revenue} budgetEstimated={budgetEstimated} comparisonLabel={comparisonLabel} />,
+    "allocation-donut": <AllocationDonut allocation={allocation} totalBudget={totalBudget} revenueLines={snapshot.revenueLines} totalRevenue={snapshot.incomeTotals?.totalIncome ?? revenue} budgetEstimated={budgetEstimated} comparisonLabel={comparisonLabel} />,
     "department-table": <DepartmentTable departments={depts} periodLabel={snapshot.period.label} comparisonLabel={comparisonLabel} />,
   };
   const visibleWidgets = cfg.order.filter((id) => !cfg.hidden.includes(id));
