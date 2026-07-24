@@ -121,6 +121,10 @@ function Push-Archive($snapshot, [string]$label) {
     $curlArgs = @('-s','-S','-X','PUT','-H','Content-Type: application/json','-H',"x-upload-password: $Password",'--data-binary',"@$tmp",$endpoint)
     if (Test-Path $caBundle) { $curlArgs = @('--cacert', $caBundle) + $curlArgs }
     $resp = & $curlExe @curlArgs
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$resp)) {
+      Remove-Item $tmp -ErrorAction SilentlyContinue
+      throw "curl failed (exit $LASTEXITCODE). Check -Url is your REAL app URL (not <app>) and -Password is the real UPLOAD_PASSWORD."
+    }
   } else {
     $headers = @{ 'x-upload-password' = $Password }
     $resp = Invoke-RestMethod -Method Put -Uri $endpoint -ContentType 'application/json' -Headers $headers -Body $body
