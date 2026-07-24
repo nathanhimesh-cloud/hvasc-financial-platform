@@ -27,6 +27,38 @@ const BILL_OPTIONS: [BillFilter, string][] = [
   ["cancelled", "Cancelled"],
 ];
 
+/** A filter pill for the invoice/bill list — tone-coded so "90+ days" reads red when active. */
+function FilterPill({
+  active,
+  onClick,
+  tone = "default",
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  tone?: "default" | "amber" | "red";
+  children: React.ReactNode;
+}) {
+  const activeCls =
+    tone === "red"
+      ? "border-red/40 bg-red/10 text-red"
+      : tone === "amber"
+        ? "border-amber/40 bg-amber/10 text-amber"
+        : "border-gold/40 bg-gold-dim text-gold-light";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-8 items-center rounded-md border px-2.5 text-[12px] font-medium transition-colors",
+        active ? activeCls : "border-border bg-elevated text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 /**
  * Invoices and supplier bills (B4).
  *
