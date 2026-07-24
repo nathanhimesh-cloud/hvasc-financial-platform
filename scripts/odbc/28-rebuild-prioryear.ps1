@@ -196,7 +196,7 @@ function Build-Month([int]$M) {
   }
 
   $snapshot = [ordered]@{
-    period = [ordered]@{ label = $label; fyLabel = $pyFyLabel; monthOfYear = $M; monthsInYear = 12; live = $true; comparisonLabel = 'Budget' }
+    period = [ordered]@{ label = $label; fyLabel = $pyFyLabel; monthOfYear = $M; monthsInYear = 12; live = $false; comparisonLabel = 'Budget' }
     departments = $departments
     grants = $grants
     revenueLines = $revenueLines
