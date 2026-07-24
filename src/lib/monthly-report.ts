@@ -154,7 +154,9 @@ export function buildMonthlyReport(
       linesLabel: "Department performance",
       grants: grantSummary(grantFigs),
       grantRows: grantFigs.filter((g) => g.entry.active).slice(0, 12),
-      cash: cashBreakdown(snapshot, grantFigs),
+      // Null when there's no balance sheet (archived P&L-only period) so Section 5
+      // disappears rather than showing $0 cash and a negative runway.
+      cash: (() => { const cb = cashBreakdown(snapshot, grantFigs); return cb.available ? cb : null; })(),
       integrity: assessIntegrity(snapshot),
       prior,
       notes,

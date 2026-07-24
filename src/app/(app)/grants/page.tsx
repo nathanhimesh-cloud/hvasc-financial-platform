@@ -62,6 +62,7 @@ export default async function GrantsPage({
           screen space every day in between.
         */
         actions={
+          !mayDraft ? undefined : (
           <ReferenceUploadButton
             kind="grant-register"
             label="Update register"
@@ -73,6 +74,7 @@ export default async function GrantsPage({
                 : `${GRANT_REGISTER.grants.length} grants · ${GRANT_REGISTER.source}`
             }
           />
+          )
         }
         notes={
           <>

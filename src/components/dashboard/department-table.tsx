@@ -38,7 +38,10 @@ export function DepartmentTable({
   // positive (unmapped expenses), but it can be negative (contra/adjustment accounts).
   const showUnassigned = reconcile && Math.abs(unassigned) >= 1;
   const totalActual = reconcile ? (totalExpenses as number) : sumYtdActual;
-  const totalVariance = sumYtdBudget - totalActual;
+  // Variance foots to the visible per-department variance cells (each is
+  // ytdBudget − ytdActual). Unassigned expenses have no budget, so they're not
+  // part of a budget variance — kept out of this total, and out of "% Spent".
+  const totalVariance = sumYtdBudget - sumYtdActual;
 
   return (
     <Panel>
@@ -160,7 +163,7 @@ export function DepartmentTable({
               <TotalCell>{formatCurrency(totalActual)}</TotalCell>
               <TotalCell>{formatCurrency(sumYtdBudget)}</TotalCell>
               <TotalCell tone={totalVariance >= 0 ? "pos" : "neg"}>{formatSignedCompact(totalVariance)}</TotalCell>
-              <TotalCell muted>{sumYtdBudget > 0 ? formatPercent(totalActual / sumYtdBudget) : "—"}</TotalCell>
+              <TotalCell muted>{sumAnnual > 0 ? formatPercent(totalActual / sumAnnual) : "—"}</TotalCell>
               <td className="border-t border-[rgba(255,255,255,0.16)] px-3.5 py-3.5" />
               <td className="border-t border-[rgba(255,255,255,0.16)] px-3.5 py-3.5" />
             </tr>

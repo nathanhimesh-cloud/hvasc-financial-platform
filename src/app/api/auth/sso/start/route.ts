@@ -16,8 +16,9 @@ export async function GET(request: Request) {
   const origin = originOf(request);
 
   const cfg = ssoConfig();
-  if (!cfg) {
-    // SSO isn't configured on this deployment — send them back to the password form.
+  // SSO needs AUTH_SECRET too (to sign the state cookie). Without it, createSsoState
+  // throws — so treat it as unconfigured and send them back rather than 500.
+  if (!cfg || !process.env.AUTH_SECRET) {
     return Response.redirect(`${origin}/login?sso=unconfigured`, 302);
   }
 

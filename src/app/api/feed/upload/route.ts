@@ -39,6 +39,12 @@ export async function POST(request: Request) {
     if (given !== required) {
       return Response.json({ ok: false, error: "Invalid upload password." }, { status: 401 });
     }
+  } else if (process.env.NODE_ENV === "production") {
+    // Fail closed in production — this route can replace the whole snapshot.
+    return Response.json(
+      { ok: false, error: "UPLOAD_PASSWORD is not configured on this deployment." },
+      { status: 503 },
+    );
   }
 
   const files = form.getAll("files").filter((f): f is File => f instanceof File);

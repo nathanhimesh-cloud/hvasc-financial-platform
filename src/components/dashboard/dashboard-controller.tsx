@@ -265,7 +265,12 @@ export function DashboardController({
     { key: "disaster-funding", label: "Disaster Recovery", value: grantMix.disaster.totalGrantIncome, format: "compact", color: "amber", icon: "life-buoy", meta: `${grantMix.disaster.count} grants · QRA / NDRRA` },
   ];
   const byKey = new Map(catalog.map((m) => [m.key, m]));
-  const shownStats = cfg.stats.map((k) => byKey.get(k)).filter((m): m is Metric => !!m);
+  // Cash KPIs need a balance sheet. On an archived P&L-only period there's none, so
+  // drop them rather than show $0 / 0.0 months (they stay in the customize catalog).
+  const CASH_KEYS = new Set(["restricted-cash", "unrestricted-cash", "cash-cover"]);
+  const shownStats = cfg.stats
+    .map((k) => byKey.get(k))
+    .filter((m): m is Metric => !!m && (cash.available || !CASH_KEYS.has(m.key)));
 
   // ── Widget nodes (filtered) ─────────────────────────────────────────────────
   const allocation = depts.map((d) => ({ department: d, share: totalBudget > 0 ? d.annualBudget / totalBudget : 0 }));

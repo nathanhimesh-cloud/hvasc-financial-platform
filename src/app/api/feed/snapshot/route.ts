@@ -98,8 +98,16 @@ export async function PUT(request: Request) {
     if (given !== required) {
       return Response.json({ ok: false, error: "Invalid upload password." }, { status: 401 });
     }
+  } else if (process.env.NODE_ENV === "production") {
+    // FAIL CLOSED in production. This route replaces every figure on the dashboard,
+    // so an unset password can't mean "let anyone in" — that would undercut the
+    // "GL figures are read-only for everyone" control. Dev stays open for testing.
+    return Response.json(
+      { ok: false, error: "UPLOAD_PASSWORD is not configured on this deployment." },
+      { status: 503 },
+    );
   } else {
-    console.warn("[feed/snapshot] UPLOAD_PASSWORD is not set; accepting unauthenticated push.");
+    console.warn("[feed/snapshot] UPLOAD_PASSWORD is not set; accepting unauthenticated push (dev only).");
   }
 
   if (!looksLikeSnapshot(snapshot)) {
@@ -163,35 +171,44 @@ export async function PUT(request: Request) {
   // Best-effort: a history failure must never fail the push.
   const archived = await saveSnapshot(persisted);
 
-  // One row per push. This is what "last updated" reads, and what tells you
-  // whether the ledger accepted the batch — the push script holds its cursor
-  // back when it didn't.
-  const meta = snapshot.meta as { generatedAtUtc?: string; maxKy?: number; source?: string } | undefined;
-  await recordSync({
-    generatedAt: meta?.generatedAtUtc ?? null,
-    fyLabel: snapshot.period?.fyLabel ?? null,
-    periodMonth: snapshot.period?.monthOfYear ?? null,
-    periodLabel: snapshot.period?.label ?? null,
-    txnsSent: incoming.length,
-    txnsIngested: ingested,
-    archived,
-    store: storeKind(),
-    maxKy: meta?.maxKy ?? null,
-    source: meta?.source ?? null,
-  });
-
   /*
-    A4b — RUN THE ACCURACY CHECKS AND RECORD THE VERDICT, EVERY TIME.
+    SYNC LOG AND INTEGRITY LOG ARE FOR LIVE SYNCS ONLY — NOT ARCHIVE BACKFILLS.
 
-    This runs the same checks the Reports page runs, at the moment the data lands,
-    and appends the result to an immutable log. It answers the question A4 could not:
-    not "is today's report trustworthy?" but "has it ever not been?" — which is what
-    an auditor asks, and what nobody could answer while each sync overwrote the last.
+    A backfilled prior-year period (?mode=archive) is not "the latest sync", so it
+    must not:
+      - become the "last updated" indicator (recordSync → lastSync), which would
+        show a prior-year month until the next live sync, and
+      - write an integrity row. A rebuilt archive carries no balance sheet, so all
+        six checks return "not-checked" → status "partial" → logged as passed=true.
+        That is a FALSE clean run in an append-only, auditor-facing log, and it
+        inflates the "clean streak". Only real syncs get an integrity verdict.
 
-    Best-effort, deliberately. A failure to WRITE the audit row must never reject a
-    good snapshot; the ledger arriving matters more than the note that it arrived.
+    The period is still archived to `snapshots` above (saveSnapshot) — that's the
+    whole point of the backfill — it just doesn't touch the live-health logs.
   */
-  await recordIntegrity(snapshot, assessIntegrity(snapshot));
+  if (!archiveOnly) {
+    // One row per push. This is what "last updated" reads, and what tells you
+    // whether the ledger accepted the batch — the push script holds its cursor
+    // back when it didn't.
+    const meta = snapshot.meta as { generatedAtUtc?: string; maxKy?: number; source?: string } | undefined;
+    await recordSync({
+      generatedAt: meta?.generatedAtUtc ?? null,
+      fyLabel: snapshot.period?.fyLabel ?? null,
+      periodMonth: snapshot.period?.monthOfYear ?? null,
+      periodLabel: snapshot.period?.label ?? null,
+      txnsSent: incoming.length,
+      txnsIngested: ingested,
+      archived,
+      store: storeKind(),
+      maxKy: meta?.maxKy ?? null,
+      source: meta?.source ?? null,
+    });
+
+    // A4b — run the accuracy checks at the moment the data lands and append the
+    // result to the immutable log, so an auditor can ask "has it ever not been
+    // trustworthy?" — not just "is today's report".
+    await recordIntegrity(snapshot, assessIntegrity(snapshot));
+  }
 
   clearSnapshotCache();
   revalidateTag("snapshot", "max");

@@ -39,6 +39,13 @@ export const MIN_MONTHS_COVER = 4;
 const CASH_LINE = /cash|bank|qtc|maxi[\s-]?direct/i;
 
 export interface CashBreakdown {
+  /**
+   * False when there's no cash data at all — e.g. a prior-year period rebuilt from
+   * the P&L only, which carries no balance sheet. Consumers should show "not
+   * available" rather than a $0 / negative figure. When false, the dollar fields
+   * are zeroed and monthsCover is null so nothing downstream shows nonsense.
+   */
+  available: boolean;
   totalCash: number;
   /** Known restricted cash. A LOWER bound — see `unmeasured`. */
   restrictedCash: number;
@@ -102,6 +109,26 @@ function monthlyOpexOf(snapshot: FinancialSnapshot): number {
 
 export function cashBreakdown(snapshot: FinancialSnapshot, grants: GrantFigures[]): CashBreakdown {
   const { total, lines } = totalCash(snapshot);
+
+  // No cash/bank lines means no balance sheet (a P&L-only archived period). Return a
+  // clean "unavailable" state — NOT $0 with a negative runway. Restricted cash comes
+  // from the grant register even here, so "unrestricted = 0 − restricted" would go
+  // negative and every downstream consumer would show nonsense. Zero it all out.
+  if (lines.length === 0) {
+    return {
+      available: false,
+      totalCash: 0,
+      restrictedCash: 0,
+      unrestrictedCash: 0,
+      monthlyOpex: 0,
+      monthsCover: null,
+      belowMinimum: false,
+      exact: false,
+      unmeasured: { missingOpeningBalance: 0, missingJobCodes: 0, count: 0 },
+      cashLines: [],
+    };
+  }
+
   const restrictedGrants = grants.filter((g) => g.entry.active && g.entry.restricted);
 
   // Unspent money on restricted grants is not the Council's to spend freely.
@@ -119,6 +146,7 @@ export function cashBreakdown(snapshot: FinancialSnapshot, grants: GrantFigures[
   const monthsCover = monthlyOpex > 0 ? unrestrictedCash / monthlyOpex : null;
 
   return {
+    available: true,
     totalCash: total,
     restrictedCash,
     unrestrictedCash,

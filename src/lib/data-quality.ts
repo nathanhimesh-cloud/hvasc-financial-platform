@@ -73,7 +73,8 @@ export function dashboardIssues(
     });
   }
 
-  if (!cash.exact) {
+  // Only when a cash figure is actually shown — not on archived P&L-only periods.
+  if (cash.available && !cash.exact) {
     issues.push({
       id: "restricted-cash-bounds",
       level: "warn",

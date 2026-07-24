@@ -17,8 +17,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Content, Panel, PanelHeader, SectionLabel, PageIntro } from "@/components/kit/panel";
+import { getSession } from "@/lib/auth/session";
+import { can, type Capability } from "@/lib/auth/roles";
 
 export const metadata = { title: "Help Centre" };
+
+/** Which capability each Data Tool link needs; absent = visible to everyone. */
+const TOOL_CAP: Record<string, Capability> = {
+  "/mapping": "mapping.edit",
+  "/audit": "audit.view",
+};
 
 /**
  * The manual.
@@ -274,7 +282,12 @@ const FAQS: { q: string; a: string }[] = [
   },
 ];
 
-export default function SupportPage() {
+export default async function SupportPage() {
+  // Only show a Data Tool card the current role can actually open — otherwise a
+  // read-only user clicks "Account Mapping" / "Audit Log" and hits "Page not found".
+  const session = await getSession();
+  const tools = TOOLS.filter((t) => !TOOL_CAP[t.href] || can(session?.role, TOOL_CAP[t.href]));
+
   return (
     <Content className="max-w-4xl">
       <PageIntro>
@@ -310,7 +323,7 @@ export default function SupportPage() {
 
       <SectionLabel hint="found under Settings">Data tools</SectionLabel>
       <div className="mb-8 flex flex-col gap-3">
-        {TOOLS.map((p) => (
+        {tools.map((p) => (
           <PageCard key={p.href} doc={p} />
         ))}
       </div>
