@@ -108,7 +108,7 @@ export default async function StatusPage() {
                     <th
                       key={h}
                       className={cn(
-                        "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#dce8f0]",
+                        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
                         i >= 3 && i <= 4 ? "text-right" : "text-left",
                       )}
                     >
@@ -121,17 +121,17 @@ export default async function StatusPage() {
                 {syncs.map((s) => {
                   const lost = s.txnsSent > 0 && s.txnsIngested < s.txnsSent;
                   return (
-                    <tr key={s.id} className="hover:bg-[rgba(255,255,255,0.03)]">
+                    <tr key={s.id} className="hover:bg-[var(--hairline-hover)]">
                       <Td>{fmt(s.receivedAt)}</Td>
                       <Td muted>{fmt(s.generatedAt)}</Td>
                       <Td>{s.periodLabel ?? "—"}</Td>
                       <Td right>{s.txnsSent.toLocaleString()}</Td>
-                      <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2 text-right">
+                      <td className="border-b border-[var(--hairline-soft)] px-3 py-2 text-right">
                         <span className={cn("font-mono text-[12px] tabular-nums", lost ? "text-amber" : "text-foreground")}>
                           {s.txnsIngested.toLocaleString()}
                         </span>
                       </td>
-                      <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2">
+                      <td className="border-b border-[var(--hairline-soft)] px-3 py-2">
                         {s.archived ? (
                           <CheckCircle2 className="h-3.5 w-3.5 text-green" strokeWidth={2} />
                         ) : (
@@ -179,7 +179,7 @@ function Td({ children, muted, right }: { children: React.ReactNode; muted?: boo
   return (
     <td
       className={cn(
-        "whitespace-nowrap border-b border-[rgba(255,255,255,0.04)] px-3 py-2 font-mono text-[12px] tabular-nums",
+        "whitespace-nowrap border-b border-[var(--hairline-soft)] px-3 py-2 font-mono text-[12px] tabular-nums",
         right && "text-right",
         muted ? "text-muted-foreground" : "text-foreground",
       )}

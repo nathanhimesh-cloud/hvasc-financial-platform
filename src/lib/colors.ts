@@ -53,16 +53,21 @@ export const accentBar: Record<BrandColor, string> = {
   gold: "before:bg-gradient-to-r before:from-gold-light before:to-transparent",
 };
 
-/** Inline style hex for SVG fills / widths where a class won't do. */
+/**
+ * Accent colours for SVG fills / inline widths where a Tailwind class won't do.
+ * These reference the per-theme CSS variables (see globals.css), so charts
+ * re-colour with the selected theme — CSS vars resolve in both inline `style`
+ * and SVG `fill`/`stroke` attributes (the app already relies on the latter).
+ */
 export const hex: Record<BrandColor, string> = {
-  teal: "#3dd6c8",
-  blue: "#6aaeff",
-  indigo: "#8593f0",
-  violet: "#b58af0",
-  amber: "#f5a830",
-  red: "#ff6060",
-  green: "#50d890",
-  gold: "#d4a84c",
+  teal: "var(--teal)",
+  blue: "var(--blue)",
+  indigo: "var(--indigo)",
+  violet: "var(--violet)",
+  amber: "var(--amber)",
+  red: "var(--red)",
+  green: "var(--green)",
+  gold: "var(--gold)",
 };
 
 export const statusToColor: Record<DepartmentStatus, BrandColor> = {

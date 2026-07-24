@@ -89,7 +89,7 @@ export function MonthlyReportView({ report }: { report: MonthlyReport }) {
             </thead>
             <tbody>
               {report.lines.map((l) => (
-                <tr key={l.label} className="border-b border-[rgba(255,255,255,0.05)]">
+                <tr key={l.label} className="border-b border-[var(--hairline-soft)]">
                   <td className="py-2 pr-3 text-foreground">{l.label}</td>
                   {report.scope === "consolidated" && <Money v={l.budget} />}
                   {report.scope === "consolidated" && (
@@ -144,7 +144,7 @@ export function MonthlyReportView({ report }: { report: MonthlyReport }) {
             </thead>
             <tbody>
               {report.grantRows.map((g) => (
-                <tr key={g.entry.id} className="border-b border-[rgba(255,255,255,0.05)]">
+                <tr key={g.entry.id} className="border-b border-[var(--hairline-soft)]">
                   <td className="py-2 pr-3 text-foreground">{g.entry.name}</td>
                   <Money v={g.totalGrantIncome} />
                   <Money v={g.incomeToDate} muted />
@@ -246,7 +246,7 @@ function Stat({ label, value, tone, sub }: { label: string; value: string; tone?
 
 function Row({ label, value, strong, muted, tone, note }: { label: string; value: string; strong?: boolean; muted?: boolean; tone?: "pos" | "neg"; note?: string }) {
   return (
-    <tr className="border-b border-[rgba(255,255,255,0.05)]">
+    <tr className="border-b border-[var(--hairline-soft)]">
       <td className="py-2 pr-3 text-muted-foreground">{label}</td>
       <td className={cn("py-2 pl-3 text-right font-mono tabular-nums", strong && "font-semibold text-foreground", tone === "pos" && "text-green", tone === "neg" && "text-red", !strong && !tone && (muted ? "text-muted-foreground" : "text-foreground"))}>
         {value}

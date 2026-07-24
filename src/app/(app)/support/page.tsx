@@ -353,7 +353,7 @@ export default async function SupportPage() {
         </p>
         <Link
           href="/account"
-          className="mt-4 inline-flex items-center gap-2 rounded-md border border-border bg-elevated px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:border-[rgba(255,255,255,0.2)]"
+          className="mt-4 inline-flex items-center gap-2 rounded-md border border-border bg-elevated px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:border-[var(--hairline)]"
         >
           <Settings className="h-4 w-4" strokeWidth={1.75} />
           Settings &amp; data tools

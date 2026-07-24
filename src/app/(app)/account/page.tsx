@@ -7,6 +7,7 @@ import { Content, Panel, PanelHeader } from "@/components/kit/panel";
 import { lastSync } from "@/lib/sync-log";
 import { getMfa } from "@/lib/auth/db";
 import { MfaSetup } from "@/components/users/mfa-setup";
+import { ThemeSelector } from "@/components/kit/theme-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +98,20 @@ export default async function AccountPage() {
           </ul>
         </Panel>
       )}
+
+      {/*
+        Appearance. A personal, client-only preference — it changes which set of CSS
+        variables the whole dashboard (charts included) paints with, and nothing else.
+        Stored in the browser, so it follows the person and never the figures.
+      */}
+      <Panel className="mb-4">
+        <PanelHeader title="Appearance" subtitle="Theme — applies to charts too" />
+        <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
+          Choose how the dashboard looks. Your choice is saved in this browser and applies
+          everywhere, including every chart. It has no effect on the figures.
+        </p>
+        <ThemeSelector />
+      </Panel>
 
       <Panel className="mb-4">
         <PanelHeader title="Data" subtitle="Where the figures come from" />
@@ -251,7 +266,7 @@ export default async function AccountPage() {
           <div className="flex flex-wrap gap-2.5">
             <Link
               href="/change-password"
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-elevated px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:border-[rgba(255,255,255,0.2)]"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-elevated px-3 py-2 text-[13px] font-medium text-foreground transition-colors hover:border-[var(--hairline)]"
             >
               <KeyRound className="h-4 w-4" strokeWidth={1.75} />
               Change password
@@ -311,7 +326,7 @@ function ToolLink({
       href={href}
       className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0"
     >
-      <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border bg-elevated text-muted-foreground transition-colors group-hover:border-[rgba(255,255,255,0.2)] group-hover:text-foreground">
+      <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border bg-elevated text-muted-foreground transition-colors group-hover:border-[var(--hairline)] group-hover:text-foreground">
         <Icon className="h-4 w-4" strokeWidth={1.75} />
       </span>
       <span className="min-w-0 flex-1">

@@ -48,7 +48,7 @@ export function ExportButton<T>({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="no-print inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-elevated px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:border-[rgba(255,255,255,0.2)] hover:text-foreground"
+        className="no-print inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-elevated px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:border-[var(--hairline)] hover:text-foreground"
       >
         <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
         Export

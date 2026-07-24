@@ -32,7 +32,7 @@ export default async function AuditPage() {
                   {["When", "User", "Action", "Detail"].map((h) => (
                     <th
                       key={h}
-                      className="border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#dce8f0]"
+                      className="border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]"
                     >
                       {h}
                     </th>
@@ -41,20 +41,20 @@ export default async function AuditPage() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-[rgba(255,255,255,0.03)]">
-                    <td className="whitespace-nowrap border-b border-[rgba(255,255,255,0.04)] px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                  <tr key={r.id} className="hover:bg-[var(--hairline-hover)]">
+                    <td className="whitespace-nowrap border-b border-[var(--hairline-soft)] px-3 py-2 font-mono text-[11px] text-muted-foreground">
                       {new Date(r.createdAt).toISOString().replace("T", " ").slice(0, 19)}
                     </td>
-                    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2 text-[13px] text-foreground">
+                    <td className="border-b border-[var(--hairline-soft)] px-3 py-2 text-[13px] text-foreground">
                       {r.username ?? "—"}
                     </td>
-                    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2">
+                    <td className="border-b border-[var(--hairline-soft)] px-3 py-2">
                       <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-foreground">
                         <ShieldCheck className="h-3 w-3 text-muted-foreground" strokeWidth={2} />
                         {r.action}
                       </span>
                     </td>
-                    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2 text-[12px] text-muted-foreground">
+                    <td className="border-b border-[var(--hairline-soft)] px-3 py-2 text-[12px] text-muted-foreground">
                       {r.detail || "—"}
                     </td>
                   </tr>

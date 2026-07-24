@@ -30,10 +30,14 @@ export function MfaSetup({ enabled }: { enabled: boolean }) {
       setQr("");
       return;
     }
+    // Draw the QR in the theme's foreground colour so the modules always contrast
+    // the card — a fixed light-grey would vanish on the Power BI light theme.
+    const fg =
+      getComputedStyle(document.documentElement).getPropertyValue("--foreground").trim() || "#e8e8e8";
     void QRCode.toDataURL(live.uri, {
       width: 200,
       margin: 1,
-      color: { dark: "#e8e8e8", light: "#00000000" },
+      color: { dark: fg, light: "#00000000" },
     }).then(setQr);
   }, [live?.uri]);
 
@@ -189,7 +193,7 @@ export function MfaSetup({ enabled }: { enabled: boolean }) {
       <button
         type="button"
         onClick={() => void beginMfa().then(setSetup)}
-        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-3 py-2 text-[12px] font-medium text-foreground transition-colors hover:border-[rgba(255,255,255,0.2)]"
+        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-3 py-2 text-[12px] font-medium text-foreground transition-colors hover:border-[var(--hairline)]"
       >
         <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
         Set up

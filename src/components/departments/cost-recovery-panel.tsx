@@ -82,7 +82,7 @@ export function CostRecoveryPanel({ recovery }: { recovery: CostRecovery }) {
                 ) : (
                   <Link
                     href={`/departments/${r.slug}`}
-                    className="block rounded-md border border-border bg-elevated/30 px-3 py-2.5 transition-colors hover:border-[rgba(255,255,255,0.18)]"
+                    className="block rounded-md border border-border bg-elevated/30 px-3 py-2.5 transition-colors hover:border-[var(--hairline)]"
                   >
                     <div className="flex items-center gap-2.5">
                       <span className={cn("flex h-7 w-7 items-center justify-center rounded-md", bgDim[r.color])}>

@@ -151,8 +151,8 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
             </thead>
             <tbody>
               {rows.map((f) => (
-                <tr key={f.entry.id} className="hover:bg-[rgba(255,255,255,0.03)]">
-                  <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5">
+                <tr key={f.entry.id} className="hover:bg-[var(--hairline-hover)]">
+                  <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5">
                     <div className="flex items-start gap-2">
                       {f.entry.restricted ? (
                         <Lock className="mt-0.5 h-3 w-3 flex-shrink-0 text-amber" strokeWidth={2} />
@@ -194,7 +194,7 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
                   <Money v={f.currentExpense} />
                   <Money v={f.expenseToDate} />
                   <Money v={f.expenseRemaining} tone={f.expenseRemaining < 0 ? "bad" : undefined} />
-                  <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right">
+                  <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 text-right">
                     <span
                       className={cn(
                         "font-mono text-[12px] font-semibold tabular-nums",
@@ -204,7 +204,7 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
                       {f.budgetedExpense > 0 ? formatPercent(f.utilisation) : "—"}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 font-mono text-[11px] text-muted-foreground">
+                  <td className="whitespace-nowrap border-b border-[var(--hairline-soft)] px-3 py-2.5 font-mono text-[11px] text-muted-foreground">
                     {f.entry.startDate || "—"} → {f.entry.endDate || "—"}
                   </td>
                 </tr>
@@ -255,7 +255,7 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
   return (
     <th
       className={cn(
-        "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#dce8f0]",
+        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
         className,
       )}
     >
@@ -266,7 +266,7 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
 
 function Money({ v, strong, muted, tone }: { v: number; strong?: boolean; muted?: boolean; tone?: "warn" | "bad" }) {
   return (
-    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right">
+    <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 text-right">
       <span
         className={cn(
           "font-mono text-[12px] tabular-nums",

@@ -278,7 +278,7 @@ export function TransactionsView({
                     <th
                       key={h}
                       className={cn(
-                        "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#dce8f0]",
+                        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
                         i >= 4 ? "text-right" : "text-left",
                       )}
                     >
@@ -289,13 +289,13 @@ export function TransactionsView({
               </thead>
               <tbody>
                 {shown.map((t, i) => (
-                  <tr key={i} className="hover:bg-[rgba(255,255,255,0.03)]">
-                    <td className="whitespace-nowrap border-b border-[rgba(255,255,255,0.04)] px-3 py-2 font-mono text-[12px] text-muted-foreground">{t.date}</td>
-                    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2 text-[13px] text-foreground">
+                  <tr key={i} className="hover:bg-[var(--hairline-hover)]">
+                    <td className="whitespace-nowrap border-b border-[var(--hairline-soft)] px-3 py-2 font-mono text-[12px] text-muted-foreground">{t.date}</td>
+                    <td className="border-b border-[var(--hairline-soft)] px-3 py-2 text-[13px] text-foreground">
                       <span className="font-mono text-[11px] text-muted-foreground">{t.code}</span> {t.account}
                     </td>
-                    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2 text-[13px] text-foreground">{t.description}</td>
-                    <td className="whitespace-nowrap border-b border-[rgba(255,255,255,0.04)] px-3 py-2 font-mono text-[11px] text-muted-foreground">{t.ref}</td>
+                    <td className="border-b border-[var(--hairline-soft)] px-3 py-2 text-[13px] text-foreground">{t.description}</td>
+                    <td className="whitespace-nowrap border-b border-[var(--hairline-soft)] px-3 py-2 font-mono text-[11px] text-muted-foreground">{t.ref}</td>
                     <Amt value={t.debit} />
                     <Amt value={t.credit} />
                   </tr>
@@ -349,7 +349,7 @@ function DateField({ label, value, onChange }: { label: string; value: string; o
 
 function Amt({ value, bold }: { value: number; bold?: boolean }) {
   return (
-    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2 text-right">
+    <td className="border-b border-[var(--hairline-soft)] px-3 py-2 text-right">
       <span className={cn("font-mono text-[12px] tabular-nums", bold ? "font-semibold text-foreground" : value ? "text-foreground" : "text-muted-foreground")}>
         {value ? formatCurrency(value) : "—"}
       </span>

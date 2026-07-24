@@ -236,7 +236,7 @@ function IconBtn({
       disabled={disabled}
       className={cn(
         "flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors",
-        "hover:border-[rgba(255,255,255,0.2)] hover:bg-elevated hover:text-foreground",
+        "hover:border-[var(--hairline)] hover:bg-elevated hover:text-foreground",
         "disabled:cursor-not-allowed disabled:opacity-40",
         tone === "bad" && "hover:border-red/40 hover:text-red",
         tone === "good" && "hover:border-green/40 hover:text-green",

@@ -500,7 +500,7 @@ export function ReportsView({
                       <th
                         key={i}
                         className={cn(
-                          "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3.5 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[#dce8f0]",
+                          "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3.5 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--th-fg)]",
                           h.align === "right" ? "text-right" : "text-left",
                         )}
                       >
@@ -511,8 +511,8 @@ export function ReportsView({
                 </thead>
                 <tbody>
                   {deptRows.map((d) => (
-                    <tr key={d.id} className="hover:bg-[rgba(255,255,255,0.03)]">
-                      <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3 text-[13px]">
+                    <tr key={d.id} className="hover:bg-[var(--hairline-hover)]">
+                      <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3 text-[13px]">
                         <div className="flex items-center gap-2.5 font-medium text-foreground">
                           <span className={cn("flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-border", bgDim[d.color])}>
                             <DeptIcon name={d.icon} className={cn("h-3.5 w-3.5", textColor[d.color])} />
@@ -523,7 +523,7 @@ export function ReportsView({
                       <Num>{formatCurrency(d.actual)}</Num>
                       <Num muted>{formatCurrency(d.comparison)}</Num>
                       <Num tone={d.variance >= 0 ? "pos" : "neg"}>{formatSignedCompact(d.variance)}</Num>
-                      <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3 text-right">
+                      <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3 text-right">
                         <span className={cn("font-mono text-[13px] font-bold tabular-nums", ragText[budgetRag(d.pct)])}>
                           {formatPercent(d.pct)}
                         </span>
@@ -537,8 +537,8 @@ export function ReportsView({
                     const deptActualSum = deptRows.reduce((a, d) => a + d.actual, 0);
                     const unassigned = figures.totalExpenses - deptActualSum;
                     return Math.abs(unassigned) >= 1 ? (
-                      <tr className="hover:bg-[rgba(255,255,255,0.03)]">
-                        <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3 text-[13px]">
+                      <tr className="hover:bg-[var(--hairline-hover)]">
+                        <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3 text-[13px]">
                           <span className="flex items-center gap-2.5 text-muted-foreground">
                             <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-border text-[11px]">
                               —
@@ -759,7 +759,7 @@ function StatementBlock({
 
 function GrandTotal({ label, value }: { label: string; value: number }) {
   return (
-    <div className="mt-3 flex items-center justify-between border-t-2 border-[rgba(255,255,255,0.16)] pt-3">
+    <div className="mt-3 flex items-center justify-between border-t-2 border-[var(--hairline)] pt-3">
       <span className="text-[14px] font-semibold text-foreground">{label}</span>
       <span className="font-mono text-[15px] font-semibold tabular-nums text-foreground">{formatCurrency(value)}</span>
     </div>
@@ -977,7 +977,7 @@ function Num({
   muted?: boolean;
 }) {
   return (
-    <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3 text-right">
+    <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3 text-right">
       <span
         className={cn(
           "font-mono text-[13px] tabular-nums",

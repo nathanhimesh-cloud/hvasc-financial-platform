@@ -52,31 +52,36 @@
   --color-elevated: var(--elevated);
   --color-card-hover: var(--card-hover);
 
-  /* secondary body text */
-  --color-subtle: #8f8f8f;
+  /* Accents are now driven by per-theme variables (see :root and [data-theme]),
+     so switching theme re-colours both Tailwind classes AND the charts (colors.ts
+     hex references these same vars). */
+  --color-subtle: var(--subtle);
 
-  /* brand accent (used sparingly: active state, focus) */
-  --color-gold: #e0b252;
-  --color-gold-light: #f0d070;
-  --color-gold-dim: rgba(224, 178, 82, 0.12);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-gold-dim: var(--gold-dim);
 
-  /* category palette — department identity (cool tones) */
-  --color-teal: #2dd4bf;
-  --color-teal-dim: rgba(45, 212, 191, 0.12);
-  --color-blue: #4f9dff;
-  --color-blue-dim: rgba(79, 157, 255, 0.12);
-  --color-indigo: #8b8bf0;
-  --color-violet: #b07cf0;
-  --color-violet-dim: rgba(176, 124, 240, 0.12);
-  --color-indigo-dim: rgba(139, 139, 240, 0.12);
+  --color-teal: var(--teal);
+  --color-teal-dim: var(--teal-dim);
+  --color-blue: var(--blue);
+  --color-blue-dim: var(--blue-dim);
+  --color-indigo: var(--indigo);
+  --color-indigo-dim: var(--indigo-dim);
+  --color-violet: var(--violet);
+  --color-violet-dim: var(--violet-dim);
 
-  /* status palette — RAG performance */
-  --color-green: #45d483;
-  --color-green-dim: rgba(69, 212, 131, 0.12);
-  --color-amber: #f5a623;
-  --color-amber-dim: rgba(245, 166, 35, 0.12);
-  --color-red: #f56565;
-  --color-red-dim: rgba(245, 101, 101, 0.12);
+  --color-green: var(--green);
+  --color-green-dim: var(--green-dim);
+  --color-amber: var(--amber);
+  --color-amber-dim: var(--amber-dim);
+  --color-red: var(--red);
+  --color-red-dim: var(--red-dim);
+
+  /* Hairline overlays + table header — themed so light mode isn't invisible. */
+  --color-hairline-soft: var(--hairline-soft);
+  --color-hairline: var(--hairline);
+  --color-hairline-hover: var(--hairline-hover);
+  --color-th-fg: var(--th-fg);
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -86,6 +91,7 @@
 
 :root {
   --radius: 10px;
+  color-scheme: dark;
 
   --background: #000000;
   --foreground: #ededed;
@@ -125,6 +131,120 @@
   --sidebar-accent-foreground: #ededed;
   --sidebar-border: rgba(255, 255, 255, 0.09);
   --sidebar-ring: rgba(224, 178, 82, 0.5);
+
+  /* Accents — Vantage dark (default). */
+  --subtle: #8f8f8f;
+  --gold: #e0b252;  --gold-light: #f0d070;  --gold-dim: rgba(224, 178, 82, 0.12);
+  --teal: #2dd4bf;  --teal-dim: rgba(45, 212, 191, 0.12);
+  --blue: #4f9dff;  --blue-dim: rgba(79, 157, 255, 0.12);
+  --indigo: #8b8bf0; --indigo-dim: rgba(139, 139, 240, 0.12);
+  --violet: #b07cf0; --violet-dim: rgba(176, 124, 240, 0.12);
+  --green: #45d483; --green-dim: rgba(69, 212, 131, 0.12);
+  --amber: #f5a623; --amber-dim: rgba(245, 166, 35, 0.12);
+  --red: #f56565;   --red-dim: rgba(245, 101, 101, 0.12);
+
+  /* Hairlines + table-header text (light-on-dark by default). */
+  --hairline-soft: rgba(255, 255, 255, 0.04);
+  --hairline: rgba(255, 255, 255, 0.16);
+  --hairline-hover: rgba(255, 255, 255, 0.03);
+  --th-fg: #dce8f0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   POWER BI — LIGHT.  Light-grey page, white cards, Segoe-style type, the classic
+   Power BI accent palette (tuned to read on white).
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme="pbi-light"] {
+  color-scheme: light;
+  --background: #f4f5f7;
+  --foreground: #252423;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-hover: #fafafa;
+  --elevated: #eef0f3;
+  --card-foreground: #252423;
+  --popover: #ffffff;
+  --popover-foreground: #252423;
+
+  --primary: #252423; --primary-foreground: #ffffff;
+  --secondary: #eef0f3; --secondary-foreground: #252423;
+  --muted: #eef0f3; --muted-foreground: #605e5c;
+  --accent: #eef0f3; --accent-foreground: #252423;
+  --destructive: #d13438;
+
+  --border: rgba(0, 0, 0, 0.10);
+  --input: rgba(0, 0, 0, 0.16);
+  --ring: rgba(1, 141, 255, 0.45);
+
+  --chart-1: #01b8aa; --chart-2: #118dff; --chart-3: #5f6bd0; --chart-4: #a66999; --chart-5: #c19100;
+
+  --sidebar: #ffffff; --sidebar-foreground: #605e5c;
+  --sidebar-primary: #252423; --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef0f3; --sidebar-accent-foreground: #252423;
+  --sidebar-border: rgba(0, 0, 0, 0.09); --sidebar-ring: rgba(1, 141, 255, 0.45);
+
+  --subtle: #605e5c;
+  --gold: #c19100;  --gold-light: #a67c00;  --gold-dim: rgba(193, 145, 0, 0.12);
+  --teal: #01998e;  --teal-dim: rgba(1, 153, 142, 0.12);
+  --blue: #118dff;  --blue-dim: rgba(17, 141, 255, 0.12);
+  --indigo: #5f6bd0; --indigo-dim: rgba(95, 107, 208, 0.12);
+  --violet: #a24f8e; --violet-dim: rgba(162, 79, 142, 0.12);
+  --green: #107c41; --green-dim: rgba(16, 124, 65, 0.12);
+  --amber: #b95000; --amber-dim: rgba(185, 80, 0, 0.12);
+  --red: #d13438;   --red-dim: rgba(209, 52, 56, 0.12);
+
+  --hairline-soft: rgba(0, 0, 0, 0.05);
+  --hairline: rgba(0, 0, 0, 0.13);
+  --hairline-hover: rgba(0, 0, 0, 0.035);
+  --th-fg: #605e5c;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   POWER BI — DARK.  Practical's dark report palette.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme="pbi-dark"] {
+  color-scheme: dark;
+  --background: #1b1a19;
+  --foreground: #f3f2f1;
+  --surface: #201f1e;
+  --card: #252423;
+  --card-hover: #2d2c2b;
+  --elevated: #323130;
+  --card-foreground: #f3f2f1;
+  --popover: #252423;
+  --popover-foreground: #f3f2f1;
+
+  --primary: #f3f2f1; --primary-foreground: #201f1e;
+  --secondary: #323130; --secondary-foreground: #f3f2f1;
+  --muted: #323130; --muted-foreground: #c8c6c4;
+  --accent: #323130; --accent-foreground: #f3f2f1;
+  --destructive: #fd625e;
+
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: rgba(1, 213, 196, 0.5);
+
+  --chart-1: #01d5c4; --chart-2: #4aa3ff; --chart-3: #8593f0; --chart-4: #c77fb5; --chart-5: #f2c811;
+
+  --sidebar: #201f1e; --sidebar-foreground: #c8c6c4;
+  --sidebar-primary: #f3f2f1; --sidebar-primary-foreground: #201f1e;
+  --sidebar-accent: #323130; --sidebar-accent-foreground: #f3f2f1;
+  --sidebar-border: rgba(255, 255, 255, 0.10); --sidebar-ring: rgba(1, 213, 196, 0.5);
+
+  --subtle: #a19f9d;
+  --gold: #f2c811;  --gold-light: #ffd94a;  --gold-dim: rgba(242, 200, 17, 0.14);
+  --teal: #01d5c4;  --teal-dim: rgba(1, 213, 196, 0.14);
+  --blue: #4aa3ff;  --blue-dim: rgba(74, 163, 255, 0.14);
+  --indigo: #8593f0; --indigo-dim: rgba(133, 147, 240, 0.14);
+  --violet: #c77fb5; --violet-dim: rgba(199, 127, 181, 0.14);
+  --green: #4ac26b; --green-dim: rgba(74, 194, 107, 0.14);
+  --amber: #f5a623; --amber-dim: rgba(245, 166, 35, 0.14);
+  --red: #fd625e;   --red-dim: rgba(253, 98, 94, 0.14);
+
+  --hairline-soft: rgba(255, 255, 255, 0.05);
+  --hairline: rgba(255, 255, 255, 0.14);
+  --hairline-hover: rgba(255, 255, 255, 0.04);
+  --th-fg: #c8c6c4;
 }
 
 @layer base {
@@ -147,11 +267,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #262626;
+    background: var(--hairline);
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #333333;
+    background: var(--input);
   }
 }
 

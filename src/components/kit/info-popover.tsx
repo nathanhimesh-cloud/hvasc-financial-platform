@@ -68,8 +68,8 @@ export function InfoPopover({
         aria-expanded={open}
         className={cn(
           "relative flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors",
-          "hover:border-[rgba(255,255,255,0.2)] hover:bg-elevated hover:text-foreground",
-          open && "border-[rgba(255,255,255,0.2)] bg-elevated text-foreground",
+          "hover:border-[var(--hairline)] hover:bg-elevated hover:text-foreground",
+          open && "border-[var(--hairline)] bg-elevated text-foreground",
           notable && !open && !failing && "border-gold/30 text-gold",
           failing && "border-red/50 bg-red/10 text-red",
         )}

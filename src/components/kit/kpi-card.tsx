@@ -24,7 +24,7 @@ export function KpiCard({ color, label, icon: Icon, value, meta, estimated, dela
       style={{ animationDelay: `${delay}ms` }}
       className={cn(
         "group relative overflow-hidden rounded-[var(--radius-lg)] border border-border bg-card px-5 pb-4 pt-5 transition-all duration-200",
-        "hover:-translate-y-0.5 hover:border-[rgba(255,255,255,0.16)] hover:bg-card-hover hover:shadow-lg hover:shadow-black/25",
+        "hover:-translate-y-0.5 hover:border-[var(--hairline)] hover:bg-card-hover hover:shadow-lg hover:shadow-black/25",
         "animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500 ease-out",
         "before:absolute before:left-0 before:right-0 before:top-0 before:h-px before:content-['']",
         accentBar[color],

@@ -21,13 +21,13 @@ export function ManagerCard({ department: d, period, priorYtd, priorLabel }: Pro
       ? "text-red"
       : d.status === "at-risk"
         ? "text-amber"
-        : "text-white";
+        : "text-foreground";
   const kindLabel =
     d.kind === "cost-revenue" ? "COST & REVENUE CENTRE" : "COST CENTRE";
   const ragColor = statusToColor[d.status];
 
   return (
-    <div className="relative overflow-hidden rounded-[var(--radius-lg)] border border-border bg-card p-5 transition-colors duration-200 hover:border-[rgba(255,255,255,0.16)]">
+    <div className="relative overflow-hidden rounded-[var(--radius-lg)] border border-border bg-card p-5 transition-colors duration-200 hover:border-[var(--hairline)]">
       {/* Header */}
       <div className="mb-5 flex items-center gap-3.5">
         <span className={cn("flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-border", bgDim[d.color])}>
@@ -85,9 +85,9 @@ export function ManagerCard({ department: d, period, priorYtd, priorLabel }: Pro
         {d.glLines.map((gl) => (
           <div
             key={gl.code}
-            className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.04)] bg-elevated px-3 py-[9px] text-xs transition-colors hover:border-[rgba(255,255,255,0.1)]"
+            className="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--hairline-soft)] bg-elevated px-3 py-[9px] text-xs transition-colors hover:border-[var(--hairline)]"
           >
-            <span className="mr-3 rounded bg-[rgba(255,255,255,0.07)] px-[7px] py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <span className="mr-3 rounded bg-[var(--hairline-soft)] px-[7px] py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
               {gl.code}
             </span>
             <span className="flex-1 font-medium text-foreground">{gl.account}</span>
@@ -125,7 +125,7 @@ export function ManagerCard({ department: d, period, priorYtd, priorLabel }: Pro
 function Metric({
   label,
   value,
-  tone = "text-white",
+  tone = "text-foreground",
   sub,
 }: {
   label: string;
@@ -134,8 +134,8 @@ function Metric({
   sub?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.05)] bg-elevated p-3">
-      <div className="mb-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#8aa0b8]">
+    <div className="rounded-[var(--radius-sm)] border border-[var(--hairline-soft)] bg-elevated p-3">
+      <div className="mb-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
         {label}
       </div>
       <div className={cn("font-heading text-[18px] font-extrabold tabular-nums tracking-[-0.02em]", tone)}>

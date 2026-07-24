@@ -116,7 +116,7 @@ export function BudgetVsActual({ data }: { data: BudgetReportData }) {
               {rows.map((r, i) => (
                 <Row key={`${r.type}-${r.node.code}-${i}`} row={r} />
               ))}
-              <tr className="border-t-2 border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] font-semibold">
+              <tr className="border-t-2 border-[var(--hairline)] bg-[var(--hairline-soft)] font-semibold">
                 <td className="px-3 py-3 text-[13px] text-foreground">TOTAL REVENUE &amp; EXPENDITURE</td>
                 <Money value={totals.revenueActual} />
                 <Money value={totals.revenueBudget} />
@@ -144,18 +144,18 @@ function Row({ row }: { row: RenderRow }) {
 
   if (row.type === "header") {
     return (
-      <tr className="bg-[rgba(255,255,255,0.02)]">
-        <td className="border-b border-[rgba(255,255,255,0.04)] py-2 text-[12px] font-semibold uppercase tracking-[0.04em] text-[#dce8f0]" style={{ paddingLeft: indent, paddingRight: 12 }}>
+      <tr className="bg-[var(--hairline-soft)]">
+        <td className="border-b border-[var(--hairline-soft)] py-2 text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--th-fg)]" style={{ paddingLeft: indent, paddingRight: 12 }}>
           {node.code} {node.label}
         </td>
-        <td colSpan={5} className="border-b border-[rgba(255,255,255,0.04)]" />
+        <td colSpan={5} className="border-b border-[var(--hairline-soft)]" />
       </tr>
     );
   }
 
   if (row.type === "subtotal") {
     return (
-      <tr className="border-y border-[rgba(255,255,255,0.08)] font-semibold">
+      <tr className="border-y border-[var(--hairline)] font-semibold">
         <td className="py-2 text-[12px] text-foreground" style={{ paddingLeft: indent, paddingRight: 12 }}>
           Total {node.label}
         </td>
@@ -170,8 +170,8 @@ function Row({ row }: { row: RenderRow }) {
 
   // Leaf account line
   return (
-    <tr className="hover:bg-[rgba(255,255,255,0.03)]">
-      <td className="border-b border-[rgba(255,255,255,0.04)] py-2 text-[13px] text-foreground" style={{ paddingLeft: indent, paddingRight: 12 }}>
+    <tr className="hover:bg-[var(--hairline-hover)]">
+      <td className="border-b border-[var(--hairline-soft)] py-2 text-[13px] text-foreground" style={{ paddingLeft: indent, paddingRight: 12 }}>
         <span className="font-mono text-[11px] text-muted-foreground">{node.code}</span> {node.label}
       </td>
       <Money value={node.revenueActual} muted zeroDash />
@@ -187,7 +187,7 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
   return (
     <th
       className={cn(
-        "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#dce8f0]",
+        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
         className,
       )}
     >
@@ -212,7 +212,7 @@ function Money({
   const isZero = Math.abs(value) < 0.005;
   const text = zeroDash && isZero ? "—" : signed ? formatSigned(value) : formatCurrency(value);
   return (
-    <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2 text-right">
+    <td className="border-b border-[var(--hairline-soft)] px-3 py-2 text-right">
       <span
         className={cn(
           "font-mono text-[12px] tabular-nums",

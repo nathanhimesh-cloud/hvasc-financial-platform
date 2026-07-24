@@ -38,7 +38,7 @@ export function GrantsTable({ grants, deptIcon, deptColor }: Props) {
                 <th
                   key={i}
                   className={cn(
-                    "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3.5 py-[11px] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dce8f0]",
+                    "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3.5 py-[11px] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--th-fg)]",
                     h.align === "right" && "text-right",
                     h.align === "center" && "text-center",
                     h.align === "left" && "text-left",
@@ -55,9 +55,9 @@ export function GrantsTable({ grants, deptIcon, deptColor }: Props) {
               const progress = g.total > 0 ? g.spent / g.total : 0;
               const color = deptColor[g.departmentId] ?? "teal";
               return (
-                <tr key={g.id} className="align-middle hover:bg-[rgba(255,255,255,0.025)]">
+                <tr key={g.id} className="align-middle hover:bg-[var(--hairline-soft)]">
                   <Cell>
-                    <div className="text-[13px] font-bold text-white">{g.name}</div>
+                    <div className="text-[13px] font-bold text-foreground">{g.name}</div>
                     <div className="mt-0.5 font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
                       {g.funder}
                     </div>
@@ -128,7 +128,7 @@ function Cell({
   return (
     <td
       className={cn(
-        "border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5 align-middle",
+        "border-b border-[var(--hairline-soft)] px-3.5 py-3.5 align-middle",
         className,
       )}
     >

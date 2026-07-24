@@ -187,8 +187,8 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
 function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolean; onToggle: () => void }) {
   return (
     <>
-      <tr className="cursor-pointer hover:bg-[rgba(255,255,255,0.03)]" onClick={onToggle}>
-        <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5">
+      <tr className="cursor-pointer hover:bg-[var(--hairline-hover)]" onClick={onToggle}>
+        <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5">
           <div className="flex items-start gap-2">
             <ChevronRight
               className={cn("mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-90")}
@@ -217,14 +217,14 @@ function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolea
         <Money v={g.budgetYtd} muted dash={!g.hasBudgetYtd} />
         <Money v={g.glActual} />
         <Money v={g.jobActual} muted />
-        <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right">
+        <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 text-right">
           <span className={cn("font-mono text-[12px] tabular-nums", g.variance < 0 ? "text-red" : "text-foreground")}>
             {g.hasBudget ? formatSignedCompact(g.variance) : "—"}
           </span>
         </td>
         {/* RAG against the budget TO DATE. Against the annual figure nothing is
             ever over budget until December, which would make the flag useless. */}
-        <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right">
+        <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 text-right">
           {g.hasBudgetYtd ? (
             <span
               className={cn("font-mono text-[12px] font-semibold tabular-nums", ragText[budgetRag(g.utilisationYtd)])}
@@ -238,15 +238,15 @@ function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolea
             </span>
           )}
         </td>
-        <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right font-mono text-[12px] tabular-nums text-muted-foreground">
+        <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 text-right font-mono text-[12px] tabular-nums text-muted-foreground">
           {g.jobs.length}
         </td>
       </tr>
 
       {isOpen &&
         g.jobs.map((j) => (
-          <tr key={j.code} className="bg-[rgba(255,255,255,0.015)]">
-            <td className="border-b border-[rgba(255,255,255,0.04)] py-2 pl-10 pr-3">
+          <tr key={j.code} className="bg-[var(--hairline-soft)]">
+            <td className="border-b border-[var(--hairline-soft)] py-2 pl-10 pr-3">
               <span className="flex flex-col">
                 <span className="text-[12px] text-foreground">{j.name || j.code}</span>
                 <span className="font-mono text-[10px] text-muted-foreground">
@@ -256,10 +256,10 @@ function FragmentRow({ g, isOpen, onToggle }: { g: JobBudgetView; isOpen: boolea
               </span>
             </td>
             <Money v={j.budget} muted dash={j.budget === 0} small />
-            <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2" />
-            <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2" />
+            <td className="border-b border-[var(--hairline-soft)] px-3 py-2" />
+            <td className="border-b border-[var(--hairline-soft)] px-3 py-2" />
             <Money v={j.actual} small />
-            <td className="border-b border-[rgba(255,255,255,0.04)] px-3 py-2" colSpan={3} />
+            <td className="border-b border-[var(--hairline-soft)] px-3 py-2" colSpan={3} />
           </tr>
         ))}
     </>
@@ -270,7 +270,7 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
   return (
     <th
       className={cn(
-        "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#dce8f0]",
+        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
         className,
       )}
     >
@@ -283,7 +283,7 @@ function Money({
   v, strong, muted, dash, small,
 }: { v: number; strong?: boolean; muted?: boolean; dash?: boolean; small?: boolean }) {
   return (
-    <td className={cn("border-b border-[rgba(255,255,255,0.04)] px-3 text-right", small ? "py-2" : "py-2.5")}>
+    <td className={cn("border-b border-[var(--hairline-soft)] px-3 text-right", small ? "py-2" : "py-2.5")}>
       <span
         className={cn(
           "font-mono tabular-nums",

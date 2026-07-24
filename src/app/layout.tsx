@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { SITE_URL, SITE_NAME, SITE_SHORT_NAME, SITE_DESCRIPTION, BRAND_BG } from "@/lib/site";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-body",
@@ -55,8 +57,15 @@ export default function RootLayout({
   return (
     <html
       lang="en-AU"
+      suppressHydrationWarning
       className={`dark ${geistSans.variable} ${geistHeading.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Set the saved theme on <html> before first paint — no flash for light-theme users. */}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {THEME_INIT_SCRIPT}
+        </Script>
+      </head>
       <body className="min-h-full">{children}</body>
     </html>
   );

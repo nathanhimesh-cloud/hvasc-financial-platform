@@ -82,7 +82,7 @@ export function AllocationDonut({
               transform="rotate(-90 57 57)"
             />
           ))}
-          <text x="57" y="54" textAnchor="middle" fill="#ffffff" fontFamily="var(--font-heading)" fontSize="14" fontWeight="800">
+          <text x="57" y="54" textAnchor="middle" fill="var(--foreground)" fontFamily="var(--font-heading)" fontSize="14" fontWeight="800">
             {formatCompact(totalBudget)}
           </text>
           <text x="57" y="65" textAnchor="middle" fill="var(--muted-foreground)" fontFamily="var(--font-mono)" fontSize="7.5" letterSpacing="1.5">
@@ -113,7 +113,7 @@ export function AllocationDonut({
 
       {/* Revenue centres — pinned toward the bottom so the card fills its height */}
       <div className="mt-auto border-t border-border pt-[18px]">
-        <div className="mb-3 font-mono text-[10px] tracking-[0.06em] text-[#8aa0b8]">
+        <div className="mb-3 font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
           REVENUE CENTRES · YTD
         </div>
         <div className="flex flex-col gap-[9px]">
@@ -141,7 +141,7 @@ export function AllocationDonut({
             </div>
           )}
           <div className="flex items-center justify-between border-t border-border pt-2.5">
-            <span className="text-[13px] font-bold text-white">
+            <span className="text-[13px] font-bold text-foreground">
               Total Revenue YTD
             </span>
             <span className="font-mono text-sm font-bold text-green">

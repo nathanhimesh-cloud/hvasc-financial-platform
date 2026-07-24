@@ -75,7 +75,7 @@ export function OperatingPosition({
                 transform="rotate(-90 50 50)"
               />
             ))}
-            <text x="50" y="47" textAnchor="middle" fill="#ffffff" fontFamily="var(--font-heading)" fontSize="13.5" fontWeight="800">
+            <text x="50" y="47" textAnchor="middle" fill="var(--foreground)" fontFamily="var(--font-heading)" fontSize="13.5" fontWeight="800">
               {formatCompact(totalIncome)}
             </text>
             <text x="50" y="58" textAnchor="middle" fill="var(--muted-foreground)" fontFamily="var(--font-mono)" fontSize="6.5" letterSpacing="1.5">
@@ -134,7 +134,7 @@ function Tile({
   hint?: string;
 }) {
   return (
-    <div className="rounded-md border border-border bg-elevated/30 px-3 py-2.5 transition-colors hover:border-[rgba(255,255,255,0.16)]">
+    <div className="rounded-md border border-border bg-elevated/30 px-3 py-2.5 transition-colors hover:border-[var(--hairline)]">
       <div className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
       <div
         className={cn(

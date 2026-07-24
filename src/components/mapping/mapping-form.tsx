@@ -426,7 +426,7 @@ function MappingTable({
               <th
                 key={i}
                 className={cn(
-                  "border-b border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)] px-3 py-2.5 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[#dce8f0]",
+                  "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--th-fg)]",
                   h.w,
                 )}
               >
@@ -440,10 +440,10 @@ function MappingTable({
             const curDept = r.edit.departmentId || r.originalDeptId;
             return (
               <tr key={r.key} className={cn("group", r.dirty && "bg-gold-dim/20")}>
-                <td className="border-b border-[rgba(255,255,255,0.05)] px-3 py-2.5 align-middle">
+                <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 align-middle">
                   <span className="font-mono text-[11px] text-muted-foreground">{r.code}</span>
                 </td>
-                <td className="border-b border-[rgba(255,255,255,0.05)] px-3 py-2.5 align-middle">
+                <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 align-middle">
                   <input
                     value={r.edit.name}
                     onChange={(e) => r.onName(e.target.value)}
@@ -454,7 +454,7 @@ function MappingTable({
                     )}
                   />
                 </td>
-                <td className="border-b border-[rgba(255,255,255,0.05)] px-3 py-2.5 align-middle">
+                <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 align-middle">
                   <div className="flex items-center gap-2">
                     <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", bgColor[colorOf[curDept] ?? "gold"])} />
                     <select
@@ -473,10 +473,10 @@ function MappingTable({
                     </select>
                   </div>
                 </td>
-                <td className="border-b border-[rgba(255,255,255,0.05)] px-3 py-2.5 text-right align-middle">
+                <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 text-right align-middle">
                   <span className="font-mono text-[12px] tabular-nums text-muted-foreground">{r.meta}</span>
                 </td>
-                <td className="border-b border-[rgba(255,255,255,0.05)] px-3 py-2.5 align-middle">
+                <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 align-middle">
                   {r.dirty && (
                     <button
                       type="button"
