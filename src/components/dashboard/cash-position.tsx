@@ -18,6 +18,28 @@ import { cn } from "@/lib/utils";
  */
 export function CashPosition({ cash, periodLabel }: { cash: CashBreakdown; periodLabel: string }) {
   const { totalCash, restrictedCash, unrestrictedCash, monthsCover, monthlyOpex, exact } = cash;
+
+  // NO BALANCE SHEET, NO CASH FIGURE.
+  // Cash comes from the balance-sheet bank accounts. Prior-year months rebuilt from
+  // the ledger's P&L don't carry a balance sheet, so there are no cash lines — and
+  // computing "unrestricted = 0 − restricted" would show a nonsense negative runway.
+  // Say plainly it isn't available for this period rather than show a false −11.7.
+  if (cash.cashLines.length === 0) {
+    return (
+      <Panel className="h-full">
+        <PanelHeader title="Cash Position & Restrictions" right={<CardBadge>{periodLabel}</CardBadge>} />
+        <div className="flex flex-col gap-2 py-4">
+          <p className="text-[13px] font-medium text-foreground">Not available for this period.</p>
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            This archived month was rebuilt from the general ledger&apos;s profit &amp; loss only. Cash,
+            restrictions and the liquidity runway come from the balance sheet, which isn&apos;t stored
+            for prior-year months — they show on the current live period.
+          </p>
+        </div>
+      </Panel>
+    );
+  }
+
   const restrictedShare = totalCash > 0 ? Math.min(Math.max(restrictedCash / totalCash, 0), 1) : 0;
   const unrestrictedShare = 1 - restrictedShare;
 
