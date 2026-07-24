@@ -153,25 +153,50 @@ export function DepartmentTable({
           {/* Totals — YTD Actual ties to the Total Expenses headline. */}
           <tfoot>
             <tr>
-              <td className="px-3.5 py-3.5 text-[13px] font-bold text-foreground">Total</td>
-              <Num>{formatCurrency(sumAnnual)}</Num>
-              <td className="px-3.5 py-3.5 text-right">
-                <span className="font-mono text-[13px] font-bold tabular-nums text-foreground">
-                  {formatCurrency(totalActual)}
-                </span>
-              </td>
-              <Num>{formatCurrency(sumYtdBudget)}</Num>
-              <Num tone={totalVariance >= 0 ? "pos" : "neg"}>{formatSignedCompact(totalVariance)}</Num>
-              <td className="px-3.5 py-3.5 text-right font-mono text-[13px] font-bold tabular-nums text-muted-foreground">
-                {sumYtdBudget > 0 ? formatPercent(totalActual / sumYtdBudget) : "—"}
-              </td>
-              <td className="px-3.5 py-3.5" />
-              <td className="px-3.5 py-3.5" />
+              <TotalCell align="left">Total</TotalCell>
+              <TotalCell>{formatCurrency(sumAnnual)}</TotalCell>
+              <TotalCell>{formatCurrency(totalActual)}</TotalCell>
+              <TotalCell>{formatCurrency(sumYtdBudget)}</TotalCell>
+              <TotalCell tone={totalVariance >= 0 ? "pos" : "neg"}>{formatSignedCompact(totalVariance)}</TotalCell>
+              <TotalCell muted>{sumYtdBudget > 0 ? formatPercent(totalActual / sumYtdBudget) : "—"}</TotalCell>
+              <td className="border-t border-[rgba(255,255,255,0.16)] px-3.5 py-3.5" />
+              <td className="border-t border-[rgba(255,255,255,0.16)] px-3.5 py-3.5" />
             </tr>
           </tfoot>
         </table>
       </div>
     </Panel>
+  );
+}
+
+/** A cell in the totals footer — clean top border, bold, no stray underlines. */
+function TotalCell({
+  children,
+  tone,
+  muted,
+  align = "right",
+}: {
+  children: React.ReactNode;
+  tone?: "pos" | "neg";
+  muted?: boolean;
+  align?: "left" | "right";
+}) {
+  return (
+    <td
+      className={cn(
+        "border-t border-[rgba(255,255,255,0.16)] px-3.5 py-3.5",
+        align === "right" ? "text-right font-mono tabular-nums" : "text-left",
+      )}
+    >
+      <span
+        className={cn(
+          "text-[13px] font-bold",
+          tone === "pos" ? "text-green" : tone === "neg" ? "text-red" : muted ? "text-muted-foreground" : "text-foreground",
+        )}
+      >
+        {children}
+      </span>
+    </td>
   );
 }
 

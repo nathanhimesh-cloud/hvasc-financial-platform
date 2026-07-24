@@ -131,10 +131,10 @@ export function AllocationDonut({
               className="flex items-center justify-between"
               title="Revenue in accounts not yet assigned to a department. Included so the breakdown ties to Total Income."
             >
-              <span className="text-[13px] font-medium text-muted-foreground">
+              <span className="text-[13px] font-medium text-foreground">
                 Other revenue
               </span>
-              <span className="font-mono text-[13px] font-bold text-muted-foreground">
+              <span className="font-mono text-[13px] font-bold text-green">
                 {formatCurrency(other)}
               </span>
             </div>
