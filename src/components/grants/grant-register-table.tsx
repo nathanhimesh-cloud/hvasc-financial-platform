@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, AlertTriangle, Lock, Unlock, Download, LifeBuoy } from "lucide-react";
+import { Search, AlertTriangle, Lock, Unlock, Download, LifeBuoy, type LucideIcon } from "lucide-react";
 import type { GrantFigures } from "@/lib/grants";
-import { Panel, PanelHeader } from "@/components/kit/panel";
+import { Panel } from "@/components/kit/panel";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { grantUtilisationRag, ragText } from "@/lib/rag";
 import { cn } from "@/lib/utils";
@@ -67,84 +67,65 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <Panel className="no-print flex flex-wrap items-end justify-between gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Search</span>
-          <span className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="grant or funder…"
-              className="w-72 rounded-md border border-border bg-elevated py-2 pl-8 pr-3 text-[13px] text-foreground outline-none focus:border-gold/40"
-            />
-          </span>
-        </label>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Operating vs capital (C2): capital grants leave the Council an asset to maintain. */}
-          <div className="flex h-[38px] items-center rounded-md border border-border bg-elevated/40 p-1">
-            {(["all", "operating", "capital"] as Kind[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setKind(k)}
-                className={cn(
-                  "h-full rounded px-3 text-[12px] font-medium capitalize transition-colors",
-                  kind === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
-          {/* Disaster recovery (C6): one-off, reimbursement-based, must not read as base income. */}
-          <button
-            type="button"
-            onClick={() => setOnlyDisaster((v) => !v)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors",
-              onlyDisaster ? "border-amber/40 bg-amber/10 text-amber" : "border-border bg-elevated text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <LifeBuoy className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Disaster recovery ({disasterCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowClosed((v) => !v)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors",
-              showClosed ? "border-gold/40 bg-gold-dim text-gold-light" : "border-border bg-elevated text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {showClosed ? "Hide" : "Show"} closed ({closedCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setOnlyIssues((v) => !v)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors",
-              onlyIssues ? "border-amber/40 bg-amber/10 text-amber" : "border-border bg-elevated text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Needs codes fixed
-          </button>
-          <button
-            type="button"
-            onClick={exportCsv}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Export CSV
-          </button>
+    <Panel className="overflow-hidden">
+      {/* Header + search on one line — one cohesive card instead of a floating filter bar */}
+      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="font-heading text-[15px] font-semibold text-foreground">Grant Register</h3>
+          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+            {rows.length} of {figures.length} grants
+          </p>
         </div>
-      </Panel>
+        <span className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search grant or funder…"
+            className="h-9 w-64 rounded-md border border-border bg-elevated pl-9 pr-3 text-[13px] text-foreground outline-none transition-colors focus:border-gold/40"
+          />
+        </span>
+      </div>
 
-      <Panel className="overflow-hidden">
-        <PanelHeader title="Grant Register" subtitle={`${rows.length} of ${figures.length} grants`} />
-        <div className="overflow-x-auto">
+      {/* Filter toolbar — uniform 36px controls, Export pinned right */}
+      <div className="no-print mb-4 flex flex-wrap items-center gap-2 border-b border-border pb-4">
+        {/* Operating vs capital (C2): capital grants leave the Council an asset to maintain. */}
+        <div className="flex h-9 items-center rounded-md border border-border bg-elevated/40 p-1">
+          {(["all", "operating", "capital"] as Kind[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKind(k)}
+              className={cn(
+                "h-full rounded px-3 text-[12px] font-medium capitalize transition-colors",
+                kind === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+        {/* Disaster recovery (C6): one-off, reimbursement-based, must not read as base income. */}
+        <FilterChip active={onlyDisaster} onClick={() => setOnlyDisaster((v) => !v)} icon={LifeBuoy} tone="amber">
+          Disaster recovery ({disasterCount})
+        </FilterChip>
+        <FilterChip active={showClosed} onClick={() => setShowClosed((v) => !v)} tone="gold">
+          {showClosed ? "Hide" : "Show"} closed ({closedCount})
+        </FilterChip>
+        <FilterChip active={onlyIssues} onClick={() => setOnlyIssues((v) => !v)} icon={AlertTriangle} tone="amber">
+          Needs codes fixed
+        </FilterChip>
+        <button
+          type="button"
+          onClick={exportCsv}
+          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-elevated px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:border-gold/30 hover:text-foreground"
+        >
+          <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+          Export CSV
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
           <table className="w-full min-w-[1560px] border-collapse">
             <thead>
               <tr>
@@ -235,8 +216,38 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
           Income = live GL revenue codes. Expense = live job-costing spend on the grant&apos;s job codes.
           Budgeted expense = total grant income (a grant should be fully spent). Opening balances come from the register.
         </p>
-      </Panel>
-    </div>
+    </Panel>
+  );
+}
+
+/** A filter toggle in the register toolbar — uniform height, tone-coded when active. */
+function FilterChip({
+  active,
+  onClick,
+  icon: Icon,
+  tone,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon?: LucideIcon;
+  tone: "amber" | "gold";
+  children: React.ReactNode;
+}) {
+  const activeCls =
+    tone === "amber" ? "border-amber/40 bg-amber/10 text-amber" : "border-gold/40 bg-gold-dim text-gold-light";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[12px] font-medium transition-colors",
+        active ? activeCls : "border-border bg-elevated text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />}
+      {children}
+    </button>
   );
 }
 

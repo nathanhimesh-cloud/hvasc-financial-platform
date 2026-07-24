@@ -45,10 +45,9 @@ export function NarrativeDrafter({
       ) : (
         <>
           <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
-            Every figure in the draft is taken from the general ledger and handed to the model already
-            calculated. <span className="text-foreground">It is not permitted to compute a number</span>
-            , and it is told nothing about the project&apos;s activities — only its financial position.
-            What comes back is a starting paragraph, not an acquittal.
+            Figures come straight from the ledger, already calculated — the model{" "}
+            <span className="text-foreground">never computes a number</span> and sees only the financial
+            position. It returns a starting paragraph to edit, not a finished acquittal.
           </p>
 
           <form action={action} className="flex flex-wrap items-end gap-3">
@@ -59,7 +58,7 @@ export function NarrativeDrafter({
               <select
                 name="grantId"
                 defaultValue={state.grantId ?? ""}
-                className="h-[38px] w-full rounded-md border border-border bg-elevated px-3 text-[13px] text-foreground outline-none focus:border-gold/40"
+                className="h-9 w-full rounded-md border border-border bg-elevated px-3 text-[13px] text-foreground outline-none focus:border-gold/40"
               >
                 <option value="" disabled>
                   Choose a grant…
@@ -74,7 +73,7 @@ export function NarrativeDrafter({
             <button
               type="submit"
               disabled={pending}
-              className="inline-flex h-[38px] items-center gap-1.5 rounded-md bg-gold px-3 text-[13px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-gold px-3 text-[13px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
               {pending ? "Drafting…" : "Draft"}
