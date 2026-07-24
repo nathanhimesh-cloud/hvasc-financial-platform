@@ -1,12 +1,14 @@
-import { FileText, Receipt, AlertTriangle, Database } from "lucide-react";
+import { FileText, Receipt, AlertTriangle, Database, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { Content, Panel, PanelHeader } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { PageToolbar } from "@/components/kit/page-toolbar";
 import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { queryInvoices, queryBills } from "@/lib/billing";
-import { formatCompact } from "@/lib/format";
+import type { AgedSchedule } from "@/lib/types";
+import { formatCompact, formatCurrency } from "@/lib/format";
 import { BillingView } from "@/components/billing/billing-view";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -191,6 +193,18 @@ export default async function BillingPage({
             />
           </div>
 
+          {/* Ageing at a glance — the buckets behind the invoices below, from
+              Practical's own month-end ageing (DRMST / CRMST). */}
+          {view.snapshot.ageing && (
+            <Panel className="mb-6">
+              <PanelHeader title="Ageing" subtitle="How old the outstanding money is · Practical's month-end buckets" />
+              <div className="flex flex-col gap-5">
+                <AgeingRow label="Owed to the Council" sub="Debtors" schedule={view.snapshot.ageing.receivables} direction="in" />
+                <AgeingRow label="Owed by the Council" sub="Creditors" schedule={view.snapshot.ageing.payables} direction="out" />
+              </div>
+            </Panel>
+          )}
+
           {neverLoaded ? (
             <Panel className="border-amber/30 bg-amber/[0.04]">
               <PanelHeader
@@ -234,5 +248,54 @@ export default async function BillingPage({
         </>
       )}
     </Content>
+  );
+}
+
+/** One side of the ageing summary — Current / 30 / 60 / 90+ buckets + total. */
+function AgeingRow({
+  label,
+  sub,
+  schedule,
+  direction,
+}: {
+  label: string;
+  sub: string;
+  schedule: AgedSchedule;
+  direction: "in" | "out";
+}) {
+  const s = schedule;
+  const alarming = s.total > 0 && s.days90 / s.total > 0.4;
+  const Icon = direction === "in" ? ArrowDownLeft : ArrowUpRight;
+  const buckets = [
+    { label: "Current", value: s.current, tone: "text-foreground" },
+    { label: "30 days", value: s.days30, tone: "text-foreground" },
+    { label: "60 days", value: s.days60, tone: "text-amber" },
+    { label: "90+ days", value: s.days90, tone: alarming ? "text-red" : "text-amber" },
+  ];
+  return (
+    <div>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+          <Icon className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
+          {label}
+          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+            {sub} · {s.count} accounts
+          </span>
+        </span>
+        <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
+          {formatCurrency(s.total)}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {buckets.map((b) => (
+          <div key={b.label} className="rounded-md border border-border bg-elevated/30 px-3 py-2.5">
+            <div className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{b.label}</div>
+            <div className={cn("mt-1 font-mono text-[13px] font-semibold tabular-nums", b.value === 0 ? "text-muted-foreground" : b.tone)}>
+              {b.value === 0 ? "—" : formatCurrency(b.value)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
