@@ -40,7 +40,10 @@ export function DepartmentTable({
 
   return (
     <Panel>
-      <PanelHeader title={`Department Summary — ${periodLabel}`} />
+      <PanelHeader
+        title={`Department Summary — ${periodLabel}`}
+        subtitle={reconcile ? `YTD Actual totals to Total Expenses (YTD) · ${formatCurrency(totalActual)}` : undefined}
+      />
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -134,7 +137,15 @@ export function DepartmentTable({
                 <Num>—</Num>
                 <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5 text-right text-muted-foreground">—</td>
                 <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5" />
-                <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5" />
+                <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5">
+                  <Link
+                    href="/mapping"
+                    className="rounded-[7px] border border-[rgba(255,255,255,0.16)] px-3 py-[5px] text-[11px] font-bold text-subtle transition-colors hover:border-[rgba(212,168,76,0.35)] hover:bg-gold-dim hover:text-gold-light"
+                    title="See which accounts aren't assigned to a department yet"
+                  >
+                    Map →
+                  </Link>
+                </td>
               </tr>
             )}
           </tbody>
