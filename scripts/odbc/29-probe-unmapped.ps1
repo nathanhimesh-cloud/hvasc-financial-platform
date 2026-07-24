@@ -6,7 +6,7 @@
   assign to a department. Their money is counted in the totals but shows on the
   dashboard as "Other revenue" (income) / "Unassigned" (expense) until mapped.
 
-  Prints code, name, kind, and current balance, biggest first — a ready list to
+  Prints code, name, kind, and current balance, biggest first - a ready list to
   hand the Council. STRICTLY READ-ONLY.
 
   Run on HVASC-APP02 (needs department-map.json next to it, same as the feed):
