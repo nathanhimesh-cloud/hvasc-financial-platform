@@ -13,13 +13,31 @@ export function DepartmentTable({
   departments,
   periodLabel,
   comparisonLabel = "Budget",
+  totalExpenses,
 }: {
   departments: DepartmentDerived[];
   periodLabel: string;
   /** What the comparator columns represent: "Budget" or "FY25". */
   comparisonLabel?: string;
+  /**
+   * Council-wide Total Expenses headline. When given, the table adds an
+   * "Unassigned" row for expenses not yet mapped to a department and a totals row,
+   * so the YTD Actual column ties to the headline rather than sitting short.
+   */
+  totalExpenses?: number;
 }) {
   const isFy25 = comparisonLabel === "FY25";
+
+  // Column sums, and the unmapped remainder that reconciles YTD Actual to the headline.
+  const sumAnnual = departments.reduce((a, d) => a + d.annualBudget, 0);
+  const sumYtdActual = departments.reduce((a, d) => a + d.ytdActual, 0);
+  const sumYtdBudget = departments.reduce((a, d) => a + d.ytdBudget, 0);
+  const reconcile = !isFy25 && totalExpenses !== undefined;
+  const unassigned = reconcile ? (totalExpenses as number) - sumYtdActual : 0;
+  const showUnassigned = reconcile && unassigned >= 1;
+  const totalActual = reconcile ? (totalExpenses as number) : sumYtdActual;
+  const totalVariance = sumYtdBudget - totalActual;
+
   return (
     <Panel>
       <PanelHeader title={`Department Summary — ${periodLabel}`} />
@@ -94,7 +112,52 @@ export function DepartmentTable({
                 </td>
               </tr>
             ))}
+
+            {/* Expenses not yet assigned to a department — shown so the column ties
+                to the Total Expenses headline instead of falling silently short. */}
+            {showUnassigned && (
+              <tr className="hover:bg-[rgba(255,255,255,0.03)]">
+                <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5 text-[13px]">
+                  <div className="flex items-center gap-2.5 text-muted-foreground">
+                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-border text-[11px]">
+                      —
+                    </span>
+                    Unassigned
+                    <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+                      not yet mapped
+                    </span>
+                  </div>
+                </td>
+                <Num>—</Num>
+                <Num>{formatCurrency(unassigned)}</Num>
+                <Num>—</Num>
+                <Num>—</Num>
+                <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5 text-right text-muted-foreground">—</td>
+                <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5" />
+                <td className="border-b border-[rgba(255,255,255,0.04)] px-3.5 py-3.5" />
+              </tr>
+            )}
           </tbody>
+
+          {/* Totals — YTD Actual ties to the Total Expenses headline. */}
+          <tfoot>
+            <tr>
+              <td className="px-3.5 py-3.5 text-[13px] font-bold text-foreground">Total</td>
+              <Num>{formatCurrency(sumAnnual)}</Num>
+              <td className="px-3.5 py-3.5 text-right">
+                <span className="font-mono text-[13px] font-bold tabular-nums text-foreground">
+                  {formatCurrency(totalActual)}
+                </span>
+              </td>
+              <Num>{formatCurrency(sumYtdBudget)}</Num>
+              <Num tone={totalVariance >= 0 ? "pos" : "neg"}>{formatSignedCompact(totalVariance)}</Num>
+              <td className="px-3.5 py-3.5 text-right font-mono text-[13px] font-bold tabular-nums text-muted-foreground">
+                {sumYtdBudget > 0 ? formatPercent(totalActual / sumYtdBudget) : "—"}
+              </td>
+              <td className="px-3.5 py-3.5" />
+              <td className="px-3.5 py-3.5" />
+            </tr>
+          </tfoot>
         </table>
       </div>
     </Panel>
