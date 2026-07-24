@@ -34,7 +34,9 @@ export function DepartmentTable({
   const sumYtdBudget = departments.reduce((a, d) => a + d.ytdBudget, 0);
   const reconcile = !isFy25 && totalExpenses !== undefined;
   const unassigned = reconcile ? (totalExpenses as number) - sumYtdActual : 0;
-  const showUnassigned = reconcile && unassigned >= 1;
+  // Show the reconciling row for a remainder in EITHER direction — usually a small
+  // positive (unmapped expenses), but it can be negative (contra/adjustment accounts).
+  const showUnassigned = reconcile && Math.abs(unassigned) >= 1;
   const totalActual = reconcile ? (totalExpenses as number) : sumYtdActual;
   const totalVariance = sumYtdBudget - totalActual;
 
