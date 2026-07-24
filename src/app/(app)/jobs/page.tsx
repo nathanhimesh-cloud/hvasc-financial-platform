@@ -19,9 +19,12 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const groups = jobBudgetGroups(view.snapshot);
   const s = jobBudgetSummary(groups);
 
-  // Actual job spend is a year-to-date flow → compare only to the same month last year.
+  // Actual job spend is a year-to-date flow → compare only to the same month last year,
+  // and only when the prior snapshot actually carries job data (a GL-only prior-year
+  // rebuild doesn't, so we show "—" rather than a misleading zero).
   const prior = await loadPriorYear(view.snapshot);
-  const priorS = prior?.sameMonth ? jobBudgetSummary(jobBudgetGroups(prior.snapshot)) : null;
+  const priorHasJobs = !!(prior?.snapshot.jobBudgets?.length || prior?.snapshot.jobCosts?.length);
+  const priorS = prior?.sameMonth && priorHasJobs ? jobBudgetSummary(jobBudgetGroups(prior.snapshot)) : null;
   const priorLabel = prior?.periodLabel ?? previousFyLabel(view.snapshot.period.fyLabel) ?? "last year";
 
 

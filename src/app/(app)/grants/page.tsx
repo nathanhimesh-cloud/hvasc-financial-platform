@@ -42,10 +42,12 @@ export default async function GrantsPage({
   const utilisation = s.totalBudgetedExpense > 0 ? s.expenseToDate / s.totalBudgetedExpense : 0;
 
   // Income received and spend to date are year-to-date FLOWS, so they only compare
-  // fairly to the SAME month last year — not to a full prior year. The label is kept
-  // even when the archive is empty, so the "vs …—" line shows and fills in later.
+  // fairly to the SAME month last year — not to a full prior year. Grant SPEND comes
+  // from job costs, so only compare when the prior snapshot carries them (a GL-only
+  // prior-year rebuild doesn't); otherwise the "vs …—" line shows and fills in later.
   const prior = await loadPriorYear(snapshot);
-  const priorS = prior?.sameMonth ? grantSummary(allGrantFigures(prior.snapshot)) : null;
+  const priorHasSpend = !!prior?.snapshot.jobCosts?.length;
+  const priorS = prior?.sameMonth && priorHasSpend ? grantSummary(allGrantFigures(prior.snapshot)) : null;
   const priorLabel = prior?.periodLabel ?? previousFyLabel(snapshot.period.fyLabel) ?? "last year";
 
   return (
