@@ -27,10 +27,10 @@ export default async function CapitalPage({ searchParams }: { searchParams: Prom
         notes={
           <>
             <InfoNote label="Where the budgets come from">
-              Transcribed from Practical&apos;s printed <span className="text-foreground">Job Cost
-              Budget</span> report ({programme.asAt}) — 43 jobs, $11.27M. They&apos;ll switch to a live
-              JCMST pull once the ODBC feed is extended; the columns here mirror the printed report
-              so the two can be held side by side.
+              <span className="text-foreground">Orig Bud</span> is the adopted figure as printed on
+              Practical&apos;s Job Cost Budget report ({programme.asAt}). <span className="text-foreground">
+              Curr Bud</span> comes LIVE from Practical&apos;s job register (JCMST estimate) each sync —
+              when the two differ, the budget has genuinely moved since printing.
             </InfoNote>
             <InfoNote label="Why capital spend isn't in expenses">
               Capital works post to <span className="text-foreground">work-in-progress asset
@@ -61,7 +61,11 @@ export default async function CapitalPage({ searchParams }: { searchParams: Prom
           icon={Construction}
           label="FY27 Programme"
           value={formatCompact(t.currBudget)}
-          meta={`${programme.jobCount} jobs · as printed ${programme.asAt}`}
+          meta={
+            programme.liveBudgets > 0
+              ? `${programme.jobCount} jobs · current budgets live from Practical`
+              : `${programme.jobCount} jobs · as printed ${programme.asAt}`
+          }
         />
         <KpiCard
           color="amber"

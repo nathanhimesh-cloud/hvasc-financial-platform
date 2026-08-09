@@ -31,6 +31,7 @@ import { OperatingResultTrend } from "./operating-result-trend";
 import type { RevenueTrend } from "@/lib/revenue-trend";
 import type { SpendTrend } from "@/lib/trend";
 import { BudgetVsActual } from "./budget-vs-actual";
+import type { AccountMonthly } from "@/lib/types";
 import { TransactionsView, type TransactionFilters } from "./transactions-view";
 import { bgDim, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
@@ -84,6 +85,7 @@ export function ReportsView({
   generatedAt,
   source,
   budgetData,
+  accountMonthly,
   transactions,
   transactionTotal,
   dailySpend,
@@ -107,6 +109,7 @@ export function ReportsView({
   generatedAt?: string;
   source?: string;
   budgetData?: BudgetReportData;
+  accountMonthly?: AccountMonthly[];
   transactions: Transaction[];
   /** Total rows in the ledger for this FY (may exceed the page we loaded). */
   transactionTotal?: number;
@@ -298,7 +301,7 @@ export function ReportsView({
       </div>
 
       {statement === "budget" ? (
-        budgetData ? <BudgetVsActual data={budgetData} /> : <ComingSoon statement="balance" />
+        budgetData ? <BudgetVsActual data={budgetData} accountMonthly={accountMonthly} currentMonth={monthOfYear} /> : <ComingSoon statement="balance" />
       ) : statement === "balance" ? (
         balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} generatedAt={generatedAt} /> : <ComingSoon statement="balance" />
       ) : statement === "cashflow" ? (

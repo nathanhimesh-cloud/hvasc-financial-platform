@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { departmentMonthFigures } from "@/lib/monthly-dept";
 import { DrillLink } from "@/components/kit/drill-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Landmark, Scale, TrendingUp, Wallet } from "lucide-react";
@@ -81,6 +82,25 @@ export default async function DepartmentPage(
         </div>
         <StatusPill status={d.status} />
       </div>
+
+      {/* This month, from the ledger's per-account monthly series (renders only
+          once the extended feed has shipped it). */}
+      {(() => {
+        const mfig = departmentMonthFigures(snapshot, d.id);
+        if (!mfig.available) return null;
+        return (
+          <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-md border border-border bg-card px-4 py-2.5 font-mono text-[11px] text-muted-foreground shadow-[var(--panel-shadow)]">
+            <span className="uppercase tracking-[0.08em]">Month {mfig.month}</span>
+            <span>
+              spend <span className="font-semibold text-foreground">{formatCompact(mfig.expenseMonth)}</span>
+              {mfig.expenseBudgetMonth !== 0 && <> vs budget {formatCompact(mfig.expenseBudgetMonth)}</>}
+            </span>
+            <span>
+              revenue <span className="font-semibold text-foreground">{formatCompact(mfig.revenueMonth)}</span>
+            </span>
+          </div>
+        );
+      })()}
 
       {/* KPIs */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

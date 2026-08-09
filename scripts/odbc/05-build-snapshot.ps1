@@ -330,6 +330,30 @@ foreach ($id in $DEPTS.Keys) {
 }
 
 # -- 5. grants register (funding received; ACCNT2 1100-1199 revenue accounts) --
+# -- 4b. per-account monthly series (GLBAL by MTH) ------------------------------
+# The Aug 2026 dashboard review asked for MONTHLY actual + budget columns next
+# to the YTD ones. GLBAL already stores both, CUMULATIVE, per period (see
+# knowledge-base 01: BALANCE and BUDGET are cumulative-to-MTH) - so the app
+# derives month m as value[m] - value[m-1]. Emit the raw cumulative series for
+# the operating chart, same filters as the accounts block above, and let the
+# app do the diffing. ~430 accounts x months: small.
+$amRows = Invoke-Rows @"
+SELECT b.GLACCOUNT, b.MTH, b.BALANCE, b.BUDGET
+FROM GLBAL b
+JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+WHERE b.MTH <= $cur AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5,6)
+ORDER BY b.GLACCOUNT, b.MTH
+"@
+$amByCode = [ordered]@{}
+foreach ($r in $amRows) {
+  $c = ([string]$r.GLACCOUNT).Trim()
+  if (-not $amByCode.Contains($c)) { $amByCode[$c] = @() }
+  $amByCode[$c] += [ordered]@{ m = [int]$r.MTH; balance = (R2 $r.BALANCE); budget = (R2 $r.BUDGET) }
+}
+$accountMonthly = @()
+foreach ($c in $amByCode.Keys) { $accountMonthly += [ordered]@{ code = $c; months = @($amByCode[$c]) } }
+Write-Host ("Account monthly series: {0} accounts x up to {1} months" -f $accountMonthly.Count, $cur) -ForegroundColor Cyan
+
 $grantRows = Invoke-Rows @"
 SELECT m.GLACCOUNT, m.DESCRIPT, b.BALANCE
 FROM GLBAL b
@@ -1890,6 +1914,7 @@ $snapshot = [ordered]@{
   transactions  = $transactions
   jobCosts      = $jobCosts
   jobBudgets    = $jobBudgets
+  accountMonthly = $accountMonthly
   balanceSheet  = $balanceSheet
   bsReconciliation = $bsReconciliation
   cashFlow      = $cashFlow

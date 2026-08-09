@@ -167,6 +167,7 @@ export default async function ReportsPage({
         generatedAt={snapshot.meta?.generatedAt}
         source={snapshot.meta?.source}
         budgetData={budgetReportFY27}
+        accountMonthly={snapshot.accountMonthly}
         transactions={transactions}
         transactionTotal={transactionTotal}
         dailySpend={snapshot.dailySpend ?? []}

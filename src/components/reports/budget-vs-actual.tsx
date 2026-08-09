@@ -7,11 +7,15 @@ import { DataStamp } from "@/components/kit/data-stamp";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   buildGroupTree,
+  monthlyMapFromSnapshot,
   nodeSurplus,
+  withBasis,
   type BudgetReportData,
   type BudgetNode,
   type BudgetGroupTree,
+  type ReportBasis,
 } from "@/lib/budget-report";
+import type { AccountMonthly } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,8 +46,25 @@ function toRows(nodes: BudgetNode[]): RenderRow[] {
   return rows;
 }
 
-export function BudgetVsActual({ data }: { data: BudgetReportData }) {
-  const trees = useMemo<BudgetGroupTree[]>(() => data.groups.map(buildGroupTree), [data]);
+export function BudgetVsActual({
+  data,
+  accountMonthly,
+  currentMonth = 1,
+}: {
+  data: BudgetReportData;
+  /** Cumulative per-account monthly series from the extended Practical feed. */
+  accountMonthly?: AccountMonthly[];
+  currentMonth?: number;
+}) {
+  const monthly = useMemo(() => monthlyMapFromSnapshot(accountMonthly), [accountMonthly]);
+  const hasMonthly = monthly.size > 0;
+  // Default to YTD — the like-for-like view the Aug 2026 review asked for.
+  const [basis, setBasis] = useState<ReportBasis>("ytd");
+  const based = useMemo(
+    () => withBasis(data, basis, monthly, currentMonth),
+    [data, basis, monthly, currentMonth],
+  );
+  const trees = useMemo<BudgetGroupTree[]>(() => based.groups.map(buildGroupTree), [based]);
   const [groupId, setGroupId] = useState(trees[0]?.id ?? "");
   const active = trees.find((t) => t.id === groupId) ?? trees[0];
 
@@ -82,7 +103,36 @@ export function BudgetVsActual({ data }: { data: BudgetReportData }) {
         ))}
       </div>
 
-      {/* Full-year surplus summary for the directorate */}
+      {/* Basis toggle — the review's core ask: monthly AND year-to-date, actual
+          vs budget, clearly separated. Month needs the extended feed's series. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(
+          [
+            { id: "month" as ReportBasis, label: `Month ${currentMonth}`, off: !hasMonthly },
+            { id: "ytd" as ReportBasis, label: "Year to date", off: false },
+            { id: "annual" as ReportBasis, label: "vs full-year budget", off: false },
+          ]
+        ).map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            disabled={b.off}
+            title={b.off ? "Monthly figures arrive with the extended Practical feed (run the updated 05 script on the PP server)." : undefined}
+            onClick={() => setBasis(b.id)}
+            className={cn(
+              "inline-flex items-center rounded-md border px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.04em] transition-colors",
+              basis === b.id
+                ? "border-gold/40 bg-gold-dim text-foreground"
+                : "border-border bg-elevated/40 text-muted-foreground hover:text-foreground",
+              b.off && "cursor-not-allowed opacity-45 hover:text-muted-foreground",
+            )}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Surplus summary for the directorate, on the selected basis */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <SummaryCard label="Revenue budget" value={totals.revenueBudget} tone="pos" sub={`${formatCurrency(totals.revenueActual)} actual`} />
         <SummaryCard label="Expenditure budget" value={totals.expenseBudget} tone="neg" sub={`${formatCurrency(totals.expenseActual)} actual`} />
@@ -129,8 +179,18 @@ export function BudgetVsActual({ data }: { data: BudgetReportData }) {
         </div>
         <p className="mt-3 flex items-start gap-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
           <Info className="mt-px h-3 w-3 flex-shrink-0" strokeWidth={1.75} />
-          Actuals are as at {data.asAt} ({pctYear} of the year elapsed), so low spend this early is expected — not
-          under-budget. Budget is the adopted full-year figure. Straight-line pace would be ~{pctYear} of budget.
+          {basis === "annual" && (
+            <>Actuals are as at {data.asAt} ({pctYear} of the year elapsed), so low spend this early is expected — not
+            under-budget. Budget is the adopted full-year figure. Straight-line pace would be ~{pctYear} of budget.</>
+          )}
+          {basis === "ytd" && (
+            <>Actual and Budget are BOTH cumulative to month {currentMonth}, so they compare like for like. The budget
+            column is Practical&apos;s own cumulative-to-period figure{hasMonthly ? "" : " (straight-lined here until the extended feed ships the series)"}.</>
+          )}
+          {basis === "month" && (
+            <>Figures are for month {currentMonth} alone — cumulative[m] − cumulative[m−1] from the general ledger, for
+            both actual and budget.</>
+          )}
         </p>
       </Panel>
     </div>

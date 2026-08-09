@@ -141,8 +141,9 @@ export function CapitalProjectsTable({ programme }: { programme: CapitalProgramm
           </div>
         )}
         <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted-foreground">
-          Budgets as printed on Practical&apos;s Job Cost Budget report ({programme.asAt}); several job
-          names are truncated on the source report. <span className="text-foreground">Actual</span> is
+          Orig Bud as printed on Practical&apos;s Job Cost Budget report ({programme.asAt}); Curr Bud live
+          from Practical&apos;s job register each sync (a difference = a real budget movement). Several job
+          names are truncated at the source. <span className="text-foreground">Actual</span> is
           job-costed spend from the ledger; <span className="text-foreground">committed</span> is open
           purchase-order value. Capital spend posts to work-in-progress asset accounts, so it appears
           here — not in operating expenses.

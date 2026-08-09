@@ -203,6 +203,88 @@ export function buildGroupTree(group: BudgetGroup): BudgetGroupTree {
   return { id: group.id, name: group.name, manager: group.manager, nodes, totals };
 }
 
+// ── Reporting basis (Aug 2026 review) ────────────────────────────────────────
+//
+// Micah's core ask: the report must distinguish MONTHLY from YEAR-TO-DATE, for
+// both actual and budget. GLBAL stores both cumulative per period, so the feed
+// ships the raw series (snapshot.accountMonthly) and this module re-expresses
+// every leaf on the chosen basis before the tree is built — the tree, the
+// subtotals and the renderer never need to know which basis they're showing.
+
+export type ReportBasis = "month" | "ytd" | "annual";
+
+interface MonthlyFig {
+  /** Cumulative balance / budget, indexed by financial-year month (1-based). */
+  bal: (number | undefined)[];
+  bud: (number | undefined)[];
+}
+export type MonthlyAccountMap = Map<string, MonthlyFig>;
+
+/** Fold the snapshot's raw series into a lookup keyed by the 9-char (4-4) code
+ * prefix — the report's transcribed leaves carry codes without the trailing
+ * "-0000" segment. */
+export function monthlyMapFromSnapshot(
+  accountMonthly?: { code: string; months: { m: number; balance: number; budget: number }[] }[],
+): MonthlyAccountMap {
+  const map: MonthlyAccountMap = new Map();
+  for (const a of accountMonthly ?? []) {
+    const bal: (number | undefined)[] = [];
+    const bud: (number | undefined)[] = [];
+    for (const mo of a.months) {
+      bal[mo.m] = mo.balance;
+      bud[mo.m] = mo.budget;
+    }
+    map.set(a.code.trim().slice(0, 9), { bal, bud });
+  }
+  return map;
+}
+
+/**
+ * Re-express every leaf's Actual and Budget on the chosen basis.
+ *
+ *   annual — untouched: YTD actual against the FULL-YEAR budget (the original
+ *            view, kept because "how much of the year's money is left" is a
+ *            real question).
+ *   ytd    — live cumulative balance vs cumulative budget at the current month
+ *            (falls back to the transcribed actual and a straight-lined budget
+ *            when the feed hasn't shipped the series for an account).
+ *   month  — cumulative[m] − cumulative[m−1] for both figures. In month 1 the
+ *            cumulative IS the month. Without series data the budget falls
+ *            back to annual ÷ 12 and the actual to 0 — callers should disable
+ *            the Month basis when the map is empty rather than show that.
+ */
+export function withBasis(
+  data: BudgetReportData,
+  basis: ReportBasis,
+  monthly: MonthlyAccountMap,
+  currentMonth: number,
+): BudgetReportData {
+  if (basis === "annual") return data;
+  const groups = data.groups.map((g) => ({
+    ...g,
+    leaves: g.leaves.map((leaf) => {
+      const fig = monthly.get(leaf.code.trim().slice(0, 9));
+      const balNow = fig?.bal[currentMonth];
+      const budNow = fig?.bud[currentMonth];
+      if (basis === "ytd") {
+        return {
+          ...leaf,
+          actual: balNow ?? leaf.actual,
+          budget: budNow ?? leaf.budget * data.yearElapsedPct,
+        };
+      }
+      const balPrev = (currentMonth > 1 ? fig?.bal[currentMonth - 1] : 0) ?? 0;
+      const budPrev = (currentMonth > 1 ? fig?.bud[currentMonth - 1] : 0) ?? 0;
+      return {
+        ...leaf,
+        actual: balNow !== undefined ? balNow - balPrev : currentMonth === 1 ? leaf.actual : 0,
+        budget: budNow !== undefined ? budNow - budPrev : leaf.budget / 12,
+      };
+    }),
+  }));
+  return { ...data, groups };
+}
+
 function attach(
   parent: BudgetNode,
   node: BudgetNode,

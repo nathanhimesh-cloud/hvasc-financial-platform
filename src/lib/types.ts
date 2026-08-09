@@ -361,6 +361,13 @@ export interface FinancialSnapshot {
   jobBudgets?: JobBudgetGroup[];
   /** Full chart of income/expense accounts, for the Account Mapping page. */
   accounts?: AccountRef[];
+  /**
+   * Per-account CUMULATIVE monthly series from GLBAL (balance + budget at each
+   * MTH 1..current). Month m's own figure = months[m] − months[m−1]; the app
+   * does the diff. Powers the Month / YTD basis toggle on the budget report
+   * (Aug 2026 review). Absent until the extended feed runs on HVASC-APP02.
+   */
+  accountMonthly?: AccountMonthly[];
   /** Prior-year totals (from GLBAL.LASTYEAR) for comparatives + the equity check. */
   priorYear?: PriorYear;
   /** Optional provenance/caveats (present on live feeds, absent on seed). */
@@ -425,6 +432,14 @@ export interface JobBudgetGroup {
   /** The part of `glActual` that was job-costed. */
   jobActual: number;
   jobs: JobBudgetEntry[];
+}
+
+
+/** One account's cumulative monthly checkpoints, straight from GLBAL. */
+export interface AccountMonthly {
+  /** Full GL code, e.g. "1250-1600-0000". */
+  code: string;
+  months: { m: number; balance: number; budget: number }[];
 }
 
 /**
