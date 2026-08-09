@@ -1,4 +1,4 @@
-import type { RevenueLine } from "@/lib/types";
+import type { AccountRef, RevenueLine } from "@/lib/types";
 
 /**
  * Headline revenue composition (Aug 2026 dashboard review). Micah asked for the
@@ -6,10 +6,13 @@ import type { RevenueLine } from "@/lib/types";
  * operating grants, capital grants, enterprise revenue, interest income, and
  * other income — not just one total against expenses.
  *
- * Classification is by revenue-line NAME, because that's what the income
- * statement gives us. The rules are deliberately visible below rather than
- * buried; anything the rules don't recognise lands in "Other income" instead of
- * being silently mis-filed, and the bucket sum is reconciled to total income so
+ * Classification is by ACCOUNT NAME, tuned against Hope Vale's actual chart
+ * (434 accounts, live snapshot Aug 2026). The council's income-statement
+ * roll-ups ("Corporate Services revenue" etc.) are BY DIRECTORATE, not by type,
+ * so the dashboard prefers the per-account chart when the snapshot ships it —
+ * see `revenueLinesFromAccounts`. The rules are deliberately visible below;
+ * anything they don't recognise lands in "Other income" instead of being
+ * silently mis-filed, and the bucket sum is reconciled to total income so
  * nothing can go missing.
  */
 
@@ -25,13 +28,32 @@ export interface RevenueBucket {
   lineCount: number;
 }
 
-const GRANT = /grant|subsid|contribut/i;
-const CAPITAL = /capital/i;
-const INTEREST = /interest|investment/i;
-const ENTERPRISE = /enterprise|sale|fee|charge|rent|lease|hire|contract|store|shop|fuel|accommodation|canteen|bakery|caf|airport|post/i;
+/**
+ * Capital-works funding. Hope Vale's capital grant revenue accounts are mostly
+ * NAMED AFTER THE WORKS ("Springhill Road", "Everlina Bridge Deck Replacement",
+ * "ROOF PROGRAM REVENUE") rather than containing the word "grant", plus the
+ * program acronyms: ICCIP, R2R / Roads to Recovery, LCRI, QRRRF, QRA
+ * Betterment, NDRRA restoration subs, Remote Capital, Growing Regions.
+ */
+const CAPITAL =
+  /capital|ICCIP|R2R|roads to recovery|LCRI|QRRRF|betterment|NDRRA|\bQRA\b|growing regions|remote capital|crucial access|bridge|footpath|upgrade|renovation|roof program|housing scheme|\broad\b|\brd\b/i;
+
+/** Operating grants, subsidies, contributions and donations. */
+const GRANT =
+  /grant|subsid|funding|contribut|donat|assistance|allocation|recurrent|FAGS|HACC|QCSS|SGFA|C&K/i;
+
+const INTEREST = /interest/i;
+
+/**
+ * Council enterprises and user charges: the store, bakery, butcher, service
+ * station, workshop, post office, plant hire, leases and rents, hall/room hire,
+ * fees, licences, utility and commercial charges, aged-persons hostel income.
+ */
+const ENTERPRISE =
+  /sale|lease|rent|hire|\bfee\b|fees|charge|licen[cs]e|bakery|butcher|foodstore|food store|service station|workshop|post office|agency|power cards|banana|rodeo|events|private works|contract works|recovery|\bAPH\b|hostel|benefit|utility|commercial|centrelink/i;
 
 function classify(label: string): RevenueBucketKey {
-  if (CAPITAL.test(label) && GRANT.test(label)) return "capital-grants";
+  if (CAPITAL.test(label)) return "capital-grants";
   if (GRANT.test(label)) return "operating-grants";
   if (INTEREST.test(label)) return "interest";
   if (ENTERPRISE.test(label)) return "enterprise";
@@ -40,13 +62,24 @@ function classify(label: string): RevenueBucketKey {
 
 const LABELS: Record<RevenueBucketKey, string> = {
   "operating-grants": "Operating grants & subsidies",
-  "capital-grants": "Capital grants",
-  enterprise: "Enterprise revenue",
+  "capital-grants": "Capital grants & works funding",
+  enterprise: "Enterprise & user charges",
   interest: "Interest income",
   other: "Other income",
 };
 
 const ORDER: RevenueBucketKey[] = ["operating-grants", "capital-grants", "enterprise", "interest", "other"];
+
+/**
+ * The per-account revenue chart as RevenueLine[], for classification. The
+ * directorate roll-up lines can't be split by type; the chart can. Zero-balance
+ * accounts are dropped (early in the FY that's most of them).
+ */
+export function revenueLinesFromAccounts(accounts: AccountRef[]): RevenueLine[] {
+  return accounts
+    .filter((a) => a.kind === "revenue" && Math.abs(a.balance) > 0.005)
+    .map((a) => ({ id: a.code, label: a.name, ytd: a.balance }));
+}
 
 /**
  * Fold revenue lines into the five buckets. `totalIncome` is the statement's

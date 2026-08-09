@@ -47,6 +47,7 @@ import { CountUp } from "@/components/kit/count-up";
 import { YoY } from "@/components/kit/yoy";
 import { OperatingPosition } from "./operating-position";
 import { RevenueComposition } from "./revenue-composition";
+import { revenueLinesFromAccounts } from "@/lib/revenue-mix";
 import { BudgetBarChart } from "./budget-bar-chart";
 import { AllocationDonut } from "./allocation-donut";
 import { DepartmentTable } from "./department-table";
@@ -280,9 +281,18 @@ export function DashboardController({
   // Revenue lines honouring the period + monthly/cumulative filters, so the
   // composition widget shows the same period as the headline figures. Monthly
   // mode diffs each line against the previous checkpoint by id.
+  //
+  // On the LATEST cumulative view (the default), prefer the per-account chart:
+  // the statement's roll-up lines are by directorate, which can't be split into
+  // grants / enterprise / interest. Filtered or monthly views fall back to the
+  // roll-ups, whose unclassifiable lines land in "Other" by design.
   const revLines = (() => {
     const ms = snapshot.monthlyStatements ?? [];
     const cur = ms.find((s) => s.idx === cfg.periodIdx) ?? ms[ms.length - 1];
+    const latestCumulative = cfg.mode !== "monthly" && cfg.periodIdx === latestIdx;
+    if (latestCumulative && (snapshot.accounts?.length ?? 0) > 0) {
+      return revenueLinesFromAccounts(snapshot.accounts!);
+    }
     const base = cur?.revenueLines ?? snapshot.incomeTotals?.revenueLines ?? snapshot.revenueLines;
     if (cfg.mode !== "monthly" || !cur) return base;
     const prev = ms.filter((s) => s.idx < cur.idx).sort((a, b) => b.idx - a.idx)[0];
