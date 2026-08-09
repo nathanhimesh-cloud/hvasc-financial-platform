@@ -19,20 +19,32 @@ import { cn } from "@/lib/utils";
 export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
   const [q, setQ] = useState("");
   const [dept, setDept] = useState<string>("all");
+  const [job, setJob] = useState<string>("all");
   const [onlyOver, setOnlyOver] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
+
+  // Every job code in the register, for the job filter (Aug 2026 review:
+  // "narrow down data by specific job code").
+  const jobOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const g of groups) for (const j of g.jobs) if (!seen.has(j.code)) seen.set(j.code, j.name);
+    return [...seen.entries()]
+      .map(([code, name]) => ({ code, name }))
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [groups]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return groups.filter((g) => {
       if (dept !== "all" && g.departmentId !== dept) return false;
+      if (job !== "all" && !g.jobs.some((j) => j.code === job)) return false;
       // Over budget means over the budget TO DATE, not the year's total.
       if (onlyOver && !(g.hasBudgetYtd && g.glActual > g.budgetYtd)) return false;
       if (!needle) return true;
       const hay = `${g.glAccount} ${g.glName} ${g.jobs.map((j) => `${j.code} ${j.name}`).join(" ")}`;
       return hay.toLowerCase().includes(needle);
     });
-  }, [groups, q, dept, onlyOver]);
+  }, [groups, q, dept, job, onlyOver]);
 
   const toggle = (gl: string) =>
     setOpen((s) => {
@@ -100,6 +112,19 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
               ))}
             </select>
           </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Job</span>
+            <select
+              value={job}
+              onChange={(e) => setJob(e.target.value)}
+              className="h-[38px] max-w-64 rounded-md border border-border bg-elevated px-3 text-[13px] text-foreground outline-none focus:border-gold/40"
+            >
+              <option value="all">All jobs</option>
+              {jobOptions.map((j) => (
+                <option key={j.code} value={j.code}>{j.code} — {j.name}</option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             onClick={() => setOnlyOver((v) => !v)}
@@ -159,7 +184,9 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
               </thead>
               <tbody>
                 {rows.map((g) => {
-                  const isOpen = open.has(g.glAccount);
+                  // A selected job should be visible, not hidden behind a collapsed
+                  // account — force those groups open while the filter is active.
+                  const isOpen = open.has(g.glAccount) || job !== "all";
                   return (
                     <FragmentRow
                       key={g.glAccount}

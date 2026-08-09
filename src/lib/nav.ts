@@ -7,6 +7,7 @@ import {
   Tags,
   ShieldCheck,
   Briefcase,
+  Construction,
   Activity,
   Gauge,
   FileClock,
@@ -45,6 +46,7 @@ export const overviewNav: NavLink[] = [
 export const trackingNav: NavLink[] = [
   { href: "/grants", label: "Grant Tracker", icon: Landmark },
   { href: "/jobs", label: "Job Budgets", icon: Briefcase },
+  { href: "/capital", label: "Capital Projects", icon: Construction },
   { href: "/commitments", label: "Commitments & Debtors", icon: FileClock },
   { href: "/billing", label: "Invoices & Bills", icon: ReceiptText },
 ];
@@ -149,6 +151,9 @@ export function getPageMeta(
   }
   if (pathname === "/jobs") {
     return { title: "Job Budgets", subtitle: "Budget vs actual by job" };
+  }
+  if (pathname === "/capital") {
+    return { title: "Capital Projects", subtitle: "FY2027 programme · budget vs actual vs committed" };
   }
   if (pathname === "/billing") {
     return { title: "Invoices & Bills", subtitle: "What the Council is owed, and what it owes" };

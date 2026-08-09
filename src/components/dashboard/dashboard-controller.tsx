@@ -46,6 +46,7 @@ import { KpiCard } from "@/components/kit/kpi-card";
 import { CountUp } from "@/components/kit/count-up";
 import { YoY } from "@/components/kit/yoy";
 import { OperatingPosition } from "./operating-position";
+import { RevenueComposition } from "./revenue-composition";
 import { BudgetBarChart } from "./budget-bar-chart";
 import { AllocationDonut } from "./allocation-donut";
 import { DepartmentTable } from "./department-table";
@@ -85,6 +86,7 @@ const ICONS: Record<string, LucideIcon> = {
 
 const WIDGET_IDS = [
   "operating-position",
+  "revenue-composition",
   "cash-position",
   "grant-mix",
   "budget-chart",
@@ -93,6 +95,7 @@ const WIDGET_IDS = [
 ] as const;
 const WIDGET_LABELS: Record<string, string> = {
   "operating-position": "Operating Position",
+  "revenue-composition": "Revenue Composition — grants, enterprise, interest",
   "cash-position": "Cash Position & Restrictions",
   "grant-mix": "Grant Mix — operating/capital & disaster",
   "budget-chart": "Budget vs Actual — by Department",
@@ -101,6 +104,7 @@ const WIDGET_LABELS: Record<string, string> = {
 };
 const WIDGET_SPAN: Record<string, string> = {
   "operating-position": "lg:col-span-12",
+  "revenue-composition": "lg:col-span-12",
   "cash-position": "lg:col-span-6",
   "grant-mix": "lg:col-span-6",
   "budget-chart": "lg:col-span-7",
@@ -273,9 +277,24 @@ export function DashboardController({
     .filter((m): m is Metric => !!m && (cash.available || !CASH_KEYS.has(m.key)));
 
   // ── Widget nodes (filtered) ─────────────────────────────────────────────────
+  // Revenue lines honouring the period + monthly/cumulative filters, so the
+  // composition widget shows the same period as the headline figures. Monthly
+  // mode diffs each line against the previous checkpoint by id.
+  const revLines = (() => {
+    const ms = snapshot.monthlyStatements ?? [];
+    const cur = ms.find((s) => s.idx === cfg.periodIdx) ?? ms[ms.length - 1];
+    const base = cur?.revenueLines ?? snapshot.incomeTotals?.revenueLines ?? snapshot.revenueLines;
+    if (cfg.mode !== "monthly" || !cur) return base;
+    const prev = ms.filter((s) => s.idx < cur.idx).sort((a, b) => b.idx - a.idx)[0];
+    if (!prev) return base;
+    const prevBy = new Map(prev.revenueLines.map((r) => [r.id, r.ytd]));
+    return base.map((r) => ({ ...r, ytd: r.ytd - (prevBy.get(r.id) ?? 0) }));
+  })();
+
   const allocation = depts.map((d) => ({ department: d, share: totalBudget > 0 ? d.annualBudget / totalBudget : 0 }));
   const widgetNode: Record<string, React.ReactNode> = {
     "operating-position": <OperatingPosition totalIncome={fin.income} totalExpenses={fin.expenses} netResult={fin.net} periodLabel={fin.label} />,
+    "revenue-composition": <RevenueComposition lines={revLines} totalIncome={fin.income} periodLabel={fin.label} />,
     "cash-position": <CashPosition cash={cash} periodLabel={snapshot.period.label} />,
     "grant-mix": <GrantMix summary={grantMix} periodLabel={snapshot.period.label} />,
     "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} trend={spendTrend(snapshot)} monthLabel={`Month ${snapshot.period.monthOfYear}`} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,

@@ -239,9 +239,16 @@ export default async function DepartmentPage(
             )}
           </Panel>
 
-          {d.kind === "cost-revenue" && revenue.length > 0 && (
-            <Panel>
-              <PanelHeader title="Revenue" subtitle="YTD" />
+          {/* Always show the income side. A manager's "complete picture" includes
+              revenue even when there is none (Aug 2026 review) — a cost centre
+              with no income says so instead of hiding the panel. */}
+          <Panel>
+            <PanelHeader title="Revenue" subtitle="YTD" />
+            {revenue.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                No revenue recorded against this centre this financial year.
+              </p>
+            ) : (
               <div className="flex flex-col gap-2">
                 {revenue.map((r) => (
                   <div key={r.id} className="flex items-center justify-between">
@@ -265,8 +272,8 @@ export default async function DepartmentPage(
                   </span>
                 </div>
               </div>
-            </Panel>
-          )}
+            )}
+          </Panel>
         </div>
       </div>
     </Content>

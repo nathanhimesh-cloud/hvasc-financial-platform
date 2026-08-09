@@ -7,6 +7,7 @@
     "build": "next build",
     "build:feed": "node scripts/build-snapshot.mjs",
     "verify:budget": "node scripts/verify-budget-report.mjs",
+    "verify:capital": "node scripts/verify-capital-budget.mjs",
     "start": "next start",
     "lint": "eslint",
     "verify:data": "node scripts/verify-data.mjs"
