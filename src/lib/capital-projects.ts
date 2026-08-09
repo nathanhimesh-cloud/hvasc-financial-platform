@@ -65,19 +65,27 @@ export interface CapitalProgramme {
   source: string;
 }
 
+/**
+ * Practical keys jobs as "JOB-SUBJOB" (4-4, e.g. "1000-2000"); the printed
+ * budget report shows a third, always-zero segment ("1000-2000-0000"). Join on
+ * the 4-4 prefix so the ledger's codes match the transcribed budgets whichever
+ * form a data block uses.
+ */
+const jobKey = (code: string) => code.trim().slice(0, 9);
+
 export function buildCapitalProgramme(snapshot: FinancialSnapshot): CapitalProgramme {
   // Job-costed spend by code. JCTRN is the primary source; the job register's
   // own per-job actuals are the fallback when the cost-ledger block is absent.
   const actualBy = new Map<string, number>();
   for (const jc of snapshot.jobCosts ?? []) {
-    const key = jc.code.trim();
+    const key = jobKey(jc.code);
     actualBy.set(key, (actualBy.get(key) ?? 0) + jc.amount);
   }
   if (actualBy.size === 0) {
     for (const g of snapshot.jobBudgets ?? []) {
       for (const j of g.jobs) {
         if (!j.actual) continue;
-        const key = j.code.trim();
+        const key = jobKey(j.code);
         actualBy.set(key, (actualBy.get(key) ?? 0) + j.actual);
       }
     }
@@ -85,13 +93,13 @@ export function buildCapitalProgramme(snapshot: FinancialSnapshot): CapitalProgr
 
   const commitBy = new Map<string, number>();
   for (const c of snapshot.commitments?.byJob ?? []) {
-    const key = c.code.trim();
+    const key = jobKey(c.code);
     commitBy.set(key, (commitBy.get(key) ?? 0) + c.amount);
   }
 
   const rows: CapitalProjectRow[] = CAPITAL_JOBS_FY27.map((seed) => {
-    const actual = actualBy.get(seed.code) ?? 0;
-    const committed = commitBy.get(seed.code) ?? 0;
+    const actual = actualBy.get(jobKey(seed.code)) ?? 0;
+    const committed = commitBy.get(jobKey(seed.code)) ?? 0;
     const totalActPlusComm = actual + committed;
     return {
       ...seed,
