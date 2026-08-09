@@ -68,7 +68,7 @@ export function CashPosition({ cash, periodLabel }: { cash: CashBreakdown; perio
             </span>
           </div>
 
-          <div className="mt-2.5 flex h-3 w-full overflow-hidden rounded-full bg-elevated">
+          <div className="mt-2.5 flex h-3 w-full overflow-hidden rounded-full bg-[var(--track)]">
             <div
               className="h-full transition-[width] duration-700 ease-out"
               style={{ width: `${restrictedShare * 100}%`, background: hex.amber }}

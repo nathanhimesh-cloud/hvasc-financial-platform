@@ -59,19 +59,32 @@ export function downloadXlsx<T>(
     const body = sheet.rows.map((r) =>
       sheet.columns.map((c) => {
         const v = c.value(r);
-        if (v === null || v === undefined) return "";
+        // TRUE empty cells, not "". An empty STRING is a text cell — in a money
+        // column it left-aligns among right-aligned numbers, which is exactly
+        // the "misaligned export" the Aug 2026 review complained about.
+        if (v === null || v === undefined || v === "") return null;
         return v;
       }),
     );
 
-    const aoa: (string | number)[][] = [header, ...body];
+    const aoa: (string | number | null)[][] = [header, ...body];
+
+    // The promised totals row (the interface always offered it; nothing wrote it).
+    if (sheet.total) {
+      aoa.push(sheet.columns.map((c) => {
+        const v = sheet.total![c.header];
+        return v === undefined || v === null || v === "" ? null : v;
+      }));
+    }
+
     const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const lastDataRow = aoa.length - 1; // includes the totals row when present
 
     // Number formats, per column, skipping the header row.
     sheet.columns.forEach((col, ci) => {
       const fmt = FORMATS[col.type ?? "text"];
       if (!fmt) return;
-      for (let ri = 1; ri <= sheet.rows.length; ri++) {
+      for (let ri = 1; ri <= lastDataRow; ri++) {
         const addr = XLSX.utils.encode_cell({ r: ri, c: ci });
         const cell = ws[addr];
         if (cell && typeof cell.v === "number") cell.z = fmt;
@@ -81,7 +94,13 @@ export function downloadXlsx<T>(
     ws["!cols"] = sheet.columns.map((c) => ({
       wch: c.width ?? Math.max(c.header.length + 2, 12),
     }));
-    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+    // Freeze the header row. The bare {xSplit, ySplit} object was silently
+    // ignored by SheetJS — the pane needs its anchor and state spelled out.
+    ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+    // Filter arrows over the data (not the totals row).
+    ws["!autofilter"] = {
+      ref: `A1:${XLSX.utils.encode_cell({ r: sheet.rows.length, c: sheet.columns.length - 1 })}`,
+    };
 
     // Sheet names are capped at 31 chars by the format itself, and Excel refuses
     // a workbook with a longer one rather than truncating politely.

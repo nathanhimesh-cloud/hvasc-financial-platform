@@ -47,7 +47,7 @@ export function BudgetBarChart({
       <div className="mb-4 flex items-center gap-4 font-mono text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-3 rounded-sm bg-muted-foreground/70" />
-          FY26 spend
+          YTD spend
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-px bg-foreground/70" />
@@ -72,7 +72,7 @@ export function BudgetBarChart({
                 <DeptIcon name={d.icon} className={`h-4 w-4 ${textColor[d.color]}`} />
                 {shortName(d.name)}
               </div>
-              <div className="relative h-[9px] flex-1 overflow-hidden rounded-[5px] bg-elevated">
+              <div className="relative h-[9px] flex-1 overflow-hidden rounded-[5px] bg-[var(--track)]">
                 <div
                   className="animate-bar absolute left-0 top-0 h-full rounded-[5px]"
                   style={{

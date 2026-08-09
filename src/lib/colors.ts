@@ -55,19 +55,20 @@ export const accentBar: Record<BrandColor, string> = {
 
 /**
  * Accent colours for SVG fills / inline widths where a Tailwind class won't do.
- * These reference the per-theme CSS variables (see globals.css), so charts
- * re-colour with the selected theme — CSS vars resolve in both inline `style`
- * and SVG `fill`/`stroke` attributes (the app already relies on the latter).
+ * These reference the per-theme DATA-VIZ variables (see globals.css): each theme
+ * keeps its readable text palette but may give charts a bolder one — the Power
+ * BI light theme swaps in the classic PBI report colours here. CSS vars resolve
+ * in both inline `style` and SVG `fill`/`stroke` attributes.
  */
 export const hex: Record<BrandColor, string> = {
-  teal: "var(--teal)",
-  blue: "var(--blue)",
-  indigo: "var(--indigo)",
-  violet: "var(--violet)",
-  amber: "var(--amber)",
-  red: "var(--red)",
-  green: "var(--green)",
-  gold: "var(--gold)",
+  teal: "var(--viz-teal)",
+  blue: "var(--viz-blue)",
+  indigo: "var(--viz-indigo)",
+  violet: "var(--viz-violet)",
+  amber: "var(--viz-amber)",
+  red: "var(--viz-red)",
+  green: "var(--viz-green)",
+  gold: "var(--viz-gold)",
 };
 
 export const statusToColor: Record<DepartmentStatus, BrandColor> = {
@@ -82,10 +83,12 @@ export const statusLabel: Record<DepartmentStatus, string> = {
   "over-budget": "Over Budget",
 };
 
-/** Alert chip classes by urgency level. */
+/** Alert chip classes by urgency level. Borders ride the theme's own accent at
+ * 30% — the old hardcoded rgba values were baked from the dark palette and
+ * clashed on the white theme. */
 export const alertChip: Record<AlertLevel, string> = {
-  urgent: "bg-red-dim text-red border border-[rgba(255,96,96,0.25)]",
-  warning: "bg-amber-dim text-amber border border-[rgba(245,168,48,0.25)]",
-  ok: "bg-green-dim text-green border border-[rgba(80,216,144,0.25)]",
+  urgent: "bg-red-dim text-red border border-red/30",
+  warning: "bg-amber-dim text-amber border border-amber/30",
+  ok: "bg-green-dim text-green border border-green/30",
   muted: "text-subtle",
 };

@@ -77,8 +77,8 @@ page calls `getSnapshot()` and is agnostic to the origin.
 
 - New **GL codes** are still being finalised — map via the Chart of Accounts
   report under General Ledger.
-- The **FY2026 budget** is not yet loaded, so budget-vs-actual is partial until
-  it is.
+- The **FY2027 budget is loaded** (live feed: `budgetEstimated: false`). The
+  old FY2026 gap only affects archived FY26 periods.
 - **Grants**: kept in an Excel register; revenue tracked by GL code, expenditure
   by **job codes**.
 - 4 departments / cost-(revenue-)centres: Water, Roads, Storage, Child Care.

@@ -13,9 +13,9 @@ export function RagDot({ color }: { color: BrandColor }) {
 }
 
 const statusPillTone: Record<DepartmentStatus, string> = {
-  "on-track": "bg-green-dim text-green border-[rgba(80,216,144,0.25)]",
-  "at-risk": "bg-amber-dim text-amber border-[rgba(245,168,48,0.25)]",
-  "over-budget": "bg-red-dim text-red border-[rgba(255,96,96,0.25)]",
+  "on-track": "bg-green-dim text-green border-green/30",
+  "at-risk": "bg-amber-dim text-amber border-amber/30",
+  "over-budget": "bg-red-dim text-red border-red/30",
 };
 
 /** Department status pill with a RAG dot. */

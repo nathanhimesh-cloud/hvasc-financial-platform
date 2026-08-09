@@ -42,15 +42,16 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [~] **Grants ingestion** — grant *funding received* now comes from Note 5.
       Still need the council's **Excel grants register** (deadlines/acquittals)
       + **job-costing** export for grant *spend* and report status.
-- [~] **Budget data** — FY2026 budget is **not loaded in Practical** (all budget
-      columns export as 0). Interim baseline = run-rate (YTD annualised). Swap to
-      real FY26 budget when loaded, or drop a **FY25 Note 3a** export for a
-      FY25-actuals baseline (the builder auto-detects it).
+- [x] **Budget data** — the **FY27 budget is loaded in Practical** (live feed
+      reports `budgetEstimated: false`; annual expense budget $26,865,716 with
+      cumulative-to-period budgets on 203 accounts). The FY26 run-rate fallback
+      remains in the code for archived periods only.
 - [ ] **Monthly trend** — exports have no month-by-month series; the sparkline is
       a flat estimate. Needs a per-period P&L export to make it real.
-- [ ] **Scheduled refresh** — document/automate the `sandsservice` scheduled
-      task that exports reports to the share; decide refresh cadence. On Vercel
-      this means an in-network agent that rebuilds + commits/pushes the snapshot.
+- [x] **Scheduled refresh** — DONE via the ODBC feed: a Windows Scheduled Task
+      on HVASC-APP02 runs `scripts/odbc/07-run-feed.ps1` at 06:00 / 12:30 / 18:00
+      AEST and PUTs the snapshot to `/api/feed/snapshot`. See `scripts/odbc/README.md`
+      (the current truth — the CSV-share route described above is superseded).
 - [ ] **(Stretch) Direct ODBC** — once Civica approves a read-only DB credential
       (PCSACCESS), implement the `odbc` source to emit the same snapshot live.
 

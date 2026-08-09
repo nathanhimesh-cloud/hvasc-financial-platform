@@ -22,7 +22,7 @@ export function Panel({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-lg)] border border-border bg-card p-5 transition-colors hover:border-[var(--hairline)]",
+        "rounded-[var(--radius-lg)] border border-border bg-card p-5 shadow-[var(--panel-shadow)] transition-colors hover:border-[var(--hairline)] print:break-inside-avoid print:shadow-none",
         className,
       )}
     >

@@ -148,6 +148,23 @@
   --hairline: rgba(255, 255, 255, 0.16);
   --hairline-hover: rgba(255, 255, 255, 0.03);
   --th-fg: #dce8f0;
+
+  /* Data-viz fills (charts, bars, donut segments, legend dots). Default to the
+     brand accents; a theme may override THESE ALONE to give its charts a bolder
+     palette than body text could carry — see the Power BI light theme. */
+  --viz-gold: var(--gold);
+  --viz-teal: var(--teal);
+  --viz-blue: var(--blue);
+  --viz-indigo: var(--indigo);
+  --viz-violet: var(--violet);
+  --viz-green: var(--green);
+  --viz-amber: var(--amber);
+  --viz-red: var(--red);
+
+  /* The track a chart bar sits in, and the card lift. On dark the borders do
+     the lifting, so the shadow is off. */
+  --track: var(--elevated);
+  --panel-shadow: 0 0 0 0 transparent;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -197,6 +214,23 @@
   --hairline: rgba(0, 0, 0, 0.13);
   --hairline-hover: rgba(0, 0, 0, 0.035);
   --th-fg: #605e5c;
+
+  /* The Power BI face. Charts get the CLASSIC report-theme data colours at full
+     strength — text keeps the readable office palette above (a #F2C80F heading
+     on white is illegible; a #F2C80F bar is signature Power BI). Cards drop the
+     wireframe look: near-invisible border, the PBI soft shadow does the lifting,
+     and bars sit in a visible grey track. */
+  --viz-gold: #f2c80f;
+  --viz-teal: #01b8aa;
+  --viz-blue: #118dff;
+  --viz-indigo: #5f6bd0;
+  --viz-violet: #a66999;
+  --viz-green: #107c41;
+  --viz-amber: #e66c37;
+  --viz-red: #d64550;
+
+  --track: #e2e5e9;
+  --panel-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.1), 0 0.3px 0.9px rgba(0, 0, 0, 0.07);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -245,6 +279,9 @@
   --hairline: rgba(255, 255, 255, 0.14);
   --hairline-hover: rgba(255, 255, 255, 0.04);
   --th-fg: #c8c6c4;
+
+  --track: #3b3a39;
+  --panel-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 @layer base {
@@ -273,6 +310,41 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--input);
   }
+
+  /* The period scrubber (and any range input). `appearance-none` strips the
+     native thumb, and nothing re-drew it — on the light theme the control was
+     close to invisible (Aug 2026 review). Themed track + a gold thumb with a
+     card-coloured ring so it reads on white AND on black. */
+  input[type="range"] {
+    height: 5px;
+    border-radius: 999px;
+    background: var(--track);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 14px;
+    width: 14px;
+    border-radius: 999px;
+    background: var(--gold);
+    border: 2px solid var(--card);
+    box-shadow: 0 0 0 1px var(--hairline), 0 1px 3px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    height: 14px;
+    width: 14px;
+    border-radius: 999px;
+    background: var(--gold);
+    border: 2px solid var(--card);
+    box-shadow: 0 0 0 1px var(--hairline), 0 1px 3px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+  }
+  input[type="range"]:disabled::-webkit-slider-thumb,
+  input[type="range"]:disabled::-moz-range-thumb {
+    opacity: 0.5;
+    cursor: default;
+  }
 }
 
 /* Print / export-to-PDF: swap to a light palette and hide the app chrome so a
@@ -298,6 +370,47 @@
   aside,
   .no-print {
     display: none !important;
+  }
+
+  /* THE MISALIGNED-PRINT FIX (Aug 2026 review). The report tables set a
+     min-width and live in `overflow-x-auto` scrollers — on screen you scroll,
+     but print CLIPS everything past the page edge, so exports lost their
+     right-hand columns. Let overflow flow, drop the min-widths, shrink the
+     type, and the whole table fits the sheet. */
+  .overflow-x-auto,
+  .overflow-hidden,
+  .overflow-y-auto {
+    overflow: visible !important;
+  }
+  table {
+    min-width: 0 !important;
+    width: 100% !important;
+    font-size: 10px !important;
+    table-layout: auto !important;
+  }
+  th,
+  td {
+    padding: 4px 6px !important;
+    white-space: normal !important;
+  }
+  thead {
+    display: table-header-group; /* repeat column headers on every page */
+  }
+  tr {
+    break-inside: avoid;
+  }
+
+  /* Multi-column dashboards stack to one column on paper. */
+  .grid {
+    display: block !important;
+  }
+  .grid > * {
+    width: 100% !important;
+    margin-bottom: 12px;
+  }
+
+  @page {
+    margin: 14mm 12mm;
   }
 }
 

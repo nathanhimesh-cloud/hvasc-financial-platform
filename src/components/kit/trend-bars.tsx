@@ -1,6 +1,7 @@
 "use client";
 
 import { formatCompact } from "@/lib/format";
+import { hex } from "@/lib/colors";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,7 +64,7 @@ export function TrendBars({
               <div key={`${d.label}-${i}`} className="group relative flex-1">
                 <div
                   className={cn(
-                    "absolute w-full transition-colors",
+                    "absolute w-full transition-opacity",
                     /*
                       COLOUR MEANS SOMETHING, so it has to mean the right thing.
 
@@ -77,17 +78,19 @@ export function TrendBars({
                       tells the CFO something went wrong when nothing did.
 
                       Gold = money out. Teal = money back. Neither is a verdict.
+                      Fills come from the theme's DATA-VIZ palette at full
+                      strength (Power BI bars are solid, not 50% washes — the
+                      old translucent gold disappeared on the white theme);
+                      non-highlighted bars step back via opacity instead.
                     */
-                    negative
-                      ? "rounded-b bg-teal/60 group-hover:bg-teal"
-                      : isHi
-                        ? "rounded-t bg-gold group-hover:bg-gold-light"
-                        : "rounded-t bg-gold/50 group-hover:bg-gold",
+                    negative ? "rounded-b" : "rounded-t",
+                    !negative && !isHi && "opacity-80 group-hover:opacity-100",
+                    negative && "opacity-90 group-hover:opacity-100",
                   )}
                   style={
                     negative
-                      ? { top: `${zeroLine}%`, height: `${Math.max(pct, 1)}%` }
-                      : { bottom: `${100 - zeroLine}%`, height: `${Math.max(pct, 1)}%` }
+                      ? { top: `${zeroLine}%`, height: `${Math.max(pct, 1)}%`, background: hex.teal }
+                      : { bottom: `${100 - zeroLine}%`, height: `${Math.max(pct, 1)}%`, background: hex.gold }
                   }
                   title={`${d.label}: ${formatCompact(d.amount)}`}
                 />
@@ -101,11 +104,11 @@ export function TrendBars({
       {hasNegative && (
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[9px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2.5 rounded-sm bg-gold/60" />
+            <span className="h-2 w-2.5 rounded-sm" style={{ background: hex.gold }} />
             spend
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2.5 rounded-sm bg-teal/60" />
+            <span className="h-2 w-2.5 rounded-sm" style={{ background: hex.teal }} />
             below the line = a credit, not a loss — usually June&apos;s accruals reversing
           </span>
         </div>

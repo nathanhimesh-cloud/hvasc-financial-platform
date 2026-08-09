@@ -49,7 +49,7 @@ export function RevenueComposition({
             </span>
           </div>
 
-          <div className="mt-2.5 flex h-3 w-full overflow-hidden rounded-full bg-elevated">
+          <div className="mt-2.5 flex h-3 w-full overflow-hidden rounded-full bg-[var(--track)]">
             {buckets.map((b) =>
               b.amount > 0 && barTotal > 0 ? (
                 <div

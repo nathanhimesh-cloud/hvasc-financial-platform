@@ -35,7 +35,7 @@ export function KpiCard({ color, label, icon: Icon, value, meta, estimated, dela
           {label}
           {estimated && (
             <span
-              className="rounded-[3px] border border-[rgba(245,168,48,0.3)] bg-amber-dim px-1 py-px text-[8px] font-semibold tracking-[0.08em] text-amber"
+              className="rounded-[3px] border border-amber/30 bg-amber-dim px-1 py-px text-[8px] font-semibold tracking-[0.08em] text-amber"
               title="Estimated — not a confirmed/loaded figure"
             >
               EST.
