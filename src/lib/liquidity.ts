@@ -1,5 +1,6 @@
 import type { FinancialSnapshot } from "@/lib/types";
 import type { GrantFigures } from "@/lib/grants";
+import { displayAccountLabel } from "@/lib/label-overrides";
 
 /**
  * Restricted vs unrestricted cash, and the liquidity rule (CFO recommendation C1).
@@ -38,6 +39,14 @@ export const MIN_MONTHS_COVER = 4;
 /** Current-asset lines that represent cash or a bank account. */
 const CASH_LINE = /cash|bank|qtc|maxi[\s-]?direct/i;
 
+/**
+ * Lines CASH_LINE would match that are NOT cash. "Banker's Suspense" contains
+ * "bank", so the regex was counting it — and the council asked for it to be
+ * removed from the cash position outright (Aug 2026 dashboard review): a
+ * suspense account is unreconciled noise, not money the Council can spend.
+ */
+const NON_CASH_LINE = /suspense/i;
+
 export interface CashBreakdown {
   /**
    * False when there's no cash data at all — e.g. a prior-year period rebuilt from
@@ -72,7 +81,9 @@ export interface CashBreakdown {
  * readable yet.
  */
 export function totalCash(snapshot: FinancialSnapshot): { total: number; lines: { label: string; amount: number }[] } {
-  const lines = (snapshot.balanceSheet?.currentAssets.lines ?? []).filter((l) => CASH_LINE.test(l.label));
+  const lines = (snapshot.balanceSheet?.currentAssets.lines ?? [])
+    .filter((l) => CASH_LINE.test(l.label) && !NON_CASH_LINE.test(l.label))
+    .map((l) => ({ ...l, label: displayAccountLabel(l.label, l.code) }));
   return { total: lines.reduce((a, l) => a + l.amount, 0), lines };
 }
 

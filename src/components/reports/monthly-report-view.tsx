@@ -163,11 +163,11 @@ export function MonthlyReportView({ report }: { report: MonthlyReport }) {
             <Stat label="Total cash" value={formatCompact(report.cash.totalCash)} />
             <Stat
               label="Unrestricted cash"
-              value={`${report.cash.exact ? "" : "≤ "}${formatCompact(report.cash.unrestrictedCash)}`}
+              value={`${report.cash.exact ? "" : "up to "}${formatCompact(report.cash.unrestrictedCash)}`}
             />
             <Stat
               label="Months of cover"
-              value={report.cash.monthsCover === null ? "—" : `${report.cash.exact ? "" : "≤ "}${report.cash.monthsCover.toFixed(1)}`}
+              value={report.cash.monthsCover === null ? "—" : `${report.cash.exact ? "" : "up to "}${report.cash.monthsCover.toFixed(1)}`}
               tone={report.cash.belowMinimum ? "neg" : "pos"}
             />
           </div>

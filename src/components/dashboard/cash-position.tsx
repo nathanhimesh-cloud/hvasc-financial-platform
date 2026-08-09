@@ -43,9 +43,11 @@ export function CashPosition({ cash, periodLabel }: { cash: CashBreakdown; perio
   const restrictedShare = totalCash > 0 ? Math.min(Math.max(restrictedCash / totalCash, 0), 1) : 0;
   const unrestrictedShare = 1 - restrictedShare;
 
-  // "at least" / "up to" — never imply precision we don't have.
+  // "at least" / "up to" — spelled out in words. The council couldn't read the
+  // ≥/≤ glyphs on screen (Aug 2026 review), and words never imply precision we
+  // don't have.
   const approx = (n: number, kind: "floor" | "ceiling") =>
-    exact ? formatCompact(n) : `${kind === "floor" ? "≥" : "≤"} ${formatCompact(n)}`;
+    exact ? formatCompact(n) : `${kind === "floor" ? "at least" : "up to"} ${formatCompact(n)}`;
 
   return (
     <Panel className="h-full">
@@ -108,7 +110,7 @@ export function CashPosition({ cash, periodLabel }: { cash: CashBreakdown; perio
             value={
               monthsCover === null
                 ? "—"
-                : `${exact ? "" : "≤ "}${monthsCover.toFixed(1)}`
+                : `${exact ? "" : "up to "}${monthsCover.toFixed(1)}`
             }
             tone={cash.belowMinimum ? "neg" : "pos"}
             hint={`unrestricted ÷ opex · min ${MIN_MONTHS_COVER}`}

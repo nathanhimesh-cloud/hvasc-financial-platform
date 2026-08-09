@@ -100,7 +100,7 @@ export function OperatingPosition({
         <div className="grid flex-1 grid-cols-3 gap-3">
           <Tile label="Surplus margin" value={<CountUp value={margin} format="percent" />} tone={surplus ? "pos" : "neg"} hint="net ÷ income" />
           <Tile label="Spend rate" value={<CountUp value={spendRatio} format="percent" />} hint="of income spent" />
-          <Tile label={surplus ? "Retained YTD" : "Shortfall YTD"} value={<CountUp value={Math.abs(netResult)} format="compact" />} tone={surplus ? "pos" : "neg"} hint={periodLabel} />
+          <Tile label={surplus ? "Surplus Year to Date" : "Shortfall Year to Date"} value={<CountUp value={Math.abs(netResult)} format="compact" />} tone={surplus ? "pos" : "neg"} hint={periodLabel} />
         </div>
       </div>
     </Panel>

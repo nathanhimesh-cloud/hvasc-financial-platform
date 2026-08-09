@@ -73,9 +73,13 @@ export interface IntegrityReport {
  */
 const BS_CASH_LINE = /cash|bank|qtc|maxi[\s-]?direct|petty|float/i;
 
+/** Suspense accounts match /bank/ by name ("Banker's Suspense") but are not cash —
+ * excluded from the cash position at the council's request (Aug 2026 review). */
+const BS_NON_CASH_LINE = /suspense/i;
+
 /** Every account on the balance sheet that represents cash or a bank account. */
 function balanceSheetCashLines(bs: BalanceSheet) {
-  return bs.currentAssets.lines.filter((l) => BS_CASH_LINE.test(l.label));
+  return bs.currentAssets.lines.filter((l) => BS_CASH_LINE.test(l.label) && !BS_NON_CASH_LINE.test(l.label));
 }
 
 /**

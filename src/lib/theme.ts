@@ -7,13 +7,16 @@
  * a different set of those variables selected by `data-theme` on <html>. The charts
  * re-theme for free because lib/colors.ts hands Recharts/SVG the variables, not hex.
  *
- * Vantage is the default and carries NO attribute — its values live on bare :root,
- * so a user who never opens Settings sees exactly what shipped.
+ * Vantage's values live on bare :root (no attribute). The DEFAULT is now
+ * "pbi-light": the council asked for a white dashboard in the Aug 2026 review
+ * (the dark background read as ominous and the ≤/≥ glyphs were hard to read),
+ * so a user who never opens Settings gets the light theme. Vantage and the dark
+ * Power BI palette remain selectable.
  */
 export type ThemeId = "vantage" | "pbi-light" | "pbi-dark";
 
 export const THEME_STORAGE_KEY = "vantage-theme";
-export const DEFAULT_THEME: ThemeId = "vantage";
+export const DEFAULT_THEME: ThemeId = "pbi-light";
 
 export const THEMES: { id: ThemeId; label: string; description: string; scheme: "dark" | "light" }[] = [
   { id: "vantage", label: "Vantage Dark", description: "The signature dark theme.", scheme: "dark" },
@@ -37,4 +40,4 @@ export function applyTheme(id: ThemeId) {
  * first paint — otherwise a light-theme user sees a black flash on every load.
  * Kept dependency-free and inlined; it runs before React hydrates.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var d=document.documentElement;if(t==='pbi-light'){d.setAttribute('data-theme','pbi-light');d.classList.remove('dark');d.style.colorScheme='light';}else if(t==='pbi-dark'){d.setAttribute('data-theme','pbi-dark');d.classList.add('dark');d.style.colorScheme='dark';}else{d.removeAttribute('data-theme');d.classList.add('dark');d.style.colorScheme='dark';}}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var d=document.documentElement;if(t==='pbi-dark'){d.setAttribute('data-theme','pbi-dark');d.classList.add('dark');d.style.colorScheme='dark';}else if(t==='vantage'){d.removeAttribute('data-theme');d.classList.add('dark');d.style.colorScheme='dark';}else{d.setAttribute('data-theme','pbi-light');d.classList.remove('dark');d.style.colorScheme='light';}}catch(e){}})();`;

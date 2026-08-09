@@ -128,12 +128,13 @@ if (cf) {
 
   // The known disagreement, quantified — not a bug in our data, a stale FR report.
   const CASH = /cash|bank|qtc|maxi[\s-]?direct|petty|float/i;
+  const NON_CASH = /suspense/i; // "Banker's Suspense" matches /bank/ but is not cash
   const bsCash = (bs?.currentAssets?.lines ?? [])
-    .filter((l) => CASH.test(l.label))
+    .filter((l) => CASH.test(l.label) && !NON_CASH.test(l.label))
     .reduce((a, l) => a + l.amount, 0);
   const codes = new Set((cf.cashAccounts ?? []).map((c) => String(c).trim()));
   const orphans = (bs?.currentAssets?.lines ?? []).filter(
-    (l) => CASH.test(l.label) && l.code && !codes.has(String(l.code).trim()),
+    (l) => CASH.test(l.label) && !NON_CASH.test(l.label) && l.code && !codes.has(String(l.code).trim()),
   );
   check(
     "Cash agrees across the two statements",
