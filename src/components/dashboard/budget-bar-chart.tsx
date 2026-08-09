@@ -5,7 +5,7 @@ import { hex, statusToColor, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
 import { formatCompact, formatCurrency, formatPercent } from "@/lib/format";
 import { CardBadge, Panel, PanelHeader } from "@/components/kit/panel";
-import { TrendBars } from "@/components/kit/trend-bars";
+import { ColumnChart } from "@/components/kit/column-chart";
 import type { SpendTrend } from "@/lib/trend";
 import { cn } from "@/lib/utils";
 
@@ -112,18 +112,20 @@ export function BudgetBarChart({
         />
       ) : trend ? (
         <div className="mt-6 border-t border-border pt-[18px]">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3">
             <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
               Daily spend
             </span>
-            {/* Budget/phasing reference for the daily view — the straight-lined pace
-                the monthly Sparkline shows as a dashed line, expressed per day. */}
-            <span className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-              <span className="h-px w-3 border-t border-dashed border-muted-foreground" />
-              Budget pace ≈ {formatCompact(monthlyBudget / 30)}/day
-            </span>
           </div>
-          <TrendBars data={trend.points} labelEvery={trend.labelEvery} height={96} />
+          <ColumnChart
+            data={trend.points.map((p) => ({ label: p.label, value: p.amount }))}
+            barLabel="daily spend"
+            refValue={monthlyBudget / 30}
+            refLabel={`budget pace ≈ ${formatCompact(monthlyBudget / 30)}/day`}
+            labelEvery={trend.labelEvery}
+            height={120}
+            showValues={false}
+          />
           <p className="mt-2 font-mono text-[9px] text-muted-foreground">{trend.subtitle}</p>
         </div>
       ) : null}
@@ -151,7 +153,13 @@ function Sparkline({
   const maxIdx = amounts.indexOf(Math.max(...amounts));
   const minIdx = amounts.indexOf(Math.min(...amounts));
   // Domain from 0 so bar heights read honestly; include the reference line.
-  const max = Math.max(...amounts, monthlyBudget) * 1.08;
+  // Nice-number ticks so the axis reads like a report chart, not a sparkline.
+  const rawMax = Math.max(...amounts, monthlyBudget, 1);
+  const stepMag = Math.pow(10, Math.floor(Math.log10(rawMax / 3)));
+  const stepUnit = rawMax / 3 / stepMag;
+  const step = (stepUnit <= 1 ? 1 : stepUnit <= 2 ? 2 : stepUnit <= 2.5 ? 2.5 : stepUnit <= 5 ? 5 : 10) * stepMag;
+  const max = step * Math.ceil(rawMax / step);
+  const ticks = [0, step, step * 2, max].filter((t, i, a) => a.indexOf(t) === i);
   const yOf = (v: number) => Math.round(H - PAD - (v / (max || 1)) * (H - PAD * 2));
   const xPct = (i: number) =>
     monthlySpend.length > 1 ? (i / (monthlySpend.length - 1)) * 100 : 50;
@@ -180,7 +188,22 @@ function Sparkline({
         </span>
       </div>
 
-      <div className="relative" style={{ height: H }}>
+      <div className="flex">
+        {/* Y-axis tick labels (Power BI look — an area chart without an axis is
+            just a shape). HTML so they never stretch with the SVG. */}
+        <div className="relative w-11 flex-shrink-0" style={{ height: H }}>
+          {ticks.map((t) => (
+            <span
+              key={t}
+              className="absolute right-1.5 -translate-y-1/2 font-mono text-[9px] tabular-nums text-muted-foreground"
+              style={{ top: `${(yOf(t) / H) * 100}%` }}
+            >
+              {formatCompact(t)}
+            </span>
+          ))}
+        </div>
+
+      <div className="relative flex-1" style={{ height: H }}>
         <svg
           width="100%"
           height={H}
@@ -194,6 +217,16 @@ function Sparkline({
               <stop offset="100%" stopColor="var(--gold)" stopOpacity="0" />
             </linearGradient>
           </defs>
+          {/* Horizontal gridlines at the ticks; the baseline is the strong one. */}
+          {ticks.map((t) => (
+            <line
+              key={`grid-${t}`}
+              x1="0" x2={W} y1={yOf(t)} y2={yOf(t)}
+              stroke={t === 0 ? "var(--hairline)" : "var(--hairline-soft)"}
+              strokeWidth={t === 0 ? 1.25 : 1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
           <path d={area} fill="url(#sparkGrad)" />
           <line
             x1="0" y1={refY} x2={W} y2={refY}
@@ -230,8 +263,9 @@ function Sparkline({
           })}
         </div>
       </div>
+      </div>
 
-      <div className="mt-1.5 flex justify-between font-mono text-[9px] tracking-[0.04em] text-muted-foreground">
+      <div className="ml-11 mt-1.5 flex justify-between font-mono text-[9px] tracking-[0.04em] text-muted-foreground">
         {monthlySpend.map((m, i) => (
           <span key={m.month} className={cn(i === maxIdx && "text-gold")}>
             {m.month}

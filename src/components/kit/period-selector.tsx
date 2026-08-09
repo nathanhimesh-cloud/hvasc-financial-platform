@@ -54,6 +54,7 @@ export function PeriodSelector({
   );
   const oldest = ordered[0];
   const newest = ordered[ordered.length - 1];
+  const fillPct = ordered.length > 1 ? (sliderIndex / (ordered.length - 1)) * 100 : 0;
 
   return (
     <div className="no-print flex flex-wrap items-center gap-2">
@@ -105,7 +106,13 @@ export function PeriodSelector({
               if (p) go(`${p.fyLabel}|${p.periodMonth}`);
             }}
             aria-label={`Period: ${selected.periodLabel}`}
-            className="h-1 w-40 cursor-pointer appearance-none rounded-full bg-elevated accent-gold disabled:opacity-50"
+            className="h-1.5 w-56 cursor-pointer appearance-none rounded-full disabled:opacity-50"
+            /* A slider you can't see isn't a slider (Aug 2026 review): fill the
+               track up to the thumb in gold so position — and the control
+               itself — is obvious at a glance on any theme. */
+            style={{
+              background: `linear-gradient(to right, var(--gold) 0%, var(--gold) ${fillPct}%, var(--track) ${fillPct}%, var(--track) 100%)`,
+            }}
           />
           <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground">
             {newest.periodLabel}
