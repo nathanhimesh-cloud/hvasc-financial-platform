@@ -21,7 +21,7 @@ import { Panel, PanelHeader } from "@/components/kit/panel";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { IntegrityBanner } from "@/components/kit/integrity-banner";
 import { DataStamp } from "@/components/kit/data-stamp";
-import { PrintButton } from "@/components/kit/print-button";
+import { ExportButton } from "@/components/kit/export-button";
 import { TrendBars } from "@/components/kit/trend-bars";
 import { DrillLink } from "@/components/kit/drill-link";
 import { MultiPeriod } from "./multi-period";
@@ -287,7 +287,7 @@ export function ReportsView({
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <DataStamp generatedAt={generatedAt} periodLabel={periodName} fyLabel={fyLabel} source={source} />
-        <PrintButton />
+        <ExportButton />
       </div>
 
       {/* Statement tabs */}

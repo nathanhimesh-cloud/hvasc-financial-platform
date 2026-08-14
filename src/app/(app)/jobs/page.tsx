@@ -32,6 +32,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     <Content>
       <PageToolbar
         view={view}
+        print={false} /* the job budget table carries the unified export menu */
         filters={groups.length > 0 ? <DataQualityBadge issues={jobIssues(s)} /> : undefined}
         notes={
           <>

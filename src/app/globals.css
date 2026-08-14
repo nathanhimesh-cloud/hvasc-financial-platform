@@ -173,12 +173,13 @@
    ───────────────────────────────────────────────────────────────────────────── */
 :root[data-theme="pbi-light"] {
   color-scheme: light;
-  --background: #f4f5f7;
+  /* Warm off-white chrome to echo the council emblem's cream card, not a cold grey. */
+  --background: #f4f3ef;
   --foreground: #252423;
   --surface: #ffffff;
   --card: #ffffff;
-  --card-hover: #fafafa;
-  --elevated: #eef0f3;
+  --card-hover: #faf9f6;
+  --elevated: #eeece6;
   --card-foreground: #252423;
   --popover: #ffffff;
   --popover-foreground: #252423;
@@ -195,10 +196,10 @@
 
   --chart-1: #01b8aa; --chart-2: #118dff; --chart-3: #5f6bd0; --chart-4: #a66999; --chart-5: #c19100;
 
-  --sidebar: #ffffff; --sidebar-foreground: #605e5c;
+  --sidebar: #f7f5f0; --sidebar-foreground: #605e5c;
   --sidebar-primary: #252423; --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef0f3; --sidebar-accent-foreground: #252423;
-  --sidebar-border: rgba(0, 0, 0, 0.09); --sidebar-ring: rgba(1, 141, 255, 0.45);
+  --sidebar-accent: #eeece6; --sidebar-accent-foreground: #252423;
+  --sidebar-border: rgba(0, 0, 0, 0.08); --sidebar-ring: rgba(1, 141, 255, 0.45);
 
   --subtle: #605e5c;
   --gold: #c19100;  --gold-light: #a67c00;  --gold-dim: rgba(193, 145, 0, 0.12);
@@ -231,6 +232,27 @@
 
   --track: #e2e5e9;
   --panel-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.1), 0 0.3px 0.9px rgba(0, 0, 0, 0.07);
+}
+
+/* Light theme: a DARK navy sidebar against the light content (the professional
+   look Hazel asked for — "darker side pane"). The rail keeps a light page readable
+   while giving the app weight. The sidebar's inner rows use the global tokens
+   (bg-elevated / text-foreground / …), so we re-point those tokens to dark-on-navy
+   values ONLY within the <aside> — no component changes, and content stays light. */
+:root[data-theme="pbi-light"] aside {
+  background-image: linear-gradient(180deg, #1c3350 0%, #172a44 55%, #132339 100%);
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.10), 4px 0 18px rgba(15, 30, 50, 0.14);
+  --foreground: #eef2f8;
+  --muted-foreground: #9fb1c6;
+  --elevated: rgba(255, 255, 255, 0.10);
+  --card-hover: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.10);
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --subtle: #8598ad;
+  /* Keep a bright gold accent (active marker / gold-light text) legible on navy. */
+  --gold: #e6b85c;
+  --gold-light: #f2cf7a;
+  --gold-dim: rgba(230, 184, 92, 0.16);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -294,6 +316,7 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
   }
 
   ::-webkit-scrollbar {

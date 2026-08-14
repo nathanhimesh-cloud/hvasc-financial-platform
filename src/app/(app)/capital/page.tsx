@@ -24,6 +24,7 @@ export default async function CapitalPage({ searchParams }: { searchParams: Prom
     <Content>
       <PageToolbar
         view={view}
+        print={false} /* the capital projects table carries the unified export menu */
         notes={
           <>
             <InfoNote label="Where the budgets come from">

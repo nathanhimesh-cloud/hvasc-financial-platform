@@ -90,6 +90,7 @@ export default async function BillingPage({
     <Content>
       <PageToolbar
         view={view}
+        print={false} /* the billing tables carry the unified export menu */
         notes={
           <>
             <InfoNote label="Where these come from">

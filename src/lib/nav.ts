@@ -9,7 +9,6 @@ import {
   Briefcase,
   Construction,
   Activity,
-  Gauge,
   FileClock,
   Receipt,
   ReceiptText,
@@ -56,7 +55,10 @@ export const reportsNav: NavLink[] = [
   { href: "/reports", label: "Detailed Reports", icon: FileText },
   { href: "/transactions", label: "Transactions", icon: Receipt },
   { href: "/monthly-report", label: "Monthly Report", icon: FileBarChart },
-  { href: "/ratios", label: "Sustainability Ratios", icon: Gauge },
+  // Sustainability Ratios is SHELVED (Hazel, 14 Aug review) until revenue-centre
+  // and departmental-expense mapping is complete — the Tier-8 measures can't be
+  // trusted before then. The /ratios route still exists but is unlinked.
+  // { href: "/ratios", label: "Sustainability Ratios", icon: Gauge },
 ];
 
 /**
@@ -129,7 +131,7 @@ export function getPageMeta(
   if (pathname === "/") {
     return {
       title: "CFO Dashboard",
-      subtitle: `${fy} · ${ctx?.periodLabel ?? "May 2026"}`,
+      subtitle: ctx?.periodLabel ? `${fy} · ${ctx.periodLabel}` : fy,
     };
   }
   if (pathname === "/grants") {

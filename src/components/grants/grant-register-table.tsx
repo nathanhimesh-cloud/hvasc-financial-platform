@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, AlertTriangle, Lock, Unlock, Download, LifeBuoy, type LucideIcon } from "lucide-react";
+import { Search, AlertTriangle, Lock, Unlock, LifeBuoy, type LucideIcon } from "lucide-react";
+import { ExportButton } from "@/components/kit/export-button";
 import type { GrantFigures } from "@/lib/grants";
 import { Panel } from "@/components/kit/panel";
 import { formatCurrency, formatPercent } from "@/lib/format";
@@ -115,14 +116,40 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
         <FilterChip active={onlyIssues} onClick={() => setOnlyIssues((v) => !v)} icon={AlertTriangle} tone="amber">
           Needs codes fixed
         </FilterChip>
-        <button
-          type="button"
-          onClick={exportCsv}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-elevated px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:border-gold/30 hover:text-foreground"
-        >
-          <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Export CSV
-        </button>
+        <div className="ml-auto">
+          <ExportButton
+            filename="hvasc-grant-register"
+            csv={exportCsv}
+            sheets={[
+              {
+                name: "Grant Register",
+                rows,
+                columns: [
+                  { header: "Grant", value: (f) => f.entry.name, width: 30 },
+                  { header: "Funder", value: (f) => f.entry.funder, width: 24 },
+                  { header: "Total grant income", value: (f) => f.totalGrantIncome || null, type: "money", width: 18 },
+                  { header: "Opening income", value: (f) => f.openingIncome || null, type: "money", width: 16 },
+                  { header: "Current income", value: (f) => f.currentIncome || null, type: "money", width: 16 },
+                  { header: "Income to date", value: (f) => f.incomeToDate || null, type: "money", width: 16 },
+                  { header: "Income remaining", value: (f) => f.incomeRemaining || null, type: "money", width: 16 },
+                  { header: "Budgeted expense", value: (f) => f.budgetedExpense || null, type: "money", width: 16 },
+                  { header: "Opening expense", value: (f) => f.openingExpense || null, type: "money", width: 16 },
+                  { header: "Current expense", value: (f) => f.currentExpense || null, type: "money", width: 16 },
+                  { header: "Expense to date", value: (f) => f.expenseToDate || null, type: "money", width: 16 },
+                  { header: "Expense remaining", value: (f) => f.expenseRemaining || null, type: "money", width: 16 },
+                  { header: "% used", value: (f) => f.utilisation, type: "percent", width: 10 },
+                  { header: "Restricted", value: (f) => (f.entry.restricted ? "Restricted" : "Unrestricted"), width: 14 },
+                  { header: "Operating/Capital", value: (f) => f.entry.operatingOrCapital, width: 16 },
+                  { header: "Disaster recovery", value: (f) => (f.disasterRecovery ? "Yes" : "No"), width: 14 },
+                  { header: "Start", value: (f) => f.entry.startDate, width: 12 },
+                  { header: "End", value: (f) => f.entry.endDate, width: 12 },
+                  { header: "Report due", value: (f) => f.entry.reportDue, width: 12 },
+                  { header: "Issues", value: (f) => f.entry.issues.join("; "), width: 30 },
+                ],
+              },
+            ]}
+          />
+        </div>
       </div>
 
       <div className="overflow-x-auto">

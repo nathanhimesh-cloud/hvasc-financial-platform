@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   ChevronRight,
@@ -70,17 +71,29 @@ export function Sidebar({
       {/* Brand + collapse toggle */}
       <div
         className={cn(
-          "flex h-[57px] items-center border-b border-sidebar-border",
+          "flex h-[64px] items-center border-b border-sidebar-border",
           collapsed ? "justify-center px-0" : "justify-between px-4",
         )}
       >
         <Link href="/" className="flex items-center gap-2.5 overflow-hidden">
-          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-foreground font-heading text-[12px] font-bold text-background">
-            HV
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-white shadow-sm">
+            <Image
+              src="/hvasc-logo.jpg"
+              alt="Hope Vale Aboriginal Shire Council"
+              width={32}
+              height={32}
+              className="h-full w-full object-contain"
+              priority
+            />
           </span>
           {!collapsed && (
-            <span className="truncate text-[13px] font-semibold tracking-tight text-foreground">
-              Hope Vale ASC
+            <span className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-[13px] font-semibold tracking-tight text-foreground">
+                Hope Vale ASC
+              </span>
+              <span className="truncate font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                Financial Intelligence
+              </span>
             </span>
           )}
         </Link>

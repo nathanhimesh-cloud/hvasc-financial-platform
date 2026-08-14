@@ -113,6 +113,36 @@ const WIDGET_SPAN: Record<string, string> = {
   "department-table": "lg:col-span-12",
 };
 const DEFAULT_STATS = ["total-income", "total-expenses", "net-result", "active-grants"];
+
+/**
+ * Where each headline figure drills to. Hazel asked (14 Aug) that clicking a
+ * headline number jump to the detailed section ON THE SAME dashboard — Income to
+ * the revenue breakdown, expenses to the department summary, grants to the grant
+ * mix — mirroring how the department summary already works. These are in-page
+ * anchors (#id) that smooth-scroll to the matching panel below.
+ */
+const METRIC_HREF: Record<string, string> = {
+  "total-income": "#revenue-composition",
+  "revenue-centres": "#revenue-composition",
+  "total-expenses": "#department-table",
+  "ytd-spend": "#department-table",
+  departments: "#department-table",
+  "over-budget": "#department-table",
+  "net-result": "#operating-position",
+  "surplus-margin": "#operating-position",
+  "spend-rate": "#operating-position",
+  "total-budget": "#budget-chart",
+  "budget-remaining": "#budget-chart",
+  "active-grants": "#grant-mix",
+  "grant-funding": "#grant-mix",
+  "grant-dependency": "#grant-mix",
+  "grants-action": "#grant-mix",
+  "capital-grants": "#grant-mix",
+  "operating-grants": "#grant-mix",
+  "disaster-funding": "#grant-mix",
+  // Cash KPIs deliberately have no drill link — the Sustainability Ratios page they
+  // used to point at is shelved until mapping is complete (Hazel, 14 Aug).
+};
 // v4: adds the cash-position / grant-mix widgets, so old saved orders must re-reconcile.
 const STORE = "hv:dashboard:v4";
 
@@ -304,7 +334,7 @@ export function DashboardController({
   const allocation = depts.map((d) => ({ department: d, share: totalBudget > 0 ? d.annualBudget / totalBudget : 0 }));
   const widgetNode: Record<string, React.ReactNode> = {
     "operating-position": <OperatingPosition totalIncome={fin.income} totalExpenses={fin.expenses} netResult={fin.net} periodLabel={fin.label} />,
-    "revenue-composition": <RevenueComposition lines={revLines} totalIncome={fin.income} periodLabel={fin.label} />,
+    "revenue-composition": <RevenueComposition lines={revLines} departments={depts} totalIncome={fin.income} periodLabel={fin.label} />,
     "cash-position": <CashPosition cash={cash} periodLabel={snapshot.period.label} />,
     "grant-mix": <GrantMix summary={grantMix} periodLabel={snapshot.period.label} />,
     "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} trend={spendTrend(snapshot)} monthLabel={`Month ${snapshot.period.monthOfYear}`} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
@@ -528,7 +558,7 @@ export function DashboardController({
               m.meta
             );
             return (
-              <KpiCard key={m.key} color={m.color} icon={ICONS[m.icon] ?? Activity} label={m.label} value={<CountUp value={m.value} format={m.format} />} meta={meta} delay={i * 70} />
+              <KpiCard key={m.key} color={m.color} icon={ICONS[m.icon] ?? Activity} label={m.label} value={<CountUp value={m.value} format={m.format} />} meta={meta} delay={i * 70} href={filtered ? undefined : METRIC_HREF[m.key]} />
             );
           })}
         </div>
@@ -542,7 +572,7 @@ export function DashboardController({
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           {visibleWidgets.map((id, i) => (
-            <div key={id} style={{ animationDelay: `${i * 90}ms` }} className={cn("animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500 ease-out", WIDGET_SPAN[id])}>
+            <div key={id} id={id} style={{ animationDelay: `${i * 90}ms` }} className={cn("scroll-mt-24 animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500 ease-out", WIDGET_SPAN[id])}>
               {widgetNode[id]}
             </div>
           ))}

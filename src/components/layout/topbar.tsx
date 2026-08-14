@@ -28,12 +28,12 @@ export function Topbar({ deptNames, metaCtx }: TopbarProps) {
   const updated = formatDate(metaCtx.updatedAt);
 
   return (
-    <header className="sticky top-0 z-50 flex h-[57px] items-center gap-4 border-b border-border bg-background/80 px-6 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 flex h-[64px] items-center gap-4 border-b border-border bg-background/80 px-6 backdrop-blur-xl">
       <div className="min-w-0">
-        <h1 className="truncate text-[15px] font-semibold leading-tight tracking-tight text-foreground">
+        <h1 className="truncate font-heading text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground">
           {title}
         </h1>
-        <p className="truncate font-mono text-[11px] leading-tight text-muted-foreground">
+        <p className="truncate font-mono text-[12px] leading-tight text-muted-foreground">
           {subtitle}
         </p>
       </div>

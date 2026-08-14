@@ -81,6 +81,7 @@ export default async function TransactionsPage({
     <Content>
       <PageToolbar
         view={view}
+        print={false} /* the transactions table carries the unified export menu */
         notes={
           <>
             <InfoNote label="Where these come from">

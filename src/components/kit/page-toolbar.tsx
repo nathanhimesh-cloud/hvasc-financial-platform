@@ -1,5 +1,5 @@
 import { PeriodSelector } from "@/components/kit/period-selector";
-import { PrintButton } from "@/components/kit/print-button";
+import { ExportButton } from "@/components/kit/export-button";
 import { InfoPopover, InfoNote } from "@/components/kit/info-popover";
 import type { PeriodView } from "@/lib/periods";
 
@@ -55,7 +55,11 @@ export function PageToolbar({
 
       <div className="no-print flex items-center gap-2">
         {actions}
-        {print && <PrintButton />}
+        {/* Pages with their own table export (billing, jobs, …) pass their own
+            ExportButton via `actions` and set print={false}. Pages without one get
+            the same unified menu here in print-only mode, so the control is
+            identical everywhere. */}
+        {print && <ExportButton />}
         <InfoPopover notable={notable} alertCount={alertCount}>
           {notes}
           {/* Provenance, on every page, in exactly one place. */}

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PageMetaContext } from "@/lib/nav";
 import { Sidebar, type DeptNavItem } from "./sidebar";
 import { Topbar } from "./topbar";
+import { AppFooter } from "./app-footer";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -65,6 +66,7 @@ export function AppShell({
           <Topbar deptNames={deptNames} metaCtx={metaCtx} />
         </div>
         <main className="pb-10">{children}</main>
+        <AppFooter />
       </div>
     </TooltipProvider>
   );

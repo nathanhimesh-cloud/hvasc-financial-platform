@@ -54,6 +54,7 @@ export default async function GrantsPage({
     <Content>
       <PageToolbar
         view={view}
+        print={false} /* the grant register table carries the unified export menu */
         filters={<DataQualityBadge issues={grantIssues(s)} />}
         /*
           The register upload is a BUTTON now, not the full-width panel that used to
