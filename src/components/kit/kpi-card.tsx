@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { ArrowUpRight, type LucideIcon } from "lucide-react";
 import type { BrandColor } from "@/lib/types";
-import { accentBar, textColor } from "@/lib/colors";
+import { accentBar, bgDim, textColor } from "@/lib/colors";
 import { cn } from "@/lib/utils";
 
 interface KpiCardProps {
   color: BrandColor;
-  /** Short uppercase label. */
+  /** Short label — what the number IS. */
   label: string;
-  /** Lucide icon shown in a chip in the top-right. */
+  /** Lucide icon shown in a colour-tinted chip beside the label. */
   icon?: LucideIcon;
   value: React.ReactNode;
   meta?: React.ReactNode;
@@ -16,45 +16,60 @@ interface KpiCardProps {
   estimated?: boolean;
   /** Stagger delay (ms) for the entrance animation. */
   delay?: number;
-  /** When set, the whole card becomes a link to the detail page for this figure. */
+  /** When set, the whole card becomes a link (or in-page "#anchor" scroll). */
   href?: string;
 }
 
-/** Headline metric card with a coloured top accent bar and an icon chip. */
+/**
+ * The one headline-metric tile, used on every page for consistency.
+ *
+ * Redesigned (Aug 2026 review) so a glance answers "what is this number?": the
+ * icon sits in a colour-tinted chip right next to a bigger, bolder label, the
+ * value dominates, and at most one quiet line of context sits beneath. The value
+ * uses PROPORTIONAL figures — a display-size number reads tighter than tabular
+ * digits, which are reserved for columns that must align (see the tables).
+ */
 export function KpiCard({ color, label, icon: Icon, value, meta, estimated, delay = 0, href }: KpiCardProps) {
   const inner = (
     <>
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <span className="flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.09em] text-foreground/75">
-          {label}
+      <div className="mb-3.5 flex items-center gap-2.5">
+        {Icon && (
+          <span
+            className={cn(
+              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-border transition-transform duration-200 group-hover:scale-105",
+              bgDim[color],
+            )}
+          >
+            <Icon className={cn("h-[18px] w-[18px]", textColor[color])} strokeWidth={1.9} />
+          </span>
+        )}
+        <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.06em] text-foreground/70">
+          <span className="truncate">{label}</span>
           {estimated && (
             <span
-              className="rounded-[3px] border border-amber/30 bg-amber-dim px-1 py-px text-[8px] font-semibold tracking-[0.08em] text-amber"
+              className="flex-shrink-0 rounded-[3px] border border-amber/30 bg-amber-dim px-1 py-px text-[8px] font-semibold tracking-[0.08em] text-amber"
               title="Estimated — not a confirmed/loaded figure"
             >
               EST.
             </span>
           )}
         </span>
-        {Icon && (
-          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-border bg-elevated transition-transform duration-200 group-hover:scale-110">
-            <Icon className={cn("h-[15px] w-[15px]", textColor[color])} strokeWidth={1.75} />
-          </span>
+        {href && (
+          <ArrowUpRight
+            className="ml-auto h-4 w-4 flex-shrink-0 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            strokeWidth={2}
+          />
         )}
       </div>
-      <div className="mb-2 font-heading text-[34px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+
+      <div className="font-heading text-[36px] font-bold leading-none tracking-[-0.02em] text-foreground">
         {value}
       </div>
+
       {meta && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="mt-2.5 flex items-center gap-1.5 text-[12px] leading-snug text-muted-foreground">
           {meta}
         </div>
-      )}
-      {href && (
-        <ArrowUpRight
-          className="absolute right-3.5 top-3.5 h-4 w-4 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-          strokeWidth={2}
-        />
       )}
     </>
   );
