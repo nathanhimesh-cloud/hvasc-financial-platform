@@ -23,15 +23,20 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
   const [onlyOver, setOnlyOver] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
 
-  // Every job code in the register, for the job filter (Aug 2026 review:
-  // "narrow down data by specific job code").
+  // The job filter is SCOPED to the selected department (Hazel, 14 Aug: "job codes
+  // should filter correctly based on the selected department"). When a department is
+  // chosen, the Job dropdown only offers jobs that post to that department's
+  // accounts — not every job in the register.
   const jobOptions = useMemo(() => {
     const seen = new Map<string, string>();
-    for (const g of groups) for (const j of g.jobs) if (!seen.has(j.code)) seen.set(j.code, j.name);
+    for (const g of groups) {
+      if (dept !== "all" && g.departmentId !== dept) continue;
+      for (const j of g.jobs) if (!seen.has(j.code)) seen.set(j.code, j.name);
+    }
     return [...seen.entries()]
       .map(([code, name]) => ({ code, name }))
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [groups]);
+  }, [groups, dept]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -103,7 +108,12 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
             <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Department</span>
             <select
               value={dept}
-              onChange={(e) => setDept(e.target.value)}
+              onChange={(e) => {
+                setDept(e.target.value);
+                // A job chosen under the old department may not exist in the new
+                // one — reset to "all jobs" so the table never goes blank.
+                setJob("all");
+              }}
               className="h-[38px] rounded-md border border-border bg-elevated px-3 text-[13px] text-foreground outline-none focus:border-gold/40"
             >
               <option value="all">All departments</option>
