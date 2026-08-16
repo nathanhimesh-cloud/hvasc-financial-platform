@@ -74,6 +74,7 @@ export function ReportsView({
   monthOfYear,
   monthsInYear,
   comparisonLabel,
+  live = true,
   periods,
   departments,
   trend,
@@ -95,6 +96,8 @@ export function ReportsView({
   monthOfYear: number;
   monthsInYear: number;
   comparisonLabel: string;
+  /** False when viewing an archived (prior-year) period rather than the live year. */
+  live?: boolean;
   periods: ReportPeriod[];
   departments: ReportDept[];
   /** What to plot: months once there are enough, days before that. */
@@ -123,6 +126,9 @@ export function ReportsView({
   };
 }) {
   const latestIdx = periods.length ? periods[periods.length - 1].idx : monthOfYear;
+  // Archived (prior-year) periods only carry the reconstructed P&L — the balance
+  // sheet, cash flow and transaction detail belong to the live current-year feed.
+  const archived = !live;
   const [statement, setStatement] = useState<Statement>("pnl");
   const [selectedIdx, setSelectedIdx] = useState<number>(latestIdx);
   const [mode, setMode] = useState<Mode>("cumulative");
@@ -293,19 +299,19 @@ export function ReportsView({
       {/* Statement tabs */}
       <div className="no-print flex flex-wrap items-center gap-1 border-b border-border pb-px">
         <StatementTab active={statement === "pnl"} onClick={() => setStatement("pnl")} icon={FileText} label="Profit & Loss" />
-        <StatementTab active={statement === "budget"} onClick={() => setStatement("budget")} icon={Table} label="Budget vs Actual" soon={!budgetData} />
-        <StatementTab active={statement === "balance"} onClick={() => setStatement("balance")} icon={Scale} label="Balance Sheet" soon={!balanceSheet} />
-        <StatementTab active={statement === "cashflow"} onClick={() => setStatement("cashflow")} icon={Banknote} label="Cashflow" soon={!cashFlow} />
+        <StatementTab active={statement === "budget"} onClick={() => setStatement("budget")} icon={Table} label="Budget vs Actual" soon={!budgetData} archived={archived} />
+        <StatementTab active={statement === "balance"} onClick={() => setStatement("balance")} icon={Scale} label="Balance Sheet" soon={!balanceSheet} archived={archived} />
+        <StatementTab active={statement === "cashflow"} onClick={() => setStatement("cashflow")} icon={Banknote} label="Cashflow" soon={!cashFlow} archived={archived} />
         {/* With the ledger on, an empty result may just mean the filter matched nothing. */}
-        <StatementTab active={statement === "transactions"} onClick={() => setStatement("transactions")} icon={Receipt} label="Transactions" soon={!transactions.length && !ledger?.serverFiltered} />
+        <StatementTab active={statement === "transactions"} onClick={() => setStatement("transactions")} icon={Receipt} label="Transactions" soon={!transactions.length && !ledger?.serverFiltered} archived={archived} />
       </div>
 
       {statement === "budget" ? (
-        budgetData ? <BudgetVsActual data={budgetData} accountMonthly={accountMonthly} currentMonth={monthOfYear} /> : <ComingSoon statement="balance" />
+        budgetData ? <BudgetVsActual data={budgetData} accountMonthly={accountMonthly} currentMonth={monthOfYear} /> : <ComingSoon statement="balance" archived={archived} />
       ) : statement === "balance" ? (
-        balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} generatedAt={generatedAt} /> : <ComingSoon statement="balance" />
+        balanceSheet ? <BalanceSheetView bs={balanceSheet} fyLabel={fyLabel} generatedAt={generatedAt} /> : <ComingSoon statement="balance" archived={archived} />
       ) : statement === "cashflow" ? (
-        cashFlow ? <CashFlowView cf={cashFlow} fyLabel={fyLabel} /> : <ComingSoon statement="cashflow" />
+        cashFlow ? <CashFlowView cf={cashFlow} fyLabel={fyLabel} /> : <ComingSoon statement="cashflow" archived={archived} />
       ) : statement === "transactions" ? (
         <TransactionsView
           transactions={transactions}
@@ -638,18 +644,22 @@ function StatementTab({
   icon: Icon,
   label,
   soon,
+  archived,
 }: {
   active: boolean;
   onClick: () => void;
   icon: typeof FileText;
   label: string;
   soon?: boolean;
+  /** True when viewing a prior-year archive, where the lock means "not archived". */
+  archived?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={soon}
+      title={soon ? (archived ? "Not held for archived prior-year periods — current year only" : "Coming soon") : undefined}
       className={cn(
         "relative inline-flex items-center gap-1.5 border-b-2 px-3.5 py-2.5 text-[13px] font-medium transition-colors",
         active
@@ -664,27 +674,39 @@ function StatementTab({
       {soon && (
         <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-elevated px-1.5 py-px font-mono text-[8px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           <Lock className="h-2.5 w-2.5" strokeWidth={2} />
-          Soon
+          {archived ? "Current yr" : "Soon"}
         </span>
       )}
     </button>
   );
 }
 
-function ComingSoon({ statement }: { statement: Statement }) {
+function ComingSoon({ statement, archived }: { statement: Statement; archived?: boolean }) {
   const label = statement === "balance" ? "Balance Sheet" : "Statement of Cash Flows";
-  const source = statement === "balance" ? "Statement of Financial Position" : "Statement of Cash Flows";
   return (
     <Panel className="flex flex-col items-center justify-center gap-3 py-16 text-center">
       <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-elevated">
         {statement === "balance" ? <Scale className="h-6 w-6 text-muted-foreground" /> : <Banknote className="h-6 w-6 text-muted-foreground" />}
       </span>
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold text-foreground">{label} — coming soon</p>
+        <p className="text-sm font-semibold text-foreground">
+          {label} — {archived ? "current year only" : "coming soon"}
+        </p>
         <p className="max-w-md text-[13px] leading-relaxed text-muted-foreground">
-          This statement isn&apos;t built yet because the data isn&apos;t captured. Upload the Practical{" "}
-          <span className="text-foreground">{source}</span> export on the Data tab — once it&apos;s parsed,
-          this view turns on automatically and joins the full statement pack.
+          {archived ? (
+            <>
+              This is an <span className="text-foreground">archived prior-year</span> period. The prior-year
+              rebuild reconstructs the <span className="text-foreground">profit &amp; loss</span> from
+              Practical&apos;s year-end figures; the balance sheet, cash flow and transaction detail are
+              captured for the <span className="text-foreground">current year</span> only. Switch back to the
+              live year to see them.
+            </>
+          ) : (
+            <>
+              This statement turns on as soon as the underlying data is captured in the feed, and joins the
+              full statement pack automatically.
+            </>
+          )}
         </p>
       </div>
     </Panel>

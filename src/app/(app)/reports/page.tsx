@@ -163,6 +163,7 @@ export default async function ReportsPage({
         monthOfYear={period.monthOfYear}
         monthsInYear={period.monthsInYear}
         comparisonLabel={period.comparisonLabel ?? "Budget"}
+        live={period.live !== false}
         periods={periods}
         revenue={revenueTrend(snapshot.monthlyStatements, budgetReportFY27, snapshot.period.monthsInYear ?? 12)}
         departments={departments}
