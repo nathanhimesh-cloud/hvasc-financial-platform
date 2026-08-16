@@ -339,12 +339,11 @@ export function ReportsView({
               <Field label="View">
                 <div className="flex rounded-md border border-border bg-elevated/40 p-0.5">
                   {(["cumulative", "monthly", "quarter", "year"] as Mode[]).map((m) => {
-                    // A period type you cannot compute is offered disabled, not hidden:
-                    // a control that vanishes reads as a missing feature.
-                    const noPrior = !prior;
-                    const disabled =
-                      (m === "monthly" && noPrior) ||
-                      (m === "quarter" && noPrior);
+                    // Every view is computable in any month: a month is the movement
+                    // since the month before (in month 1 that's the whole thing), a
+                    // quarter is the movement since the quarter began. So the toggle
+                    // is always live — early in the year the shorter views simply
+                    // coincide with year-to-date, and they diverge as months post.
                     return (
                       <button
                         key={m}
@@ -354,10 +353,8 @@ export function ReportsView({
                           // "Full year" means the whole year, so go to the last month posted.
                           if (m === "year") setSelectedIdx(latestIdx);
                         }}
-                        disabled={disabled}
-                        title={disabled ? "Needs more than one month of data" : undefined}
                         className={cn(
-                          "rounded px-3 py-1.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                          "rounded px-3 py-1.5 text-[12px] font-medium transition-colors",
                           mode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                         )}
                       >
