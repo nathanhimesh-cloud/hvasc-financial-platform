@@ -100,8 +100,8 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
         title={tab === "owed-to-us" ? "Invoices" : "Supplier bills"}
         subtitle={
           tab === "owed-to-us"
-            ? "Money the Council is owed"
-            : "Money the Council owes"
+            ? "Owed to the Council"
+            : "Owed by the Council"
         }
         right={
           tab === "owed-to-us" ? (
