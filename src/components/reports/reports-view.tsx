@@ -13,7 +13,6 @@ import {
   Receipt,
   ArrowRight,
   AlertOctagon,
-  Info,
 } from "lucide-react";
 import type { BrandColor, BalanceSheet, CashFlow, Transaction, DailySpendPoint, PriorYear } from "@/lib/types";
 import type { IntegrityReport } from "@/lib/integrity";
@@ -373,22 +372,6 @@ export function ReportsView({
               {fyLabel} · {periodName}
             </div>
           </Panel>
-
-          {/* With one month posted, every period view resolves to that month — say
-              so, so a toggle that doesn't move the figures reads as informative
-              rather than broken. Disappears on its own once a second month is in. */}
-          {periods.length <= 1 && (
-            <p className="-mt-1 flex items-start gap-2 rounded-md border border-border/60 bg-elevated/40 px-3 py-2.5 text-[12px] leading-relaxed text-muted-foreground">
-              <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.75} />
-              <span>
-                Only <span className="font-medium text-foreground">{periods[0]?.month ?? periodName}</span> is
-                posted in Practical so far, so <span className="text-foreground">Month</span>,{" "}
-                <span className="text-foreground">Quarter</span> and{" "}
-                <span className="text-foreground">Full year</span> all match year-to-date. The views
-                diverge as soon as the next month is in the ledger.
-              </span>
-            </p>
-          )}
 
           {/* KPIs */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -218,6 +218,25 @@ for ($M = 1; $M -le 12; $M++) {
   Write-Host ("{0,-10} {1,16:N0} {2,16:N0} {3,16:N0}" -f $b.label, $b.income, $b.expenses, $b.net)
 }
 
+# Attach the cumulative month-by-month series to each snapshot. The Reports page
+# builds its period selector and its YTD/Month/Quarter/Full-year toggle from
+# `monthlyStatements`; without it an archived year collapses to a single YTD point
+# and the toggle can't move. Each month M gets the series for months 1..M.
+$series = @()
+foreach ($b in $built) {
+  $series += [ordered]@{
+    idx           = [int]$b.snapshot.period.monthOfYear
+    month         = ($b.label -split ' ')[0]
+    totalIncome   = $b.income
+    totalExpenses = $b.expenses
+    netResult     = $b.net
+    revenueLines  = $b.snapshot.revenueLines
+  }
+}
+for ($i = 0; $i -lt $built.Count; $i++) {
+  $built[$i].snapshot.monthlyStatements = @($series[0..$i])
+}
+
 if (-not $Push) {
   Write-Host ""
   Write-Host "DRY RUN - nothing pushed. If these match last year's known actuals, re-run with:" -ForegroundColor Yellow

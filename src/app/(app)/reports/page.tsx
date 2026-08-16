@@ -144,6 +144,13 @@ export default async function ReportsPage({
               invented. Some accounts move cash without being mapped to a line in that report; they are
               shown as &quot;Other operating&quot; so the statement still ties to the cent.
             </InfoNote>
+            <InfoNote label="Period views (YTD / Month / Quarter / Full year)">
+              YTD is the year up to the selected month; Month and Quarter narrow it to that month or
+              quarter. They only differ once more than one month of data is posted, so the figures
+              won&apos;t move between views until then. The current financial year has{" "}
+              <span className="text-foreground">{period.label.split(" ")[0]}</span> posted so far, so
+              every view shows the same month.
+            </InfoNote>
             <InfoNote label="Early in the financial year">
               Small and even negative figures in the first months are expected — June&apos;s year-end
               accruals reverse in July.
