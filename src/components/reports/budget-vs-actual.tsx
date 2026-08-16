@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Building2, Info } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/kit/panel";
 import { DataStamp } from "@/components/kit/data-stamp";
+import { ExportButton } from "@/components/kit/export-button";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import {
   buildGroupTree,
@@ -103,12 +104,33 @@ export function BudgetVsActual({
         ))}
       </div>
 
-      {/* Basis toggle — the review's core ask: monthly AND year-to-date, actual
-          vs budget, clearly separated. Month needs the extended feed's series. */}
+      {/* Basis toggle — the review's core ask: monthly, quarterly AND year-to-date,
+          actual vs budget, clearly separated. Month/quarter need the extended feed's
+          series. Export sits on the right, same menu as every other page. */}
       <div className="flex flex-wrap items-center gap-1.5">
+        <span className="order-last ml-auto sm:order-none">
+          <ExportButton
+            filename={`hvasc-budget-vs-actual-${active.id}`}
+            sheets={[
+              {
+                name: active.name.slice(0, 28),
+                rows: rows.filter((r) => r.type === "leaf").map((r) => r.node),
+                columns: [
+                  { header: "Account", value: (n) => n.label, width: 40 },
+                  { header: "Revenue actual", value: (n) => n.revenueActual || null, type: "money", width: 16 },
+                  { header: "Revenue budget", value: (n) => n.revenueBudget || null, type: "money", width: 16 },
+                  { header: "Expense actual", value: (n) => n.expenseActual || null, type: "money", width: 16 },
+                  { header: "Expense budget", value: (n) => n.expenseBudget || null, type: "money", width: 16 },
+                  { header: "Surplus/(def.) actual", value: (n) => n.revenueActual - n.expenseActual, type: "money", width: 18 },
+                ],
+              },
+            ]}
+          />
+        </span>
         {(
           [
             { id: "month" as ReportBasis, label: `Month ${currentMonth}`, off: !hasMonthly },
+            { id: "quarter" as ReportBasis, label: `Q${Math.floor((currentMonth - 1) / 3) + 1}`, off: !hasMonthly },
             { id: "ytd" as ReportBasis, label: "Year to date", off: false },
             { id: "annual" as ReportBasis, label: "vs full-year budget", off: false },
           ]

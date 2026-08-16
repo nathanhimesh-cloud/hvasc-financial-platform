@@ -211,7 +211,7 @@ export function buildGroupTree(group: BudgetGroup): BudgetGroupTree {
 // every leaf on the chosen basis before the tree is built — the tree, the
 // subtotals and the renderer never need to know which basis they're showing.
 
-export type ReportBasis = "month" | "ytd" | "annual";
+export type ReportBasis = "month" | "quarter" | "ytd" | "annual";
 
 interface MonthlyFig {
   /** Cumulative balance / budget, indexed by financial-year month (1-based). */
@@ -273,12 +273,19 @@ export function withBasis(
           budget: budNow ?? leaf.budget * data.yearElapsedPct,
         };
       }
-      const balPrev = (currentMonth > 1 ? fig?.bal[currentMonth - 1] : 0) ?? 0;
-      const budPrev = (currentMonth > 1 ? fig?.bud[currentMonth - 1] : 0) ?? 0;
+      // month / quarter: cumulative[now] − cumulative[baseline]. The baseline is
+      // the month before this period began — the month before for "month", the
+      // month before the quarter started for "quarter" (FY quarters are 1–3, 4–6,
+      // 7–9, 10–12). A quarter spanning `monthsInPeriod` months straight-lines the
+      // budget over that many twelfths when there's no per-month series.
+      const baseMonth = basis === "quarter" ? Math.floor((currentMonth - 1) / 3) * 3 : currentMonth - 1;
+      const monthsInPeriod = currentMonth - baseMonth;
+      const balPrev = (baseMonth >= 1 ? fig?.bal[baseMonth] : 0) ?? 0;
+      const budPrev = (baseMonth >= 1 ? fig?.bud[baseMonth] : 0) ?? 0;
       return {
         ...leaf,
-        actual: balNow !== undefined ? balNow - balPrev : currentMonth === 1 ? leaf.actual : 0,
-        budget: budNow !== undefined ? budNow - budPrev : leaf.budget / 12,
+        actual: balNow !== undefined ? balNow - balPrev : baseMonth === 0 ? leaf.actual : 0,
+        budget: budNow !== undefined ? budNow - budPrev : leaf.budget * (monthsInPeriod / 12),
       };
     }),
   }));

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Download, FileSpreadsheet, FileText, Printer, ChevronDown } from "lucide-react";
 import { downloadXlsx, type XlsxSheet } from "@/lib/export-xlsx";
+import { downloadCsv } from "@/lib/csv-export";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,6 +51,20 @@ export function ExportButton<T>({
 
   const hasXlsx = !!filename && !!sheets && sheets.length > 0;
 
+  // CSV is offered whenever there's tabular data: an explicit `csv` callback wins,
+  // otherwise it's derived from the SAME columns as the Excel export, so every
+  // sheets-based page gets a CSV option for free and the two always agree.
+  const csvFn =
+    csv ??
+    (hasXlsx
+      ? () => {
+          const sheet = sheets![0];
+          const headers = sheet.columns.map((c) => c.header);
+          const rows = sheet.rows.map((r) => sheet.columns.map((c) => c.value(r) as string | number | null));
+          downloadCsv(filename!, headers, rows);
+        }
+      : undefined);
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -91,12 +106,12 @@ export function ExportButton<T>({
             </MenuItem>
           )}
 
-          {csv && (
+          {csvFn && (
             <MenuItem
               border
               icon={<FileText className="h-3.5 w-3.5" strokeWidth={1.75} />}
               onClick={() => {
-                csv();
+                csvFn();
                 setOpen(false);
               }}
             >

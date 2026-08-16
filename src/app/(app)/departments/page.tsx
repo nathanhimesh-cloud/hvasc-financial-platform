@@ -2,6 +2,7 @@ import { getSnapshot } from "@/lib/data";
 import { deriveDepartments } from "@/lib/derive";
 import { Content } from "@/components/kit/panel";
 import { ManagerCard } from "@/components/managers/manager-card";
+import { DepartmentExport } from "@/components/departments/department-export";
 import { CostRecoveryPanel } from "@/components/departments/cost-recovery-panel";
 import { costRecovery } from "@/lib/cost-recovery";
 import { loadPriorYear, previousFyLabel } from "@/lib/prior-year";
@@ -25,6 +26,10 @@ export default async function DepartmentsPage() {
 
   return (
     <Content>
+      <div className="no-print mb-4 flex justify-end">
+        <DepartmentExport departments={departments} />
+      </div>
+
       {/* B7 — do the trading operations pay for themselves? Refuses to score
           rather than divide by a negative year-to-date cost. */}
       <div className="mb-4">

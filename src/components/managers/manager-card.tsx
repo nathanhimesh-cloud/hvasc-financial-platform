@@ -62,6 +62,20 @@ export function ManagerCard({ department: d, period, priorYtd, priorLabel }: Pro
         />
       </div>
 
+      {/* Revenue — the income side of the "complete picture" (Aug 2026 review).
+          Shown for revenue centres; a cost centre with no income says so rather
+          than hiding the line. */}
+      {d.kind === "cost-revenue" && (
+        <div className="mb-3 flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--hairline-soft)] bg-elevated/60 px-3 py-2">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Revenue (YTD)
+          </span>
+          <span className={cn("font-mono text-[13px] font-bold tabular-nums", (d.revenue ?? 0) > 0 ? "text-green" : "text-muted-foreground")}>
+            {(d.revenue ?? 0) > 0 ? formatCurrency(d.revenue ?? 0) : "—"}
+          </span>
+        </div>
+      )}
+
       {/* Spend bar (RAG status colour) */}
       <div className="mb-[7px] h-[7px] overflow-hidden rounded-[4px] bg-elevated">
         <div

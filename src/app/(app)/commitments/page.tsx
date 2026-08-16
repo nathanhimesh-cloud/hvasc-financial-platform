@@ -5,6 +5,7 @@ import { PageToolbar } from "@/components/kit/page-toolbar";
 import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { assessWorkingCapital, commitmentsBySupplier, type AgeingInsight } from "@/lib/working-capital";
+import { CommitmentsExport } from "@/components/commitments/commitments-export";
 import { formatCurrency, formatCompact, formatPercent } from "@/lib/format";
 import { loadPriorYear, previousFyLabel } from "@/lib/prior-year";
 import { YoY } from "@/components/kit/yoy";
@@ -36,12 +37,15 @@ export default async function CommitmentsPage({
   const wcPrior = prior ? assessWorkingCapital(prior.snapshot) : null;
   const priorLabel = prior?.periodLabel ?? previousFyLabel(view.snapshot.period.fyLabel) ?? "last year";
 
-  const suppliers = c ? commitmentsBySupplier(c.lines).slice(0, 8) : [];
+  const allSuppliers = c ? commitmentsBySupplier(c.lines) : [];
+  const suppliers = allSuppliers.slice(0, 8);
 
   return (
     <Content>
       <PageToolbar
         view={view}
+        print={false} /* the export menu (with Print/PDF) is provided in actions */
+        actions={<CommitmentsExport suppliers={allSuppliers} />}
         notable={wc.receivables?.alarming || !!c?.staleCount}
         notes={
           <>

@@ -3,6 +3,7 @@ import { PageToolbar } from "@/components/kit/page-toolbar";
 import { InfoNote } from "@/components/kit/info-popover";
 import { MonthlyReportView } from "@/components/reports/monthly-report-view";
 import { MonthlyReportPicker } from "@/components/reports/monthly-report-picker";
+import { MonthlyReportExport } from "@/components/reports/monthly-report-export";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { buildMonthlyReport, reportScopes } from "@/lib/monthly-report";
 import { loadPriorYear } from "@/lib/prior-year";
@@ -37,6 +38,8 @@ export default async function MonthlyReportPage({
     <Content>
       <PageToolbar
         view={view}
+        print={false} /* the export menu (with Print/PDF) is provided in actions */
+        actions={<MonthlyReportExport report={report} />}
         filters={<MonthlyReportPicker scopes={scopes} selected={selected} />}
         notes={
           <InfoNote label="Early in the financial year">
