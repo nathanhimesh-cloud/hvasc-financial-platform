@@ -1,4 +1,4 @@
-import { Landmark, Banknote, Send, AlertTriangle, Lock } from "lucide-react";
+import { Landmark, Banknote, Send, Lock } from "lucide-react";
 import { PageToolbar } from "@/components/kit/page-toolbar";
 import { InfoNote } from "@/components/kit/info-popover";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
@@ -124,12 +124,16 @@ export default async function GrantsPage({
             </span>
           }
         />
+        {/* Restricted grant cash held but not yet spent — the acquittal obligation,
+            and a figure not shown anywhere else on this row. (The register's
+            unresolved-code count still rides on the data-quality badge above and the
+            "Needs codes fixed" filter in the table below.) */}
         <KpiCard
-          color={s.needsAttention > 0 ? "red" : "green"}
-          icon={s.needsAttention > 0 ? AlertTriangle : Lock}
-          label={s.needsAttention > 0 ? "Codes To Fix" : "Restricted Unspent"}
-          value={s.needsAttention > 0 ? s.needsAttention : formatCompact(s.restrictedUnspent)}
-          meta={s.needsAttention > 0 ? "Register rows unresolved" : "Unspent restricted grant cash"}
+          color="green"
+          icon={Lock}
+          label="Restricted Unspent"
+          value={formatCompact(s.restrictedUnspent)}
+          meta="Unspent restricted grant cash"
         />
       </div>
 

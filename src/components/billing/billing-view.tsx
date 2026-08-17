@@ -207,7 +207,7 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
                 <th className="pb-2 pr-4 text-left font-normal">Description</th>
                 <th className="pb-2 pr-4 text-right font-normal">Invoiced</th>
                 <th className="pb-2 pr-4 text-right font-normal">Outstanding</th>
-                <th className="pb-2 text-right font-normal">Overdue</th>
+                <th className="pb-2 text-right font-normal">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -232,27 +232,22 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
                   >
                     {r.outstanding === 0 ? "—" : formatCurrency(r.outstanding)}
                   </td>
+                  {/* Status: received (money in) · N days overdue · or the due date
+                      for anything not yet due — never a bare "not due". */}
                   <td className="py-2.5 text-right">
                     {r.outstanding === 0 ? (
                       <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase text-green">
                         <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
-                        paid
+                        received
                       </span>
-                    ) : r.daysOverdue === null ? (
-                      <span className="font-mono text-[10px] text-muted-foreground">—</span>
+                    ) : r.daysOverdue !== null && r.daysOverdue > 0 ? (
+                      <span className={cn("font-mono text-[11px] tabular-nums", r.daysOverdue > 90 ? "text-red" : "text-amber")}>
+                        {r.daysOverdue}d overdue
+                      </span>
+                    ) : r.dueDate ? (
+                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">due {r.dueDate}</span>
                     ) : (
-                      <span
-                        className={cn(
-                          "font-mono text-[11px] tabular-nums",
-                          r.daysOverdue > 90
-                            ? "text-red"
-                            : r.daysOverdue > 0
-                              ? "text-amber"
-                              : "text-muted-foreground",
-                        )}
-                      >
-                        {r.daysOverdue > 0 ? `${r.daysOverdue}d` : "not due"}
-                      </span>
+                      <span className="font-mono text-[10px] text-muted-foreground">—</span>
                     )}
                   </td>
                 </tr>
@@ -306,6 +301,8 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
                         <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
                         paid
                       </span>
+                    ) : r.dueDate ? (
+                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">due {r.dueDate}</span>
                     ) : (
                       <span className="font-mono text-[10px] uppercase text-amber">open</span>
                     )}
