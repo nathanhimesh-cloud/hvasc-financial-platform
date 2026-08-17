@@ -5,7 +5,6 @@ import {
   FileClock,
   FileText,
   FileBarChart,
-  Gauge,
   LayoutGrid,
   Activity,
   Tags,
@@ -176,32 +175,9 @@ const PAGES: PageDoc[] = [
     ],
   },
   {
-    href: "/ratios",
-    icon: Gauge,
-    title: "Sustainability Ratios",
-    purpose: "The Queensland statutory measures the Council is assessed on.",
-    explains: [
-      {
-        term: "Tier 8",
-        meaning:
-          "Hope Vale's tier under the Financial Management (Sustainability) Guideline 2024. Benchmarks differ by tier, and the Operating Surplus Ratio has NO benchmark for Tier 8 — so it is reported and never flagged.",
-      },
-      {
-        term: "Why last year's figures?",
-        meaning:
-          "These are annual measures. The Council raises its rates once a year and receives most grant income late, so a surplus ratio calculated from July alone would be wildly negative and mean nothing. Flow ratios report on the last complete year; cash cover and the asset ratios are point-in-time and current.",
-      },
-      {
-        term: "Not yet computable",
-        meaning:
-          "Some measures need data the finance system doesn't hold — an asset renewal flag, ABS population figures. The page says which, and who can supply it, rather than showing a guess.",
-      },
-    ],
-  },
-  {
     href: "/departments",
     icon: LayoutGrid,
-    title: "Departments",
+    title: "Departmental Snapshot",
     purpose: "The Council's three management departments, and a drill-down into each.",
     explains: [
       {

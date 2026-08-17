@@ -89,7 +89,7 @@ export function dataNavFor(role: string | undefined): NavLink[] {
 /** First item in the Departments section — the manager grid. */
 export const allDepartmentsNav: NavLink = {
   href: "/departments",
-  label: "All Departments",
+  label: "Departmental Snapshot",
   icon: LayoutGrid,
 };
 
@@ -164,7 +164,7 @@ export function getPageMeta(
     return { title: "Commitments & Debtors", subtitle: "Money in flight" };
   }
   if (pathname === "/departments") {
-    return { title: "Manager View", subtitle: `${ctx?.deptCount ?? "All"} departments` };
+    return { title: "Departmental Snapshot", subtitle: `${ctx?.deptCount ?? "All"} departments · income & spend` };
   }
   if (pathname === "/transactions") {
     return { title: "Transactions", subtitle: "Every posting in the ledger" };
