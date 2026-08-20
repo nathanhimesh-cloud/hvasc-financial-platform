@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { DrillLink } from "@/components/kit/drill-link";
 import { ExportButton } from "@/components/kit/export-button";
+import { TablePager, usePagination, STICKY_HEAD } from "@/components/kit/table-pager";
 import { Search, Download, ChevronRight, AlertTriangle } from "lucide-react";
 import type { JobBudgetView } from "@/lib/job-budgets";
 import { Panel, PanelHeader } from "@/components/kit/panel";
@@ -50,6 +51,8 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
       return hay.toLowerCase().includes(needle);
     });
   }, [groups, q, dept, job, onlyOver]);
+
+  const paged = usePagination(rows, { size: 50, resetKey: `${q}|${dept}|${job}|${onlyOver}` });
 
   const toggle = (gl: string) =>
     setOpen((s) => {
@@ -173,11 +176,21 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
         />
       </Panel>
 
-      <Panel className="overflow-hidden">
+      <Panel>
         <PanelHeader title="Budget vs Actual by Job" subtitle={`${rows.length} of ${groups.length} GL accounts`} />
         {rows.length === 0 ? (
           <p className="py-10 text-center text-[13px] text-muted-foreground">No accounts match these filters.</p>
         ) : (
+          <>
+          <TablePager
+            total={paged.total}
+            page={paged.page}
+            pageSize={paged.pageSize}
+            pages={paged.pages}
+            onPage={paged.setPage}
+            onPageSize={paged.setPageSize}
+            label="GL accounts"
+          />
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1080px] border-collapse">
               <thead>
@@ -193,7 +206,7 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((g) => {
+                {paged.pageItems.map((g) => {
                   // A selected job should be visible, not hidden behind a collapsed
                   // account — force those groups open while the filter is active.
                   const isOpen = open.has(g.glAccount) || job !== "all";
@@ -209,6 +222,7 @@ export function JobBudgetTable({ groups }: { groups: JobBudgetView[] }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
         <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted-foreground">
           Budget sits on the GL account, not the job — that&apos;s how Practical stores it.
@@ -307,7 +321,8 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
   return (
     <th
       className={cn(
-        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
+        "border-b border-[var(--hairline)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
+        STICKY_HEAD,
         className,
       )}
     >

@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { hex } from "@/lib/colors";
-import { formatCompact, formatPercent } from "@/lib/format";
+import { formatCompact, formatCurrency, formatPercent } from "@/lib/format";
 import { CardBadge, Panel, PanelHeader } from "@/components/kit/panel";
 import { CountUp } from "@/components/kit/count-up";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,8 @@ export function OperatingPosition({
   netResult: number;
   periodLabel: string;
 }) {
+  const [hover, setHover] = useState<number | null>(null);
+
   const surplus = netResult >= 0;
   const margin = totalIncome > 0 ? netResult / totalIncome : 0;
   const spendRatio = totalIncome > 0 ? totalExpenses / totalIncome : 0;
@@ -31,20 +34,26 @@ export function OperatingPosition({
   const expShare = totalIncome > 0 ? Math.min(totalExpenses / totalIncome, 1) : 0;
   const surShare = Math.max(0, 1 - expShare);
 
+  // One source of truth for both the arcs and the legend, so hover cross-highlights.
+  const items = [
+    { label: "Expenses", value: totalExpenses, pct: spendRatio, frac: expShare, color: hex.amber },
+    { label: surplus ? "Net Surplus" : "Net Deficit", value: netResult, pct: margin, frac: surShare, color: surplus ? hex.green : hex.red },
+  ];
+
   const R = 40;
   const SW = 14;
   const CIRC = 2 * Math.PI * R;
-  const parts = [
-    { color: hex.amber, frac: expShare },
-    { color: surplus ? hex.green : hex.red, frac: surShare },
-  ];
   let acc = 0;
-  const segments = parts.map((p) => {
+  const segments = items.map((p) => {
     const len = p.frac * CIRC;
     const seg = { color: p.color, dash: `${len} ${CIRC - len}`, offset: -acc };
     acc += len;
     return seg;
   });
+
+  const active = hover !== null ? items[hover] : null;
+  const centreValue = active ? active.value : totalIncome;
+  const centreLabel = active ? active.label.toUpperCase() : "INCOME";
 
   return (
     <Panel className="h-full">
@@ -52,12 +61,13 @@ export function OperatingPosition({
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-8">
         {/* Composition donut + legend */}
-        <div className="flex items-center gap-5">
+        <div className="relative flex items-center gap-5">
           <svg
             width="118"
             height="118"
             viewBox="0 0 100 100"
             className="flex-shrink-0 origin-center animate-in fade-in zoom-in-75 fill-mode-both duration-700 ease-out"
+            onMouseLeave={() => setHover(null)}
           >
             <circle cx="50" cy="50" r={R} fill="none" stroke="var(--elevated)" strokeWidth={SW} />
             {segments.map((s, i) => (
@@ -68,29 +78,48 @@ export function OperatingPosition({
                 r={R}
                 fill="none"
                 stroke={s.color}
-                strokeWidth={SW}
+                strokeWidth={hover === i ? SW + 3 : SW}
                 strokeLinecap="butt"
                 strokeDasharray={s.dash}
                 strokeDashoffset={s.offset}
                 transform="rotate(-90 50 50)"
+                opacity={hover !== null && hover !== i ? 0.4 : 1}
+                style={{ cursor: "pointer", transition: "opacity 120ms ease, stroke-width 120ms ease" }}
+                onMouseEnter={() => setHover(i)}
               />
             ))}
-            <text x="50" y="47" textAnchor="middle" fill="var(--foreground)" fontFamily="var(--font-heading)" fontSize="13.5" fontWeight="800">
-              {formatCompact(totalIncome)}
+            <text x="50" y="47" textAnchor="middle" fill={active ? active.color : "var(--foreground)"} fontFamily="var(--font-heading)" fontSize="13.5" fontWeight="800">
+              {formatCompact(centreValue)}
             </text>
             <text x="50" y="58" textAnchor="middle" fill="var(--muted-foreground)" fontFamily="var(--font-mono)" fontSize="6.5" letterSpacing="1.5">
-              INCOME
+              {centreLabel}
             </text>
           </svg>
 
+          {/* Tooltip on segment hover — leads with the value. */}
+          {active && (
+            <div className="pointer-events-none absolute -top-1 left-14 z-20 -translate-y-full whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-2 shadow-xl shadow-black/20">
+              <div className="font-heading text-[16px] font-bold leading-none tabular-nums" style={{ color: active.color }}>
+                {formatCurrency(active.value)}
+              </div>
+              <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+                {active.label} · {formatPercent(active.pct)} of income
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3">
-            <LegendRow color={hex.amber} label="Expenses" value={totalExpenses} pct={spendRatio} />
-            <LegendRow
-              color={surplus ? hex.green : hex.red}
-              label={surplus ? "Net Surplus" : "Net Deficit"}
-              value={netResult}
-              pct={margin}
-            />
+            {items.map((it, i) => (
+              <LegendRow
+                key={it.label}
+                color={it.color}
+                label={it.label}
+                value={it.value}
+                pct={it.pct}
+                dim={hover !== null && hover !== i}
+                onHover={(on) => setHover(on ? i : null)}
+              />
+            ))}
           </div>
         </div>
 
@@ -107,9 +136,27 @@ export function OperatingPosition({
   );
 }
 
-function LegendRow({ color, label, value, pct }: { color: string; label: string; value: number; pct: number }) {
+function LegendRow({
+  color,
+  label,
+  value,
+  pct,
+  dim,
+  onHover,
+}: {
+  color: string;
+  label: string;
+  value: number;
+  pct: number;
+  dim?: boolean;
+  onHover?: (on: boolean) => void;
+}) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div
+      className={cn("flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1 transition-all", dim ? "opacity-40" : "hover:bg-[var(--hairline-soft)]")}
+      onMouseEnter={() => onHover?.(true)}
+      onMouseLeave={() => onHover?.(false)}
+    >
       <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: color }} />
       <span className="w-[92px] flex-shrink-0 text-[13px] font-medium text-foreground">{label}</span>
       <span className="w-[64px] flex-shrink-0 text-right font-mono text-[13px] font-semibold tabular-nums" style={{ color }}>

@@ -66,6 +66,11 @@ export function RevenueMixTrend({ periods }: { periods: Period[] }) {
         </div>
       </div>
 
+      {/* A stacked-column TREND of one month is one bar — pointless and tall. Below
+          two months, show a single compact split bar (grants vs own-source) instead;
+          the full column chart returns once there's more than a point to plot. */}
+      {pts.length > 1 ? (
+        <>
       <div className="flex h-[140px] items-end gap-2">
         {pts.map((p) => {
           const gH = Math.round((p.grant / peak) * 132);
@@ -99,6 +104,23 @@ export function RevenueMixTrend({ periods }: { periods: Period[] }) {
           </span>
         ))}
       </div>
+        </>
+      ) : last && last.total > 0 ? (
+        <div>
+          <div className="flex h-9 w-full overflow-hidden rounded-md bg-[var(--track)]">
+            {last.grant > 0 && (
+              <div className="h-full bg-gold" style={{ width: `${(last.grant / last.total) * 100}%` }} title={`Grants ${formatCompact(last.grant)}`} />
+            )}
+            {last.own > 0 && (
+              <div className="h-full bg-teal" style={{ width: `${(last.own / last.total) * 100}%` }} title={`Own-source ${formatCompact(last.own)}`} />
+            )}
+          </div>
+          <div className="mt-1.5 flex justify-between font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+            <span>Grants {formatCompact(last.grant)}</span>
+            <span>Own-source {formatCompact(last.own)}</span>
+          </div>
+        </div>
+      ) : null}
 
       {pts.length < 2 && (
         <p className={cn("mt-3 border-t border-border/60 pt-3 text-[11px] leading-relaxed text-muted-foreground")}>

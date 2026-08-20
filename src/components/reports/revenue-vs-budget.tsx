@@ -25,17 +25,41 @@ export function RevenueVsBudget({
   annualBudget: number;
 }) {
   if (points.length < 2) {
+    const p = points[0];
+    // Nothing posted at all — don't render an empty panel.
+    if (!p) return null;
+    // One month: a cumulative TREND can't be drawn, but the actual-vs-budget figure
+    // for the month absolutely can — show that compactly instead of a placeholder.
+    const variance = p.actual - p.budget;
+    const behind = variance < 0;
+    const pctOfBudget = p.budget > 0 ? p.actual / p.budget : 0;
     return (
       <Panel>
-        <PanelHeader title="Revenue against budget" subtitle="Cumulative, across the year" />
-        <p className="text-[12px] leading-relaxed text-muted-foreground">
-          A trend needs at least two months.{" "}
-          <span className="text-foreground">
-            {points.length === 1 ? "One month is" : "No months are"} posted
-          </span>{" "}
-          in this financial year — this chart draws itself once the second month lands. Until then,
-          the year-to-date figures on the Reports page are the whole picture.
-        </p>
+        <PanelHeader
+          title="Revenue against budget"
+          subtitle={`Year to date · ${p.month}`}
+          right={<TrendingUp className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} />}
+        />
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Revenue received</div>
+            <div className="font-heading text-[22px] font-semibold tabular-nums text-green">{formatCompact(p.actual)}</div>
+          </div>
+          <div className="text-right">
+            <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Budget to date</div>
+            <div className="font-heading text-[16px] font-semibold tabular-nums text-muted-foreground">{formatCompact(p.budget)}</div>
+          </div>
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--track)]">
+          <div className={cn("h-full rounded-full", behind ? "bg-amber" : "bg-green")} style={{ width: `${Math.min(pctOfBudget, 1) * 100}%` }} />
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 font-mono text-[10px] tabular-nums">
+          <span className={behind ? "text-amber" : "text-green"}>
+            {behind ? "" : "+"}
+            {formatCurrency(variance)} {behind ? "behind budget" : "ahead of budget"}
+          </span>
+          <span className="text-muted-foreground">One month posted — the trend line builds as the year lands.</span>
+        </div>
       </Panel>
     );
   }

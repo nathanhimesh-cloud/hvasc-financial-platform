@@ -13,7 +13,6 @@ import {
   Filter,
   LayoutGrid,
   BarChart3,
-  CalendarRange,
   TrendingUp,
   TrendingDown,
   Wallet,
@@ -32,12 +31,14 @@ import {
   Hourglass,
   type LucideIcon,
 } from "lucide-react";
-import type { BrandColor, FinancialSnapshot } from "@/lib/types";
+import Link from "next/link";
+import type { AccountRef, BrandColor, FinancialSnapshot } from "@/lib/types";
+import { Panel, PanelHeader } from "@/components/kit/panel";
 import { deriveDepartments, grantNeedsAction } from "@/lib/derive";
 import { assessIntegrity } from "@/lib/integrity";
 import { dashboardIssues } from "@/lib/data-quality";
 import { DataQualityBadge } from "@/components/kit/data-quality-badge";
-import { formatCompact } from "@/lib/format";
+import { formatCompact, formatCurrency } from "@/lib/format";
 import { bgColor } from "@/lib/colors";
 import { allGrantFigures, grantSummary } from "@/lib/grants";
 import { cashBreakdown, MIN_MONTHS_COVER } from "@/lib/liquidity";
@@ -154,6 +155,8 @@ interface Config {
   periodIdx: number;
   mode: Mode;
   depts: string[] | null; // null = all
+  /** Show only accounts not yet mapped to a department (chasing what needs mapping). */
+  unmappedOnly: boolean;
 }
 
 interface PeriodPoint {
@@ -215,6 +218,7 @@ export function DashboardController({
     periodIdx: latestIdx,
     mode: "cumulative",
     depts: null,
+    unmappedOnly: false,
   });
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<"filters" | "stats" | "panels">("filters");
@@ -235,6 +239,7 @@ export function DashboardController({
           periodIdx: periods.some((x) => x.idx === p.periodIdx) ? (p.periodIdx as number) : c.periodIdx,
           mode: p.mode === "monthly" ? "monthly" : "cumulative",
           depts: Array.isArray(p.depts) ? p.depts.filter((id) => allDeptIds.includes(id)) : null,
+          unmappedOnly: !!p.unmappedOnly,
         };
       });
     } catch {
@@ -363,9 +368,15 @@ export function DashboardController({
       if (next.length === 0) next = allDeptIds;
       return { ...c, depts: next.length === allDeptIds.length ? null : next };
     });
-  const reset = () => setCfg({ stats: DEFAULT_STATS, order: [...WIDGET_IDS], hidden: [], periodIdx: latestIdx, mode: "cumulative", depts: null });
+  const reset = () => setCfg({ stats: DEFAULT_STATS, order: [...WIDGET_IDS], hidden: [], periodIdx: latestIdx, mode: "cumulative", depts: null, unmappedOnly: false });
 
-  const filtered = cfg.depts !== null || cfg.periodIdx !== latestIdx || cfg.mode !== "cumulative";
+  const filtered = cfg.depts !== null || cfg.periodIdx !== latestIdx || cfg.mode !== "cumulative" || cfg.unmappedOnly;
+
+  // Accounts the department map couldn't resolve — the ~$888k Micah still needs to
+  // assign. "Unmapped only" turns the panel area into this list so it can be chased.
+  const unmappedAccounts = (snapshot.accounts ?? [])
+    .filter((a) => a.departmentId === null && Math.abs(a.balance) > 0.005)
+    .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
 
   return (
     <div>
@@ -410,43 +421,9 @@ export function DashboardController({
           <div className="p-4">
             {tab === "filters" && (
               <div className="flex flex-col gap-5">
-                {/* Time period */}
-                <section className="flex flex-col gap-3">
-                  <SectionTitle icon={CalendarRange} title="Time period" hint="Income, expenses & net result" />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative">
-                      <select
-                        value={cfg.periodIdx}
-                        onChange={(e) => set({ periodIdx: Number(e.target.value) })}
-                        className="h-9 rounded-md border border-border bg-elevated pl-3 pr-8 text-[13px] font-medium text-foreground outline-none transition-colors focus:border-gold/40"
-                      >
-                        {periods.map((p) => (
-                          <option key={p.idx} value={p.idx}>
-                            {p.month}
-                            {p.idx === latestIdx ? " (latest)" : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex h-9 items-center rounded-md border border-border bg-elevated/40 p-1">
-                      {(["cumulative", "monthly"] as Mode[]).map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => set({ mode: m })}
-                          className={cn(
-                            "h-full rounded px-3 text-[12px] font-medium transition-colors",
-                            cfg.mode === m ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                          )}
-                        >
-                          {m === "cumulative" ? "Cumulative" : "This month"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-
-                <div className="h-px bg-border" />
+                {/* The period is chosen by the selector at the top of the page, so it
+                    isn't duplicated here — this panel is only which departments (or
+                    the unmapped accounts) the figures below are scoped to. */}
 
                 {/* Departments */}
                 <section className="flex flex-col gap-3">
@@ -470,7 +447,7 @@ export function DashboardController({
                       </div>
                     }
                   />
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
+                  <div className={cn("grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4", cfg.unmappedOnly && "pointer-events-none opacity-40")}>
                     {allDepts.map((d) => {
                       const on = cfg.depts === null || cfg.depts.includes(d.id);
                       return (
@@ -490,6 +467,24 @@ export function DashboardController({
                       );
                     })}
                   </div>
+
+                  {/* Unmapped-only — focuses the whole page on the accounts the
+                      department map couldn't resolve, so they can be chased down. */}
+                  <button
+                    type="button"
+                    onClick={() => set({ unmappedOnly: !cfg.unmappedOnly })}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-left text-[12px] transition-colors",
+                      cfg.unmappedOnly ? "border-amber/50 bg-amber-dim text-foreground" : "border-border bg-elevated/40 text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <AlertTriangle className={cn("h-4 w-4 flex-shrink-0", cfg.unmappedOnly ? "text-amber" : "text-muted-foreground")} strokeWidth={1.75} />
+                    <span className="flex-1">
+                      <span className="font-medium text-foreground">Unmapped accounts only</span>
+                      <span className="ml-1.5 text-muted-foreground">show just the {unmappedAccounts.length} accounts with no department</span>
+                    </span>
+                    {cfg.unmappedOnly && <Check className="h-3.5 w-3.5 flex-shrink-0 text-amber" strokeWidth={2.25} />}
+                  </button>
                 </section>
               </div>
             )}
@@ -542,8 +537,8 @@ export function DashboardController({
         </div>
       )}
 
-      {/* Stats */}
-      {shownStats.length > 0 && (
+      {/* Stats — hidden in unmapped-only mode, which has its own focused summary. */}
+      {!cfg.unmappedOnly && shownStats.length > 0 && (
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {shownStats.map((m, i) => {
             // "vs this time last year" — only in the default council-wide YTD view,
@@ -564,8 +559,10 @@ export function DashboardController({
         </div>
       )}
 
-      {/* Panels */}
-      {visibleWidgets.length === 0 ? (
+      {/* Panels — or, in unmapped-only mode, the list of accounts to chase. */}
+      {cfg.unmappedOnly ? (
+        <UnmappedPanel accounts={unmappedAccounts} />
+      ) : visibleWidgets.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-card/40 px-6 py-10 text-center text-[13px] text-muted-foreground">
           All panels hidden — open <span className="text-foreground">Customize dashboard → Panels</span> to bring some back.
         </div>
@@ -579,6 +576,81 @@ export function DashboardController({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The unmapped-only view: every account the department map couldn't resolve, so a
+ * finance officer can see exactly what needs assigning in Practical (the ~$888k
+ * behind the dashboard's "Unassigned" / "Other revenue" lines).
+ */
+function UnmappedPanel({ accounts }: { accounts: AccountRef[] }) {
+  if (!accounts.length) {
+    return (
+      <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-card/40 px-6 py-10 text-center text-[13px] text-muted-foreground">
+        Every account is mapped to a department — nothing to chase.
+      </div>
+    );
+  }
+  const revTotal = accounts.filter((a) => a.kind === "revenue").reduce((s, a) => s + a.balance, 0);
+  const expTotal = accounts.filter((a) => a.kind === "expense").reduce((s, a) => s + a.balance, 0);
+
+  return (
+    <Panel>
+      <PanelHeader
+        title="Unmapped accounts"
+        subtitle={`${accounts.length} with no department · revenue ${formatCompact(revTotal)} · expense ${formatCompact(expTotal)}`}
+        right={
+          <Link
+            href="/mapping"
+            className="rounded-[7px] border border-[var(--hairline)] px-3 py-[5px] text-[11px] font-bold text-subtle transition-colors hover:border-[rgba(212,168,76,0.35)] hover:bg-gold-dim hover:text-gold-light"
+          >
+            Map accounts →
+          </Link>
+        }
+      />
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              {[
+                { label: "Account", align: "left" },
+                { label: "Type", align: "left" },
+                { label: "Amount (YTD)", align: "right" },
+              ].map((h) => (
+                <th
+                  key={h.label}
+                  className={cn(
+                    "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3.5 py-[11px] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--th-fg)]",
+                    h.align === "right" ? "text-right" : "text-left",
+                  )}
+                >
+                  {h.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.map((a) => (
+              <tr key={a.code} className="hover:bg-[var(--hairline-hover)]">
+                <td className="border-b border-[var(--hairline-soft)] px-3.5 py-2.5">
+                  <span className="mr-2.5 font-mono text-[11px] text-muted-foreground">{a.code}</span>
+                  <span className="text-[13px] font-medium text-foreground">{a.name}</span>
+                </td>
+                <td className="border-b border-[var(--hairline-soft)] px-3.5 py-2.5">
+                  <span className={cn("rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em]", a.kind === "revenue" ? "bg-green-dim text-green" : "bg-amber-dim text-amber")}>
+                    {a.kind}
+                  </span>
+                </td>
+                <td className="border-b border-[var(--hairline-soft)] px-3.5 py-2.5 text-right font-mono text-[13px] font-medium tabular-nums text-foreground">
+                  {formatCurrency(a.balance)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { hex } from "@/lib/colors";
 import { formatCompact, formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -9,15 +10,15 @@ import { cn } from "@/lib/utils";
  *
  * What makes a chart read as "Power BI" rather than a decorated div: a real
  * y-axis with nice-number tick labels, faint horizontal gridlines, solid
- * full-strength columns, an explicit dashed reference line with a legend, and
- * value labels when there's room. This component does exactly that, on the
- * theme's data-viz palette, and survives real council data — a negative day
- * (June's accruals reversing) draws downward from a zero line in teal, because
- * money coming back is not an error.
+ * full-strength columns on the report palette, an explicit dashed reference line
+ * with a legend, value labels when there's room — and a proper HOVER TOOLTIP: a
+ * white card that leads with the value, names the point, and (when there's a
+ * reference line) says how far above or below pace it sits. Hovering dims the
+ * other columns and lifts a faint band behind the focused one, so the eye is
+ * pulled to the number being read.
  *
- * Rendering: shapes live in a stretched SVG (crisp at any width via
- * non-scaling strokes); ALL text is HTML positioned by percentage, so labels
- * never distort.
+ * Rendering: shapes live in a stretched SVG (crisp at any width via non-scaling
+ * strokes); ALL text is HTML positioned by percentage, so labels never distort.
  */
 
 export interface ColumnPoint {
@@ -55,6 +56,8 @@ export function ColumnChart({
   /** Value labels above bars. "auto" = only when there's room. */
   showValues?: boolean | "auto";
 }) {
+  const [hover, setHover] = useState<number | null>(null);
+
   if (!data.length) return null;
 
   const values = data.map((d) => d.value);
@@ -81,6 +84,9 @@ export function ColumnChart({
   const xPct = (i: number) => band * i + band / 2;
 
   const labelsOn = showValues === true || (showValues === "auto" && n <= 13);
+  const active = hover !== null ? data[hover] : null;
+  // Keep the tooltip on-screen: nudge its anchor away from the edges.
+  const tipLeft = hover === null ? 0 : Math.min(Math.max(xPct(hover), 12), 88);
 
   return (
     <div className="w-full">
@@ -119,7 +125,7 @@ export function ColumnChart({
         </div>
 
         {/* Plot */}
-        <div className="relative flex-1" style={{ height }}>
+        <div className="relative flex-1" style={{ height }} onMouseLeave={() => setHover(null)}>
           <svg
             width="100%"
             height={height}
@@ -127,6 +133,11 @@ export function ColumnChart({
             preserveAspectRatio="none"
             className="absolute inset-0 overflow-visible"
           >
+            {/* Faint band behind the focused column. */}
+            {hover !== null && (
+              <rect x={band * hover} y={0} width={band} height={height} fill="var(--hairline-soft)" />
+            )}
+
             {/* Gridlines; the zero line is the strong one. */}
             {ticks.map((t) => (
               <line
@@ -147,6 +158,7 @@ export function ColumnChart({
               const y = (yPct(d.value) / 100) * height;
               const negative = d.value < 0;
               const h = Math.max(Math.abs(zero - y), 1);
+              const dim = hover !== null && hover !== i;
               return (
                 <rect
                   key={`${d.label}-${i}`}
@@ -154,11 +166,11 @@ export function ColumnChart({
                   y={negative ? zero : y}
                   width={barW}
                   height={h}
-                  rx={1}
+                  rx={1.5}
                   fill={negative ? hex.teal : hex.gold}
-                >
-                  <title>{`${d.label}: ${formatCurrency(d.value)}`}</title>
-                </rect>
+                  opacity={dim ? 0.4 : 1}
+                  style={{ transition: "opacity 120ms ease" }}
+                />
               );
             })}
 
@@ -176,10 +188,26 @@ export function ColumnChart({
                 vectorEffect="non-scaling-stroke"
               />
             )}
+
+            {/* Invisible full-height hit targets — a hover zone far bigger than the
+                mark, so a 1px column on a quiet day is still easy to read. */}
+            {data.map((d, i) => (
+              <rect
+                key={`hit-${i}`}
+                x={band * i}
+                y={0}
+                width={band}
+                height={height}
+                fill="transparent"
+                style={{ cursor: "pointer" }}
+                onMouseEnter={() => setHover(i)}
+              />
+            ))}
           </svg>
 
-          {/* Value labels (HTML). */}
+          {/* Value labels (HTML) — hidden while hovering so the tooltip owns the read. */}
           {labelsOn &&
+            hover === null &&
             data.map((d, i) => (
               <span
                 key={`v-${d.label}-${i}`}
@@ -192,17 +220,44 @@ export function ColumnChart({
                 {formatCompact(d.value)}
               </span>
             ))}
+
+          {/* Hover tooltip — leads with the value, then the point, then pace. */}
+          {active && (
+            <div
+              className="pointer-events-none absolute z-20 -translate-x-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-2 shadow-xl shadow-black/20"
+              style={{ left: `${tipLeft}%`, top: 2 }}
+            >
+              <div className={cn("font-heading text-[16px] font-bold leading-none tabular-nums", active.value < 0 ? "text-teal" : "text-foreground")}>
+                {formatCurrency(active.value)}
+              </div>
+              <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+                {barLabel} · {active.label}
+              </div>
+              {refValue !== undefined && (
+                <div className="mt-0.5 font-mono text-[10px] tabular-nums">
+                  {active.value - refValue >= 0 ? (
+                    <span className="text-red">{formatCompact(active.value - refValue)} over pace</span>
+                  ) : (
+                    <span className="text-green">{formatCompact(refValue - active.value)} under pace</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* X labels. */}
+      {/* X labels — the focused one lifts to full-strength foreground. */}
       <div className="ml-11 mt-1.5 flex" aria-hidden>
         {data.map((d, i) => (
           <span
             key={`x-${d.label}-${i}`}
-            className={cn("flex-1 truncate text-center font-mono text-[9px] text-muted-foreground")}
+            className={cn(
+              "flex-1 truncate text-center font-mono text-[9px] transition-colors",
+              hover === i ? "font-semibold text-foreground" : "text-muted-foreground",
+            )}
           >
-            {i % labelEvery === 0 ? d.label : ""}
+            {i % labelEvery === 0 || hover === i ? d.label : ""}
           </span>
         ))}
       </div>

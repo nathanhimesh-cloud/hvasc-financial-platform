@@ -22,7 +22,7 @@ import { KpiCard } from "@/components/kit/kpi-card";
 import { IntegrityBanner } from "@/components/kit/integrity-banner";
 import { DataStamp } from "@/components/kit/data-stamp";
 import { ExportButton } from "@/components/kit/export-button";
-import { TrendBars } from "@/components/kit/trend-bars";
+import { ColumnChart } from "@/components/kit/column-chart";
 import { DrillLink } from "@/components/kit/drill-link";
 import { MultiPeriod } from "./multi-period";
 import { RevenueVsBudget } from "./revenue-vs-budget";
@@ -328,20 +328,10 @@ export function ReportsView({
           {/* Filter bar */}
           <Panel className="flex flex-wrap items-end justify-between gap-4">
             <div className="flex flex-wrap items-end gap-4">
-              <Field label="Period">
-                <select
-                  value={selectedIdx}
-                  onChange={(e) => setSelectedIdx(Number(e.target.value))}
-                  className="rounded-md border border-border bg-elevated px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-gold/40"
-                >
-                  {periods.map((p) => (
-                    <option key={p.idx} value={p.idx}>
-                      {p.month}
-                      {p.idx === latestIdx ? "  (latest)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              {/* The period is chosen by the selector at the top of the page — no
+                  second month dropdown here. This View toggle only refines HOW that
+                  period is read: year-to-date, the month alone, the quarter, or the
+                  full year. */}
               <Field label="View">
                 <div className="flex rounded-md border border-border bg-elevated/40 p-0.5">
                   {(["cumulative", "monthly", "quarter", "year"] as Mode[]).map((m) => {
@@ -595,9 +585,9 @@ export function ReportsView({
                 title={trend.granularity === "day" ? "Daily Expense Trend" : "Monthly Expense Trend"}
                 subtitle={trend.subtitle}
               />
-              <TrendBars
-                data={trend.points}
-                highlight={trend.highlight}
+              <ColumnChart
+                data={trend.points.map((p) => ({ label: p.label, value: p.amount }))}
+                barLabel={trend.granularity === "day" ? "daily spend" : "monthly spend"}
                 labelEvery={trend.labelEvery}
               />
             </Panel>

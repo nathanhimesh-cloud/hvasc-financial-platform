@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, Receipt, Ban, CheckCircle2 } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/kit/panel";
 import { ExportButton } from "@/components/kit/export-button";
+import { TablePager, usePagination, STICKY_HEAD } from "@/components/kit/table-pager";
 import { formatCurrency } from "@/lib/format";
 import type { InvoicePage, BillPage } from "@/lib/billing";
 import { cn } from "@/lib/utils";
@@ -93,6 +94,11 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
   });
 
   const shownCount = tab === "owed-to-us" ? invoiceRows.length : billRows.length;
+
+  // Page each list; reset to page 1 when the tab or a filter changes.
+  const pagedInvoices = usePagination(invoiceRows, { size: 50, resetKey: `${tab}|${ageFilter}` });
+  const pagedBills = usePagination(billRows, { size: 50, resetKey: `${tab}|${billFilter}` });
+  const paged = tab === "owed-to-us" ? pagedInvoices : pagedBills;
 
   return (
     <Panel>
@@ -195,6 +201,16 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
         </span>
       </div>
 
+      <TablePager
+        total={paged.total}
+        page={paged.page}
+        pageSize={paged.pageSize}
+        pages={paged.pages}
+        onPage={paged.setPage}
+        onPageSize={paged.setPageSize}
+        label={tab === "owed-to-us" ? "invoices" : "bills"}
+      />
+
       {/* Wide tables scroll INSIDE their own container. The page body must never
           scroll sideways. */}
       <div className="overflow-x-auto">
@@ -202,16 +218,16 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
           <table className="w-full min-w-[860px] border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-border font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-                <th className="pb-2 pr-4 text-left font-normal">Date</th>
-                <th className="pb-2 pr-4 text-left font-normal">Customer</th>
-                <th className="pb-2 pr-4 text-left font-normal">Description</th>
-                <th className="pb-2 pr-4 text-right font-normal">Invoiced</th>
-                <th className="pb-2 pr-4 text-right font-normal">Outstanding</th>
-                <th className="pb-2 text-right font-normal">Status</th>
+                <th className={cn("pb-2 pr-4 text-left font-normal", STICKY_HEAD)}>Date</th>
+                <th className={cn("pb-2 pr-4 text-left font-normal", STICKY_HEAD)}>Customer</th>
+                <th className={cn("pb-2 pr-4 text-left font-normal", STICKY_HEAD)}>Description</th>
+                <th className={cn("pb-2 pr-4 text-right font-normal", STICKY_HEAD)}>Invoiced</th>
+                <th className={cn("pb-2 pr-4 text-right font-normal", STICKY_HEAD)}>Outstanding</th>
+                <th className={cn("pb-2 text-right font-normal", STICKY_HEAD)}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {invoiceRows.map((r) => (
+              {pagedInvoices.pageItems.map((r) => (
                 <tr key={r.ky} className="border-b border-border/50 last:border-0">
                   <td className="py-2.5 pr-4 font-mono text-[11px] text-muted-foreground">
                     {r.date}
@@ -258,16 +274,16 @@ export function BillingView({ invoices, bills }: { invoices: InvoicePage; bills:
           <table className="w-full min-w-[900px] border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-border font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-                <th className="pb-2 pr-4 text-left font-normal">Date</th>
-                <th className="pb-2 pr-4 text-left font-normal">Supplier</th>
-                <th className="pb-2 pr-4 text-left font-normal">Description</th>
-                <th className="pb-2 pr-4 text-left font-normal">Order</th>
-                <th className="pb-2 pr-4 text-right font-normal">Amount</th>
-                <th className="pb-2 text-right font-normal">Status</th>
+                <th className={cn("pb-2 pr-4 text-left font-normal", STICKY_HEAD)}>Date</th>
+                <th className={cn("pb-2 pr-4 text-left font-normal", STICKY_HEAD)}>Supplier</th>
+                <th className={cn("pb-2 pr-4 text-left font-normal", STICKY_HEAD)}>Description</th>
+                <th className={cn("pb-2 pr-4 text-left font-normal", STICKY_HEAD)}>Order</th>
+                <th className={cn("pb-2 pr-4 text-right font-normal", STICKY_HEAD)}>Amount</th>
+                <th className={cn("pb-2 text-right font-normal", STICKY_HEAD)}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {billRows.map((r) => (
+              {pagedBills.pageItems.map((r) => (
                 <tr
                   key={r.ky}
                   className={cn(

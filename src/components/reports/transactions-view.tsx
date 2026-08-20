@@ -5,8 +5,9 @@ import { useRouter, usePathname } from "next/navigation";
 import { Search, Download, Loader2, X } from "lucide-react";
 import type { Transaction, DailySpendPoint } from "@/lib/types";
 import { Panel, PanelHeader } from "@/components/kit/panel";
-import { TrendBars } from "@/components/kit/trend-bars";
+import { ColumnChart } from "@/components/kit/column-chart";
 import { ExportButton } from "@/components/kit/export-button";
+import { TablePager, usePagination, STICKY_HEAD } from "@/components/kit/table-pager";
 import { formatCurrency, formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,6 @@ import { cn } from "@/lib/utils";
  *     say so rather than labelling a partial sum "total".
  */
 
-const ROW_CAP = 300;
 
 export interface TransactionFilters {
   q?: string;
@@ -112,7 +112,9 @@ export function TransactionsView({
     });
   }, [transactions, q, from, to, serverFiltered]);
 
-  const shown = filtered.slice(0, ROW_CAP);
+  // Page the loaded rows instead of capping them at a fixed number.
+  const paged = usePagination(filtered, { size: 50, resetKey: `${q}|${from}|${to}|${serverFiltered}` });
+  const shown = paged.pageItems;
   const matching = serverFiltered ? (transactionTotal ?? filtered.length) : filtered.length;
 
   // Only the database can total rows it didn't send us.
@@ -185,14 +187,13 @@ export function TransactionsView({
       {dailySpend.length > 0 && (
         <Panel>
           <PanelHeader title="Daily Spend" subtitle="Operating spend by day · current FY" />
-          {/* The shared chart. The local one put a percentage height on a bar
-              whose parent column had no height - a percentage of `auto` is ZERO, so
-              every bar rendered 0px tall and the panel looked like missing data.
-              Exactly the bug TrendBars already had, in a component I forgot about. */}
-          <TrendBars
-            data={dailySpend.map((d) => ({ label: dayLabel(d.date), amount: d.amount }))}
+          {/* The SAME column chart used on the dashboard's Daily Spend — one
+              component everywhere, so every daily-spend chart reads identically
+              (y-axis, hover tooltip, credit bars below the line). */}
+          <ColumnChart
+            data={dailySpend.map((d) => ({ label: dayLabel(d.date), value: d.amount }))}
+            barLabel="daily spend"
             labelEvery={dailySpend.length > 14 ? Math.ceil(dailySpend.length / 10) : 1}
-            height={120}
           />
         </Panel>
       )}
@@ -259,12 +260,24 @@ export function TransactionsView({
         </button>
       </Panel>
 
-      {/* Table */}
-      <Panel className="overflow-hidden">
+      {/* Table — no overflow-hidden here: it would make this Panel the scroll
+          container and trap the pager's position:sticky. */}
+      <Panel>
         <PanelHeader
           title="Transactions"
-          subtitle={`${matching.toLocaleString()} matching · showing ${shown.length.toLocaleString()}`}
+          subtitle={`${matching.toLocaleString()} matching`}
         />
+        {matching > 0 && (
+          <TablePager
+            total={paged.total}
+            page={paged.page}
+            pageSize={paged.pageSize}
+            pages={paged.pages}
+            onPage={paged.setPage}
+            onPageSize={paged.setPageSize}
+            label="transactions"
+          />
+        )}
         {matching === 0 ? (
           <p className="py-10 text-center text-[13px] text-muted-foreground">
             No transactions match these filters.
@@ -278,7 +291,8 @@ export function TransactionsView({
                     <th
                       key={h}
                       className={cn(
-                        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
+                        "border-b border-[var(--hairline)] px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
+                        STICKY_HEAD,
                         i >= 4 ? "text-right" : "text-left",
                       )}
                     >
@@ -314,12 +328,10 @@ export function TransactionsView({
           </div>
         )}
 
-        {matching > shown.length && (
+        {serverFiltered && matching > filtered.length && (
           <p className="mt-3 font-mono text-[10px] text-muted-foreground">
-            Showing {shown.length.toLocaleString()} of {matching.toLocaleString()} matching rows
-            {serverFiltered
-              ? " — narrow the search or date range, or export CSV."
-              : " — export CSV for the full set."}
+            {filtered.length.toLocaleString()} of {matching.toLocaleString()} matching rows are loaded
+            — narrow the search or date range, or export CSV for the full set.
           </p>
         )}
         {!serverFiltered && (

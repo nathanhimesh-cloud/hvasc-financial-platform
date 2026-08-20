@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Department, RevenueLine } from "@/lib/types";
 import { hex } from "@/lib/colors";
 import { formatCompact, formatCurrency, formatPercent } from "@/lib/format";
@@ -32,6 +33,7 @@ export function AllocationDonut({
   // not assigned to a department — usually a small positive, but it can be NEGATIVE
   // (contra / adjustment accounts that net down the total). Either way we show it as
   // its own line and make the Total equal the headline, so it always reconciles.
+  const [hover, setHover] = useState<number | null>(null);
   const listed = revenueLines.reduce((a, r) => a + r.ytd, 0);
   const other = totalRevenue - listed;
   const showOther = Math.abs(other) >= 1;
@@ -60,12 +62,13 @@ export function AllocationDonut({
         right={<CardBadge>{allocation.length} depts</CardBadge>}
       />
 
-      <div className="flex items-center gap-[22px]">
+      <div className="relative flex items-center gap-[22px]">
         <svg
           width="114"
           height="114"
           viewBox="0 0 114 114"
           className="flex-shrink-0 origin-center animate-in fade-in zoom-in-75 fill-mode-both duration-700 ease-out"
+          onMouseLeave={() => setHover(null)}
         >
           <circle cx="57" cy="57" r={r} fill="none" stroke="var(--elevated)" strokeWidth="17" />
           {segments.map((s, i) => (
@@ -76,23 +79,46 @@ export function AllocationDonut({
               r={r}
               fill="none"
               stroke={s.color}
-              strokeWidth="17"
+              strokeWidth={hover === i ? 20 : 17}
               strokeDasharray={s.dash}
               strokeDashoffset={s.offset}
               transform="rotate(-90 57 57)"
+              opacity={hover !== null && hover !== i ? 0.4 : 1}
+              style={{ cursor: "pointer", transition: "opacity 120ms ease, stroke-width 120ms ease" }}
+              onMouseEnter={() => setHover(i)}
             />
           ))}
-          <text x="57" y="54" textAnchor="middle" fill="var(--foreground)" fontFamily="var(--font-heading)" fontSize="14" fontWeight="800">
-            {formatCompact(totalBudget)}
+          <text x="57" y="54" textAnchor="middle" fill={hover !== null ? hex[sorted[hover].department.color] : "var(--foreground)"} fontFamily="var(--font-heading)" fontSize="14" fontWeight="800">
+            {formatCompact(hover !== null ? sorted[hover].department.annualBudget : totalBudget)}
           </text>
           <text x="57" y="65" textAnchor="middle" fill="var(--muted-foreground)" fontFamily="var(--font-mono)" fontSize="7.5" letterSpacing="1.5">
-            {isFy25 ? "FY25 SPEND" : "TOTAL"}
+            {hover !== null ? "DEPT" : isFy25 ? "FY25 SPEND" : "TOTAL"}
           </text>
         </svg>
 
+        {/* Tooltip on slice hover — value first, then the department and its share. */}
+        {hover !== null && (
+          <div className="pointer-events-none absolute left-16 top-0 z-20 -translate-y-2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-2 shadow-xl shadow-black/20">
+            <div className="font-heading text-[16px] font-bold leading-none tabular-nums" style={{ color: hex[sorted[hover].department.color] }}>
+              {formatCurrency(sorted[hover].department.annualBudget)}
+            </div>
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+              {shortLabel(sorted[hover].department.name)} · {formatPercent(sorted[hover].share)}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-1 flex-col gap-2">
-          {sorted.map(({ department, share }) => (
-            <div key={department.id} className="flex items-center gap-2.5 text-xs">
+          {sorted.map(({ department, share }, i) => (
+            <div
+              key={department.id}
+              className={cn(
+                "flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1 text-xs transition-all",
+                hover !== null && hover !== i ? "opacity-40" : "hover:bg-[var(--hairline-soft)]",
+              )}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+            >
               <span
                 className="h-2 w-2 flex-shrink-0 rounded-full"
                 style={{ background: hex[department.color] }}

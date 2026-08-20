@@ -82,6 +82,11 @@ export function OperatingResultTrend({
         </div>
       </div>
 
+      {/* A time-series chart of a single month is just one bar in a sea of white,
+          so below two months we collapse to the headline figures above plus a line
+          saying why — the chart returns the moment there's a trend to draw. */}
+      {pts.length > 1 ? (
+        <>
       {/* Bars around a centre zero line. */}
       <div className="relative" style={{ height: `${half * 2 + 4}px` }}>
         <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-border" />
@@ -134,6 +139,13 @@ export function OperatingResultTrend({
           <span className="flex items-center gap-1.5"><span className="h-0.5 w-3 bg-gold/70" /> Budget pace</span>
         )}
       </div>
+        </>
+      ) : (
+        <p className="border-t border-border/60 pt-3 text-[11px] leading-relaxed text-muted-foreground">
+          Only <span className="text-foreground">{last?.month ?? "one month"}</span> is posted this year — the
+          month-by-month surplus / deficit chart fills in as more months land.
+        </p>
+      )}
     </Panel>
   );
 }

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, AlertTriangle, Lock, Unlock, LifeBuoy, type LucideIcon } from "lucide-react";
 import { ExportButton } from "@/components/kit/export-button";
+import { TablePager, usePagination, STICKY_HEAD } from "@/components/kit/table-pager";
 import type { GrantFigures } from "@/lib/grants";
 import { Panel } from "@/components/kit/panel";
 import { formatCurrency, formatPercent } from "@/lib/format";
@@ -41,6 +42,8 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
     });
   }, [figures, q, onlyIssues, showClosed, kind, onlyDisaster]);
 
+  const paged = usePagination(rows, { size: 50, resetKey: `${q}|${kind}|${onlyIssues}|${showClosed}|${onlyDisaster}` });
+
   const exportCsv = () => {
     const header = [
       "Grant", "Funder", "Total grant income", "Opening income", "Current income",
@@ -68,7 +71,7 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
   };
 
   return (
-    <Panel className="overflow-hidden">
+    <Panel>
       {/* Header + search on one line — one cohesive card instead of a floating filter bar */}
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -152,6 +155,16 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
         </div>
       </div>
 
+      <TablePager
+        total={paged.total}
+        page={paged.page}
+        pageSize={paged.pageSize}
+        pages={paged.pages}
+        onPage={paged.setPage}
+        onPageSize={paged.setPageSize}
+        label="grants"
+      />
+
       <div className="overflow-x-auto">
           <table className="w-full min-w-[1560px] border-collapse">
             <thead>
@@ -177,7 +190,7 @@ export function GrantRegisterTable({ figures }: { figures: GrantFigures[] }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((f) => (
+              {paged.pageItems.map((f) => (
                 <tr key={f.entry.id} className="hover:bg-[var(--hairline-hover)]">
                   <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5">
                     <div className="flex items-start gap-2">
@@ -282,7 +295,8 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
   return (
     <th
       className={cn(
-        "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
+        "border-b border-[var(--hairline)] px-3 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--th-fg)]",
+        STICKY_HEAD,
         className,
       )}
     >

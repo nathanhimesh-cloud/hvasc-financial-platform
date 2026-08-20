@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Tags, Landmark, Search, RotateCcw, Save, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import type { BrandColor } from "@/lib/types";
 import { Panel, PageIntro } from "@/components/kit/panel";
+import { TablePager, usePagination, STICKY_HEAD } from "@/components/kit/table-pager";
 import { bgColor } from "@/lib/colors";
 import { formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -75,6 +76,7 @@ export function MappingForm({
   const [tab, setTab] = useState<"accounts" | "grants">("accounts");
   const [query, setQuery] = useState("");
   const [onlyEdited, setOnlyEdited] = useState(false);
+  const [onlyUnmapped, setOnlyUnmapped] = useState(false);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -168,8 +170,20 @@ export function MappingForm({
   }
 
   // ── filtering ───────────────────────────────────────────────────────────────
+  // "Unmapped" = the department map couldn't resolve it, so it has no original
+  // department (shown as "Unmapped"). These are the ones behind the dashboard's
+  // "Unassigned" / "Other revenue" lines — the accounts most needing a decision.
+  const unmappedAccounts = accounts.filter((a) => !a.originalDeptId).length;
+  const unmappedGrants = grants.filter((g) => !g.originalDeptId).length;
+  const unmappedCount = tab === "accounts" ? unmappedAccounts : unmappedGrants;
+
   const q = query.trim().toLowerCase();
   const visibleAccounts = accounts.filter((a) => {
+    const isUnmapped = !a.originalDeptId;
+    // Unmapped rows are HIDDEN from the default list — they surface only when the
+    // "Unmapped" toggle is on (which in turn hides the mapped ones). An account you
+    // have already edited stays visible either way, so your change never disappears.
+    if (onlyUnmapped ? !isUnmapped : isUnmapped && !accDirty(a)) return false;
     if (onlyEdited && !accDirty(a)) return false;
     if (!q) return true;
     return (
@@ -179,6 +193,8 @@ export function MappingForm({
     );
   });
   const visibleGrants = grants.filter((g) => {
+    const isUnmapped = !g.originalDeptId;
+    if (onlyUnmapped ? !isUnmapped : isUnmapped && !grtDirty(g)) return false;
     if (onlyEdited && !grtDirty(g)) return false;
     if (!q) return true;
     return (
@@ -187,6 +203,13 @@ export function MappingForm({
       (grt[g.id].name || "").toLowerCase().includes(q)
     );
   });
+
+  // Page each list; reset to page 1 whenever a filter changes so you never land on
+  // a now-empty page.
+  const resetKey = `${q}|${onlyEdited}|${onlyUnmapped}`;
+  const pagedAccounts = usePagination(visibleAccounts, { size: 50, resetKey });
+  const pagedGrants = usePagination(visibleGrants, { size: 50, resetKey });
+  const paged = tab === "accounts" ? pagedAccounts : pagedGrants;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 pb-24">
@@ -221,6 +244,20 @@ export function MappingForm({
             </label>
             <button
               type="button"
+              onClick={() => setOnlyUnmapped((v) => !v)}
+              title="Show only accounts the department map couldn't resolve — the ones behind the dashboard's Unassigned / Other revenue lines."
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.06em] transition-colors",
+                onlyUnmapped
+                  ? "border-amber/50 bg-amber-dim text-amber"
+                  : "border-border bg-elevated text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <AlertTriangle className="h-3 w-3" strokeWidth={2} />
+              Unmapped ({unmappedCount})
+            </button>
+            <button
+              type="button"
               onClick={() => setOnlyEdited((v) => !v)}
               className={cn(
                 "rounded-md border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.06em] transition-colors",
@@ -234,11 +271,20 @@ export function MappingForm({
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table — paged, with a sticky rows-per-page + page-number bar. */}
+        <TablePager
+          total={paged.total}
+          page={paged.page}
+          pageSize={paged.pageSize}
+          pages={paged.pages}
+          onPage={paged.setPage}
+          onPageSize={paged.setPageSize}
+          label={tab === "accounts" ? "accounts" : "grants"}
+        />
         {tab === "accounts" ? (
           <MappingTable
             entityLabel="account"
-            rows={visibleAccounts.map((a) => ({
+            rows={pagedAccounts.pageItems.map((a) => ({
               key: a.code,
               code: a.code,
               originalName: a.originalName,
@@ -258,7 +304,7 @@ export function MappingForm({
         ) : (
           <MappingTable
             entityLabel="grant"
-            rows={visibleGrants.map((g) => ({
+            rows={pagedGrants.pageItems.map((g) => ({
               key: g.id,
               code: g.funder,
               originalName: g.originalName,
@@ -426,7 +472,8 @@ function MappingTable({
               <th
                 key={i}
                 className={cn(
-                  "border-b border-[var(--hairline)] bg-[var(--hairline-soft)] px-3 py-2.5 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--th-fg)]",
+                  "border-b border-[var(--hairline)] px-3 py-2.5 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--th-fg)]",
+                  STICKY_HEAD,
                   h.w,
                 )}
               >
@@ -456,15 +503,21 @@ function MappingTable({
                 </td>
                 <td className="border-b border-[var(--hairline-soft)] px-3 py-2.5 align-middle">
                   <div className="flex items-center gap-2">
-                    <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", bgColor[colorOf[curDept] ?? "gold"])} />
+                    {/* An unmapped row has no department (value ""); without an
+                        explicit option a <select> silently shows the first one, so
+                        unmapped accounts looked like "Corporate Services". Now they
+                        read as "Unmapped" in amber until a department is picked. */}
+                    <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", curDept ? bgColor[colorOf[curDept] ?? "gold"] : "bg-amber")} />
                     <select
                       value={curDept}
                       onChange={(e) => r.onDept(e.target.value)}
                       className={cn(
-                        "w-full rounded border bg-elevated px-2 py-1.5 text-[13px] text-foreground outline-none transition-colors focus:border-gold/40",
+                        "w-full rounded border bg-elevated px-2 py-1.5 text-[13px] outline-none transition-colors focus:border-gold/40",
+                        curDept ? "text-foreground" : "text-amber",
                         curDept !== r.originalDeptId ? "border-gold/30" : "border-border",
                       )}
                     >
+                      {!curDept && <option value="">— Unmapped · pick a department —</option>}
                       {departments.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}
