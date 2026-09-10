@@ -2,6 +2,7 @@
 
 import { Columns3 } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/kit/panel";
+import { ExportButton } from "@/components/kit/export-button";
 import { formatCompact } from "@/lib/format";
 import type { ReportPeriod } from "./reports-view";
 import { cn } from "@/lib/utils";
@@ -61,7 +62,29 @@ export function MultiPeriod({ periods }: { periods: ReportPeriod[] }) {
       <PanelHeader
         title="Month by month"
         subtitle="Each month's movement — not the running total"
-        right={<Columns3 className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} />}
+        right={
+          <div className="flex items-center gap-2.5">
+            <Columns3 className="no-print h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
+            {/* Exported a month PER ROW, not per column as it reads on screen: a
+                spreadsheet is filtered and charted down a column, so months belong
+                on the vertical axis once the data leaves the page. */}
+            <ExportButton
+              filename="hvasc-month-by-month"
+              sheets={[
+                {
+                  name: "Month by month",
+                  rows: cols,
+                  columns: [
+                    { header: "Month", value: (c: (typeof cols)[number]) => c.month, width: 12 },
+                    { header: "Income", value: (c: (typeof cols)[number]) => c.income, type: "money", width: 16 },
+                    { header: "Expenses", value: (c: (typeof cols)[number]) => c.expenses, type: "money", width: 16 },
+                    { header: "Net result", value: (c: (typeof cols)[number]) => c.net, type: "money", width: 16 },
+                  ],
+                },
+              ]}
+            />
+          </div>
+        }
       />
 
       {/* Wide tables scroll INSIDE their own container. The page body must never

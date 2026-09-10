@@ -6,6 +6,7 @@ import { bgDim, statusToColor, textColor } from "@/lib/colors";
 import { DeptIcon } from "@/lib/icons";
 import { formatCurrency, formatPercent, formatSignedCompact } from "@/lib/format";
 import { Panel, PanelHeader } from "@/components/kit/panel";
+import { ExportButton } from "@/components/kit/export-button";
 import { StatusPill } from "@/components/kit/pills";
 import { cn } from "@/lib/utils";
 
@@ -44,11 +45,64 @@ export function DepartmentTable({
   // part of a budget variance — kept out of this total, and out of "% Spent".
   const totalVariance = sumYtdBudget - sumYtdActual;
 
+  // Export rows mirror what's on screen, Unassigned included — an export that
+  // silently drops the reconciling row wouldn't tie back to Total Expenses, and
+  // whoever opened it in Excel would be chasing a difference that isn't real.
+  const exportRows = [
+    ...departments.map((d) => ({
+      name: d.name,
+      annualBudget: d.annualBudget,
+      ytdActual: d.ytdActual,
+      ytdBudget: d.ytdBudget,
+      variance: d.ytdBudget - d.ytdActual,
+      pctSpent: d.annualBudget > 0 ? d.ytdActual / d.annualBudget : null,
+      revenue: d.revenue ?? 0,
+      status: d.status,
+    })),
+    ...(showUnassigned
+      ? [
+          {
+            name: "Unassigned",
+            annualBudget: 0,
+            ytdActual: unassigned,
+            ytdBudget: 0,
+            variance: 0,
+            pctSpent: null,
+            revenue: 0,
+            status: "unmapped",
+          },
+        ]
+      : []),
+  ];
+  type ExportRow = (typeof exportRows)[number];
+
   return (
     <Panel>
       <PanelHeader
         title={`Department Summary — ${periodLabel}`}
         subtitle={reconcile ? `YTD Actual totals to Total Expenses (YTD) · ${formatCurrency(totalActual)}` : undefined}
+        right={
+          <ExportButton
+            filename="hvasc-department-summary"
+            meta={{ period: periodLabel }}
+            sheets={[
+              {
+                name: "Departments",
+                rows: exportRows,
+                columns: [
+                  { header: "Department", value: (r: ExportRow) => r.name, width: 24 },
+                  { header: isFy25 ? "FY25 Actual" : "Annual Budget", value: (r: ExportRow) => r.annualBudget || null, type: "money", width: 16 },
+                  { header: isFy25 ? "FY26 YTD" : "YTD Actual", value: (r: ExportRow) => r.ytdActual, type: "money", width: 16 },
+                  { header: `YTD ${comparisonLabel}`, value: (r: ExportRow) => r.ytdBudget || null, type: "money", width: 16 },
+                  { header: "Variance", value: (r: ExportRow) => r.variance || null, type: "money", width: 14 },
+                  { header: "% Spent", value: (r: ExportRow) => r.pctSpent, type: "percent", width: 10 },
+                  { header: "Revenue (YTD)", value: (r: ExportRow) => r.revenue || null, type: "money", width: 16 },
+                  { header: "Status", value: (r: ExportRow) => r.status, width: 14 },
+                ],
+              },
+            ]}
+          />
+        }
       />
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">

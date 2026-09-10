@@ -1,6 +1,5 @@
 import { Content } from "@/components/kit/panel";
 import { DashboardController } from "@/components/dashboard/dashboard-controller";
-import { PeriodSelector } from "@/components/kit/period-selector";
 import { resolvePeriodView, type SearchParams } from "@/lib/periods";
 import { loadPriorYear, priorDashboardStats, previousFyLabel } from "@/lib/prior-year";
 
@@ -26,15 +25,16 @@ export default async function CfoDashboardPage({
 
   return (
     <Content>
-      <div className="mb-4">
-        <PeriodSelector
-          periods={view.periods}
-          selected={view.selected}
-          isLatest={view.isLatest}
-          hasHistory={view.hasHistory}
-        />
-      </div>
-      <DashboardController snapshot={view.snapshot} prior={{ label: priorLabel, stats: priorStats }} />
+      {/* The period control lives INSIDE the dashboard now: it carries the month
+          range as well as the archived-period jump, and the range is client state
+          the controller owns. One control, one place. */}
+      <DashboardController
+        snapshot={view.snapshot}
+        prior={{ label: priorLabel, stats: priorStats }}
+        periods={view.periods}
+        selected={view.selected}
+        isLatest={view.isLatest}
+      />
     </Content>
   );
 }

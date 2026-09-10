@@ -50,7 +50,17 @@ const FORMATS: Record<NonNullable<XlsxColumn<unknown>["type"]>, string | undefin
 export function downloadXlsx<T>(
   filename: string,
   sheets: XlsxSheet<T>[],
-  meta?: { period?: string; generatedAt?: string },
+  meta?: {
+    period?: string;
+    generatedAt?: string;
+    /**
+     * Extra `[label, value]` rows for the About sheet — where each column came
+     * from in Practical (table, column, filter). An export that leaves the
+     * building has to be able to answer "where did this number come from"
+     * without the person holding it having to come back and ask.
+     */
+    notes?: [string, string][];
+  },
 ) {
   const wb = XLSX.utils.book_new();
 
@@ -120,6 +130,7 @@ export function downloadXlsx<T>(
     [],
     ["Source", "Civica Practical Plus (live general ledger, read-only)"],
     ["Note", "Figures depend on the accuracy of the data recorded in Practical."],
+    ...(meta?.notes?.length ? [[], ["Where this comes from in Practical", ""], ...meta.notes] : []),
   ]);
   about["!cols"] = [{ wch: 16 }, { wch: 60 }];
   XLSX.utils.book_append_sheet(wb, about, "About");

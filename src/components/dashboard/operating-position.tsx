@@ -57,7 +57,11 @@ export function OperatingPosition({
 
   return (
     <Panel className="h-full">
-      <PanelHeader title="Operating Position — YTD" right={<CardBadge>{periodLabel}</CardBadge>} />
+      {/* The title takes the period from the range, not the word "YTD". With a
+          month range selected the figures are that range, and a panel headed YTD
+          over one month's numbers is the same stale-label trap that had Aug
+          departments reconciled against Jul income. */}
+      <PanelHeader title={`Operating Position — ${periodLabel}`} right={<CardBadge>{periodLabel}</CardBadge>} />
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-8">
         {/* Composition donut + legend */}
@@ -129,7 +133,7 @@ export function OperatingPosition({
         <div className="grid flex-1 grid-cols-3 gap-3">
           <Tile label="Surplus margin" value={<CountUp value={margin} format="percent" />} tone={surplus ? "pos" : "neg"} hint="net ÷ income" />
           <Tile label="Spend rate" value={<CountUp value={spendRatio} format="percent" />} hint="of income spent" />
-          <Tile label={surplus ? "Surplus Year to Date" : "Shortfall Year to Date"} value={<CountUp value={Math.abs(netResult)} format="compact" />} tone={surplus ? "pos" : "neg"} hint={periodLabel} />
+          <Tile label={surplus ? "Surplus" : "Shortfall"} value={<CountUp value={Math.abs(netResult)} format="compact" />} tone={surplus ? "pos" : "neg"} hint={periodLabel} />
         </div>
       </div>
     </Panel>

@@ -6,6 +6,7 @@ import { Tags, Landmark, Search, RotateCcw, Save, CheckCircle2, AlertTriangle, I
 import type { BrandColor } from "@/lib/types";
 import { Panel, PageIntro } from "@/components/kit/panel";
 import { TablePager, usePagination, STICKY_HEAD } from "@/components/kit/table-pager";
+import { ExportButton } from "@/components/kit/export-button";
 import { bgColor } from "@/lib/colors";
 import { formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,10 @@ export interface AccountRow {
   originalDeptId: string;
   originalDeptName: string;
   amount: number;
+  /** GLMST.ACCNTTYPE: 5 → revenue, 6 → expense. Splits the unmapped exports. */
+  kind: "revenue" | "expense";
+  /** Annual budget on the account (GLBAL.BUDGET at period 12). */
+  budget: number;
   /** Current override name ("" = none). */
   name: string;
   /** Current override department id ("" = none). */
@@ -43,16 +48,45 @@ export interface GrantRow {
 type Edit = { name: string; departmentId: string };
 type EditMap = Record<string, Edit>;
 
+/**
+ * Where each exported column comes from in Practical, written onto the About
+ * sheet of every workbook this page produces. An export outlives the screen it
+ * came from, and "where did this number come from" should be answerable by the
+ * person holding the file rather than by asking us.
+ */
+const PRACTICAL_SOURCE: [string, string][] = [
+  ["Chart of accounts", "GLMST — one row per general-ledger account"],
+  ["GL code", "GLMST.GLACCOUNT (e.g. 7015-1100-0000)"],
+  ["Account name", "GLMST.DESCRIPT"],
+  ["Revenue vs expense", "GLMST.ACCNTTYPE — 5 = revenue, 6 = expense"],
+  ["YTD balance", "GLBAL.BALANCE at the current period (cumulative year to date, not the month)"],
+  ["Active accounts only", "GLMST.RECACTIVE = 'Y' and GLMST.ISCONTROL = 'Y'"],
+  [
+    "Directorate mapping",
+    "CVREPORTGROUP + CVREPORTGROUPLINK — Practical's Report Groups screen, joined on GLMST.KY",
+  ],
+  [
+    "Why an account is unmapped",
+    "It is not a member of any Report Group matching a directorate (Corporate Services-Finance / Operations Manager / Social Services Director)",
+  ],
+  ["To fix", "Add the account to the right Report Group in Practical; it moves on the next sync"],
+];
+
 export function MappingForm({
   departments,
   accounts,
   grants,
   passwordRequired,
+  periodLabel,
+  generatedAt,
 }: {
   departments: DeptOption[];
   accounts: AccountRow[];
   grants: GrantRow[];
   passwordRequired: boolean;
+  /** Stamped onto the unmapped exports so a downloaded file dates itself. */
+  periodLabel?: string;
+  generatedAt?: string;
 }) {
   const router = useRouter();
   const colorOf = useMemo(
@@ -77,6 +111,9 @@ export function MappingForm({
   const [query, setQuery] = useState("");
   const [onlyEdited, setOnlyEdited] = useState(false);
   const [onlyUnmapped, setOnlyUnmapped] = useState(false);
+  // Revenue / expense split within the unmapped list. Reset when the toggle goes
+  // off so turning it back on does not resume a filter nobody can see.
+  const [kindFilter, setKindFilter] = useState<"all" | "revenue" | "expense">("all");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -173,7 +210,10 @@ export function MappingForm({
   // "Unmapped" = the department map couldn't resolve it, so it has no original
   // department (shown as "Unmapped"). These are the ones behind the dashboard's
   // "Unassigned" / "Other revenue" lines — the accounts most needing a decision.
-  const unmappedAccounts = accounts.filter((a) => !a.originalDeptId).length;
+  const unmappedList = accounts.filter((a) => !a.originalDeptId);
+  const unmappedAccounts = unmappedList.length;
+  const unmappedRevenue = unmappedList.filter((a) => a.kind === "revenue").length;
+  const unmappedExpense = unmappedList.filter((a) => a.kind === "expense").length;
   const unmappedGrants = grants.filter((g) => !g.originalDeptId).length;
   const unmappedCount = tab === "accounts" ? unmappedAccounts : unmappedGrants;
 
@@ -185,6 +225,7 @@ export function MappingForm({
     // have already edited stays visible either way, so your change never disappears.
     if (onlyUnmapped ? !isUnmapped : isUnmapped && !accDirty(a)) return false;
     if (onlyEdited && !accDirty(a)) return false;
+    if (onlyUnmapped && kindFilter !== "all" && a.kind !== kindFilter) return false;
     if (!q) return true;
     return (
       a.code.toLowerCase().includes(q) ||
@@ -206,7 +247,20 @@ export function MappingForm({
 
   // Page each list; reset to page 1 whenever a filter changes so you never land on
   // a now-empty page.
-  const resetKey = `${q}|${onlyEdited}|${onlyUnmapped}`;
+  // Department id → name, for naming the target of a reassignment in an export.
+  const deptNameById: Record<string, string> = Object.fromEntries(departments.map((d) => [d.id, d.name]));
+
+  // Name the file after what's actually in it, so two downloads from the same
+  // page don't land in Downloads as "…(1).xlsx" with no way to tell them apart.
+  const accountExportName = onlyUnmapped
+    ? kindFilter === "revenue"
+      ? "hvasc-unmapped-revenue"
+      : kindFilter === "expense"
+        ? "hvasc-unmapped-expenses"
+        : "hvasc-unmapped-accounts"
+    : "hvasc-account-mapping";
+
+  const resetKey = `${q}|${onlyEdited}|${onlyUnmapped}|${kindFilter}`;
   const pagedAccounts = usePagination(visibleAccounts, { size: 50, resetKey });
   const pagedGrants = usePagination(visibleGrants, { size: 50, resetKey });
   const paged = tab === "accounts" ? pagedAccounts : pagedGrants;
@@ -244,7 +298,7 @@ export function MappingForm({
             </label>
             <button
               type="button"
-              onClick={() => setOnlyUnmapped((v) => !v)}
+              onClick={() => setOnlyUnmapped((v) => { if (v) setKindFilter("all"); return !v; })}
               title="Show only accounts the department map couldn't resolve — the ones behind the dashboard's Unassigned / Other revenue lines."
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.06em] transition-colors",
@@ -268,6 +322,76 @@ export function MappingForm({
             >
               Edited only
             </button>
+
+            {/* Revenue / expense split. Only meaningful while "Unmapped" is on:
+                that's the list someone is actually working through, and the two
+                halves are different conversations — unmapped revenue is the
+                dashboard's "Council-wide & unmapped" line and reads positive,
+                unmapped expenses are the "Unassigned" line and at Hope Vale read
+                NEGATIVE (they're credit-side payroll recovery accounts). */}
+            {tab === "accounts" && onlyUnmapped && (
+              <div className="flex items-center overflow-hidden rounded-md border border-border">
+                {(["all", "revenue", "expense"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setKindFilter(k)}
+                    className={cn(
+                      "px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.06em] transition-colors",
+                      kindFilter === k
+                        ? "bg-gold-dim text-gold-light"
+                        : "bg-elevated text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {k === "all" ? `All ${unmappedAccounts}` : k === "revenue" ? `Revenue ${unmappedRevenue}` : `Expenses ${unmappedExpense}`}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Exports what's ON SCREEN, filters and all — so "Unmapped" + Export
+                gives exactly the list to send Micah, rather than the whole chart of
+                accounts he then has to filter again. */}
+            {tab === "accounts" ? (
+              <ExportButton<AccountRow>
+                filename={accountExportName}
+                meta={{ period: periodLabel, generatedAt, notes: PRACTICAL_SOURCE }}
+                sheets={[
+                  {
+                    name: onlyUnmapped ? "Unmapped" : "Accounts",
+                    rows: visibleAccounts,
+                    columns: [
+                      { header: "GL code", value: (a) => a.code, width: 18 },
+                      { header: "Account name", value: (a) => acc[a.code]?.name || a.originalName, width: 40 },
+                      { header: "Imported name", value: (a) => a.originalName, width: 40 },
+                      { header: "Type", value: (a) => (a.kind === "revenue" ? "Revenue" : "Expense"), width: 10 },
+                      { header: "Department", value: (a) => a.originalDeptName, width: 22 },
+                      { header: "Reassigned to", value: (a) => deptNameById[acc[a.code]?.departmentId ?? ""] ?? "", width: 22 },
+                      { header: "YTD", value: (a) => a.amount, type: "money", width: 16 },
+                      { header: "Annual budget", value: (a) => a.budget || null, type: "money", width: 16 },
+                    ],
+                  },
+                ]}
+              />
+            ) : (
+              <ExportButton<GrantRow>
+                filename="hvasc-grant-mapping"
+                sheets={[
+                  {
+                    name: "Grants",
+                    rows: visibleGrants,
+                    columns: [
+                      { header: "Grant", value: (g) => grt[g.id]?.name || g.originalName, width: 40 },
+                      { header: "Imported name", value: (g) => g.originalName, width: 40 },
+                      { header: "Funder", value: (g) => g.funder, width: 28 },
+                      { header: "Department", value: (g) => g.originalDeptName, width: 22 },
+                      { header: "Reassigned to", value: (g) => deptNameById[grt[g.id]?.departmentId ?? ""] ?? "", width: 22 },
+                      { header: "Total", value: (g) => g.total, type: "money", width: 16 },
+                    ],
+                  },
+                ]}
+              />
+            )}
           </div>
         </div>
 
@@ -321,6 +445,27 @@ export function MappingForm({
             colorOf={colorOf}
             metaHeader="Funding"
             codeIsText
+          />
+        )}
+
+        {/* Second pager below the table. With 225 accounts at 50 a page, paging
+            from the top means scrolling back up for every page — and the bar is
+            no longer sticky, so it isn't waiting there when you reach the end. */}
+        {paged.pages > 1 && (
+          <TablePager
+            border="top"
+            total={paged.total}
+            page={paged.page}
+            pageSize={paged.pageSize}
+            pages={paged.pages}
+            onPage={(p) => {
+              paged.setPage(p);
+              // Back to the top of the list — a new page that starts mid-scroll
+              // looks like the same page with different numbers.
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onPageSize={paged.setPageSize}
+            label={tab === "accounts" ? "accounts" : "grants"}
           />
         )}
       </Panel>

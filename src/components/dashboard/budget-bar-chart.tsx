@@ -103,30 +103,34 @@ export function BudgetBarChart({
         axis and the chart came out blank. Fall back to the shared bar chart, which
         handles a signed series and can plot the daily detail instead.
       */}
-      {monthlySpend.length >= 2 ? (
-        <Sparkline
-          monthlySpend={monthlySpend}
-          monthlyBudget={monthlyBudget}
-          trendEstimated={trendEstimated}
-          isFy25={isFy25}
-        />
-      ) : trend ? (
+      {/* ONE chart, every month of the year.
+          This used to render a monthly sparkline at two months or more and daily
+          bars below that, so the panel changed shape between July and August for
+          reasons invisible to the reader. Whatever the period, it now shows the
+          same daily series (see spendTrend), and the monthly summary that the
+          sparkline carried survives underneath as avg / high / low. */}
+      {trend ? (
         <div className="mt-6 border-t border-border pt-[18px]">
           <div className="mb-3">
             <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-              Daily spend
+              {trend.granularity === "day" ? "Daily spend" : "Monthly spend"}
             </span>
           </div>
           <ColumnChart
             data={trend.points.map((p) => ({ label: p.label, value: p.amount }))}
-            barLabel="daily spend"
-            refValue={monthlyBudget / 30}
-            refLabel={`budget pace ≈ ${formatCompact(monthlyBudget / 30)}/day`}
+            barLabel={trend.granularity === "day" ? "daily spend" : "monthly spend"}
+            refValue={trend.granularity === "day" ? monthlyBudget / 30 : monthlyBudget}
+            refLabel={
+              trend.granularity === "day"
+                ? `budget pace ≈ ${formatCompact(monthlyBudget / 30)}/day`
+                : `budget ${formatCompact(monthlyBudget)}/mo`
+            }
             labelEvery={trend.labelEvery}
             height={120}
             showValues={false}
           />
           <p className="mt-2 font-mono text-[9px] text-muted-foreground">{trend.subtitle}</p>
+          {monthlySpend.length > 0 && <MonthlySummary monthlySpend={monthlySpend} />}
         </div>
       ) : null}
     </Panel>
@@ -279,6 +283,31 @@ function Sparkline({
         <Stat label={`High · ${monthlySpend[maxIdx]?.month}`} value={formatCompact(amounts[maxIdx])} />
         <Stat label={`Low · ${monthlySpend[minIdx]?.month}`} value={formatCompact(amounts[minIdx])} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Avg / high / low per month. This lived inside the sparkline, which no longer
+ * renders — but it was the part of that panel worth keeping, so it stands on its
+ * own beneath the daily chart. Months, not days, on purpose: "the highest day"
+ * is usually one payroll run and says nothing.
+ */
+function MonthlySummary({ monthlySpend }: { monthlySpend: MonthlySpend[] }) {
+  const amounts = monthlySpend.map((m) => m.amount);
+  const total = amounts.reduce((a, b) => a + b, 0);
+  const avg = amounts.length ? total / amounts.length : 0;
+  let maxIdx = 0;
+  let minIdx = 0;
+  amounts.forEach((v, i) => {
+    if (v > amounts[maxIdx]) maxIdx = i;
+    if (v < amounts[minIdx]) minIdx = i;
+  });
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center">
+      <Stat label="Avg / mo" value={formatCompact(avg)} />
+      <Stat label={`High · ${monthlySpend[maxIdx]?.month}`} value={formatCompact(amounts[maxIdx])} />
+      <Stat label={`Low · ${monthlySpend[minIdx]?.month}`} value={formatCompact(amounts[minIdx])} />
     </div>
   );
 }

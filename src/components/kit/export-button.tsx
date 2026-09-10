@@ -32,7 +32,8 @@ export function ExportButton<T>({
 }: {
   filename?: string;
   sheets?: XlsxSheet<T>[];
-  meta?: { period?: string; generatedAt?: string };
+  /** `notes` become [label, value] rows on the workbook's About sheet. */
+  meta?: { period?: string; generatedAt?: string; notes?: [string, string][] };
   /** Optional CSV fallback — the page's own per-table exporter. */
   csv?: () => void;
   label?: string;

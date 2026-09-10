@@ -56,6 +56,8 @@ export default async function MappingPage() {
         originalDeptId: a.departmentId ?? "",
         originalDeptName: a.departmentId ? (deptName[a.departmentId] ?? a.departmentId) : "Unmapped",
         amount: a.balance,
+        kind: a.kind,
+        budget: a.budget,
         name: accOv[a.code]?.name ?? "",
         departmentId: accOv[a.code]?.departmentId ?? "",
       });
@@ -70,7 +72,11 @@ export default async function MappingPage() {
           originalName: gl.account,
           originalDeptId: d.id,
           originalDeptName: d.name,
+          // Older snapshots have no chart of accounts, only each department top
+          // GL lines - which are expenses by construction.
           amount: gl.amount,
+          kind: "expense" as const,
+          budget: 0,
           name: accOv[gl.code]?.name ?? "",
           departmentId: accOv[gl.code]?.departmentId ?? "",
         });
@@ -151,6 +157,8 @@ export default async function MappingPage() {
         accounts={accounts}
         grants={grants}
         passwordRequired={!!process.env.UPLOAD_PASSWORD}
+        periodLabel={base.period?.label}
+        generatedAt={base.meta?.generatedAt}
       />
     </Content>
   );

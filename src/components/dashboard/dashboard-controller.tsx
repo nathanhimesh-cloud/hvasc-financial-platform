@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { spendTrend } from "@/lib/trend";
 import {
   Settings2,
@@ -32,7 +32,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import type { AccountRef, BrandColor, FinancialSnapshot } from "@/lib/types";
+import type { AccountRef, BrandColor, FinancialSnapshot, PeriodRef } from "@/lib/types";
 import { Panel, PanelHeader } from "@/components/kit/panel";
 import { deriveDepartments, grantNeedsAction } from "@/lib/derive";
 import { assessIntegrity } from "@/lib/integrity";
@@ -42,7 +42,17 @@ import { formatCompact, formatCurrency } from "@/lib/format";
 import { bgColor } from "@/lib/colors";
 import { allGrantFigures, grantSummary } from "@/lib/grants";
 import { cashBreakdown, MIN_MONTHS_COVER } from "@/lib/liquidity";
-import { grantDependencyRag } from "@/lib/rag";
+import { budgetStatus, grantDependencyRag } from "@/lib/rag";
+import { PeriodRangeSelect } from "./period-range-select";
+import {
+  isYearToDate,
+  monthKeys,
+  normaliseMonths,
+  rangeCouncilTotals,
+  rangeDepartments,
+  rangeLabel,
+  type MonthSelection,
+} from "@/lib/period-range";
 import { KpiCard } from "@/components/kit/kpi-card";
 import { CountUp } from "@/components/kit/count-up";
 import { YoY } from "@/components/kit/yoy";
@@ -145,15 +155,27 @@ const METRIC_HREF: Record<string, string> = {
   // used to point at is shelved until mapping is complete (Hazel, 14 Aug).
 };
 // v4: adds the cash-position / grant-mix widgets, so old saved orders must re-reconcile.
-const STORE = "hv:dashboard:v4";
+// v5: periodIdx + mode became a month RANGE. Bumping the key retires saved v4
+// configs rather than migrating them — the only field that changed is the one
+// that shouldn't have been persisted in the first place.
+const STORE = "hv:dashboard:v5";
 
-type Mode = "cumulative" | "monthly";
 interface Config {
   stats: string[];
   order: string[];
   hidden: string[];
-  periodIdx: number;
-  mode: Mode;
+  /**
+   * Selected months as financial-year indices (1 = July). Empty means every
+   * available month, i.e. year to date. Not contiguous by construction — the
+   * control is checkboxes. Never restored from storage; see the restore effect.
+   */
+  months: number[];
+  /**
+   * Which financial year those months belong to. Never both at once: the ledger
+   * closes and reopens at 30 June, so a total spanning two years would be adding
+   * up movements either side of a reset.
+   */
+  fy: "current" | "prior";
   depts: string[] | null; // null = all
   /** Show only accounts not yet mapped to a department (chasing what needs mapping). */
   unmappedOnly: boolean;
@@ -180,10 +202,17 @@ const YOY_KEYS: Record<string, "up" | "down" | "neutral"> = {
 export function DashboardController({
   snapshot,
   prior,
+  periods: archivedPeriods,
+  selected,
+  isLatest = true,
 }: {
   snapshot: FinancialSnapshot;
   /** Same-month prior-year values keyed by metric key, + a label. Empty stats = not archived yet. */
   prior?: { label: string; stats: Record<string, number> };
+  /** Archived snapshots, for the second half of the period control. */
+  periods?: PeriodRef[];
+  selected?: PeriodRef;
+  isLatest?: boolean;
 }) {
   const allDepts = useMemo(() => deriveDepartments(snapshot), [snapshot]);
   const allDeptIds = useMemo(() => allDepts.map((d) => d.id), [allDepts]);
@@ -197,6 +226,17 @@ export function DashboardController({
 
   // Every caveat on this page, gathered into the one indicator in the toolbar.
   const issues = useMemo(() => dashboardIssues(snapshot, cash, integrity), [snapshot, cash, integrity]);
+
+  /**
+   * The two financial years the snapshot can describe month by month.
+   *
+   * The prior year comes from `GLBAL.LASTYEAR`, which Practical stores CUMULATIVE
+   * TO PERIOD exactly like BALANCE — so last year has a full monthly series in the
+   * very table the feed already reads. `priorYear.monthlyStatements` is absent on
+   * snapshots built before Sep 2026, and then only the current year is offered.
+   */
+  const priorMonths = snapshot.priorYear?.monthlyStatements ?? [];
+  const priorSupported = priorMonths.length > 1 && (snapshot.priorYear?.accountMonthly?.length ?? 0) > 0;
 
   const periods: PeriodPoint[] = useMemo(() => {
     const ms = snapshot.monthlyStatements ?? [];
@@ -215,8 +255,8 @@ export function DashboardController({
     stats: DEFAULT_STATS,
     order: [...WIDGET_IDS],
     hidden: [],
-    periodIdx: latestIdx,
-    mode: "cumulative",
+    months: [],
+    fy: "current",
     depts: null,
     unmappedOnly: false,
   });
@@ -236,8 +276,19 @@ export function DashboardController({
           stats: (p.stats ?? c.stats).filter(Boolean),
           order,
           hidden: (p.hidden ?? []).filter((id) => WIDGET_IDS.includes(id as never)),
-          periodIdx: periods.some((x) => x.idx === p.periodIdx) ? (p.periodIdx as number) : c.periodIdx,
-          mode: p.mode === "monthly" ? "monthly" : "cumulative",
+          // ALWAYS open on the full year to date, never on a saved range.
+          //
+          // The old code restored the saved period whenever that month still
+          // existed in the data — so the moment a new month synced, the dashboard
+          // showed the OLD month's income statement beside the NEW month's
+          // departments. Revenue Composition then reconciled Aug department
+          // revenue ($3,110,259) against Jul total income ($2,118,455) and
+          // reported the $991,804 difference as "unmapped" revenue.
+          //
+          // Layout preferences are worth persisting. A period is not: it goes
+          // stale on its own, and a stale period silently mixes two months.
+          months: [],
+          fy: "current" as const,
           depts: Array.isArray(p.depts) ? p.depts.filter((id) => allDeptIds.includes(id)) : null,
           unmappedOnly: !!p.unmappedOnly,
         };
@@ -253,17 +304,95 @@ export function DashboardController({
   }, [cfg]);
 
   // ── Apply filters ──────────────────────────────────────────────────────────
-  const fin = useMemo(() => {
-    const cur = periods.find((p) => p.idx === cfg.periodIdx) ?? periods[periods.length - 1];
-    if (cfg.mode === "cumulative") {
-      return { income: cur.totalIncome, expenses: cur.totalExpenses, net: cur.netResult, label: `YTD to ${cur.month}` };
-    }
-    const prior = periods.filter((p) => p.idx < cur.idx).sort((a, b) => b.idx - a.idx)[0];
-    if (!prior) return { income: cur.totalIncome, expenses: cur.totalExpenses, net: cur.netResult, label: cur.month };
-    return { income: cur.totalIncome - prior.totalIncome, expenses: cur.totalExpenses - prior.totalExpenses, net: cur.netResult - prior.netResult, label: `${cur.month} (month)` };
-  }, [periods, cfg.periodIdx, cfg.mode]);
+  /**
+   * Can the range control actually re-derive the panels? It needs the
+   * per-account monthly series (to rebuild department figures) and more than one
+   * month to choose between.
+   */
+  const rangeSupported = (snapshot.accountMonthly?.length ?? 0) > 0 && periods.length > 1;
 
-  const depts = cfg.depts ? allDepts.filter((d) => cfg.depts!.includes(d.id)) : allDepts;
+  // Which year is being looked at. Falls back to the current one if a prior-year
+  // selection survives into a snapshot that no longer carries the prior series.
+  const onPrior = cfg.fy === "prior" && priorSupported;
+
+  /** The month list, statements and account series for the year in view. */
+  const active = useMemo(() => {
+    if (onPrior) {
+      return {
+        months: priorMonths.map((s) => ({ idx: s.idx, month: s.month })),
+        statements: priorMonths,
+        accountMonthly: snapshot.priorYear?.accountMonthly,
+        latest: priorMonths[priorMonths.length - 1]?.idx ?? 12,
+        fyLabel: snapshot.priorYear?.fyLabel ?? "",
+      };
+    }
+    return {
+      months: periods.map((p) => ({ idx: p.idx, month: p.month })),
+      statements: snapshot.monthlyStatements,
+      accountMonthly: snapshot.accountMonthly,
+      latest: latestIdx,
+      fyLabel: snapshot.period.fyLabel,
+    };
+  }, [onPrior, priorMonths, periods, snapshot, latestIdx]);
+
+  // Forced to the whole year when month selection isn't supported. Otherwise a
+  // stray selection would filter the council totals while the departments stayed
+  // on the snapshot's own figures — the two-periods-in-one-card bug this replaced.
+  const selMonths: MonthSelection = useMemo(
+    () => normaliseMonths(rangeSupported || onPrior ? cfg.months : [], active.latest),
+    [cfg.months, active.latest, rangeSupported, onPrior],
+  );
+  const atYtd = isYearToDate(selMonths, active.latest) && !onPrior;
+  const monthName = useCallback(
+    (idx: number) => active.months.find((p) => p.idx === idx)?.month ?? `M${idx}`,
+    [active.months],
+  );
+
+  // Council income / expenses / net for the selection. Falls back to the
+  // snapshot's own totals when there's no monthly series to subtract across.
+  const fin = useMemo(() => {
+    const totals = rangeCouncilTotals(active.statements, selMonths);
+    const label = rangeLabel(selMonths, monthName, active.latest) + (onPrior ? ` ${active.fyLabel}` : "");
+    if (totals) return { ...totals, label };
+    const it = snapshot.incomeTotals;
+    return {
+      income: it?.totalIncome ?? 0,
+      expenses: it?.totalExpenses ?? 0,
+      net: it?.netResult ?? 0,
+      label: snapshot.period.label,
+    };
+  }, [snapshot, selMonths, monthName, active, onPrior]);
+
+  /**
+   * Departments re-derived for the range from the per-account monthly series.
+   *
+   * `null` means the feed hasn't shipped `accountMonthly` — an older snapshot.
+   * The range control is then disabled and the snapshot's own figures stand,
+   * rather than every department reading $0, which looks like a council that
+   * stopped spending.
+   */
+  const rangedDepts = useMemo(() => {
+    if (atYtd) return null; // whole current year IS the snapshot's own figures
+    const byDept = rangeDepartments(snapshot.accounts, active.accountMonthly, selMonths);
+    if (!byDept) return null;
+    return allDepts.map((d) => {
+      const f = byDept.get(d.id) ?? { expense: 0, expenseBudget: 0, revenue: 0 };
+      return {
+        ...d,
+        ytdActual: f.expense,
+        ytdBudget: f.expenseBudget,
+        revenue: f.revenue,
+        variance: f.expenseBudget - f.expense,
+        // Against the RANGE's budget, not the annual one: "% of the year's money
+        // spent" is not a question a two-month window can answer.
+        pctSpent: f.expenseBudget > 0 ? f.expense / f.expenseBudget : 0,
+        status: budgetStatus(f.expenseBudget > 0 ? f.expense / f.expenseBudget : 0),
+      };
+    });
+  }, [snapshot, selMonths, allDepts, atYtd, active]);
+
+  const scopedDepts = rangedDepts ?? allDepts;
+  const depts = cfg.depts ? scopedDepts.filter((d) => cfg.depts!.includes(d.id)) : scopedDepts;
   const grants = cfg.depts ? snapshot.grants.filter((g) => cfg.depts!.includes(g.departmentId)) : snapshot.grants;
 
   const totalBudget = depts.reduce((a, d) => a + d.annualBudget, 0);
@@ -323,28 +452,46 @@ export function DashboardController({
   // roll-ups, whose unclassifiable lines land in "Other" by design.
   const revLines = (() => {
     const ms = snapshot.monthlyStatements ?? [];
-    const cur = ms.find((s) => s.idx === cfg.periodIdx) ?? ms[ms.length - 1];
-    const latestCumulative = cfg.mode !== "monthly" && cfg.periodIdx === latestIdx;
-    if (latestCumulative && (snapshot.accounts?.length ?? 0) > 0) {
+    if (atYtd && (snapshot.accounts?.length ?? 0) > 0) {
       return revenueLinesFromAccounts(snapshot.accounts!);
     }
-    const base = cur?.revenueLines ?? snapshot.incomeTotals?.revenueLines ?? snapshot.revenueLines;
-    if (cfg.mode !== "monthly" || !cur) return base;
-    const prev = ms.filter((s) => s.idx < cur.idx).sort((a, b) => b.idx - a.idx)[0];
-    if (!prev) return base;
-    const prevBy = new Map(prev.revenueLines.map((r) => [r.id, r.ytd]));
-    return base.map((r) => ({ ...r, ytd: r.ytd - (prevBy.get(r.id) ?? 0) }));
+    const at = (idx: number) => ms.filter((s) => s.idx <= idx).sort((a, b) => b.idx - a.idx)[0];
+    const last = at(selMonths[selMonths.length - 1]);
+    const base = last?.revenueLines ?? snapshot.incomeTotals?.revenueLines ?? snapshot.revenueLines;
+    if (!last) return base;
+
+    // Sum each line's movement over the SELECTED months — the same per-month
+    // subtraction the totals use, so a non-contiguous pick adds up to exactly
+    // the months ticked rather than everything between the first and the last.
+    const byId = new Map<string, number>();
+    for (const m of selMonths) {
+      const end = at(m);
+      if (!end) continue;
+      const start = m > 1 ? at(m - 1) : null;
+      const startBy = new Map((start?.revenueLines ?? []).map((r) => [r.id, r.ytd]));
+      for (const r of end.revenueLines) {
+        byId.set(r.id, (byId.get(r.id) ?? 0) + r.ytd - (startBy.get(r.id) ?? 0));
+      }
+    }
+    return base.map((r) => ({ ...r, ytd: byId.get(r.id) ?? 0 }));
   })();
 
   const allocation = depts.map((d) => ({ department: d, share: totalBudget > 0 ? d.annualBudget / totalBudget : 0 }));
   const widgetNode: Record<string, React.ReactNode> = {
     "operating-position": <OperatingPosition totalIncome={fin.income} totalExpenses={fin.expenses} netResult={fin.net} periodLabel={fin.label} />,
-    "revenue-composition": <RevenueComposition lines={revLines} departments={depts} totalIncome={fin.income} periodLabel={fin.label} />,
+    // Both sides of this card now come from the SAME range: department revenue is
+    // re-derived per range from the per-account series, and total income is the
+    // range's council income. They used to be drawn from different periods, which
+    // is how Aug departments ($3,110,259) ended up reconciled against Jul income
+    // ($2,118,455) and the $991,804 difference was reported as unmapped revenue.
+    "revenue-composition": (
+      <RevenueComposition lines={revLines} departments={depts} totalIncome={fin.income} periodLabel={fin.label} />
+    ),
     "cash-position": <CashPosition cash={cash} periodLabel={snapshot.period.label} />,
     "grant-mix": <GrantMix summary={grantMix} periodLabel={snapshot.period.label} />,
-    "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} trend={spendTrend(snapshot)} monthLabel={`Month ${snapshot.period.monthOfYear}`} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
-    "allocation-donut": <AllocationDonut allocation={allocation} totalBudget={totalBudget} revenueLines={snapshot.revenueLines} totalRevenue={snapshot.incomeTotals?.totalIncome ?? revenue} budgetEstimated={budgetEstimated} comparisonLabel={comparisonLabel} />,
-    "department-table": <DepartmentTable departments={depts} periodLabel={snapshot.period.label} comparisonLabel={comparisonLabel} totalExpenses={cfg.depts === null ? snapshot.incomeTotals?.totalExpenses : undefined} />,
+    "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} trend={spendTrend(snapshot, monthKeys(selMonths, active.fyLabel))} monthLabel={fin.label} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
+    "allocation-donut": <AllocationDonut allocation={allocation} totalBudget={totalBudget} revenueLines={snapshot.revenueLines} totalRevenue={fin.income} budgetEstimated={budgetEstimated} comparisonLabel={comparisonLabel} />,
+    "department-table": <DepartmentTable departments={depts} periodLabel={fin.label} comparisonLabel={comparisonLabel} totalExpenses={cfg.depts === null ? fin.expenses : undefined} />,
   };
   const visibleWidgets = cfg.order.filter((id) => !cfg.hidden.includes(id));
 
@@ -368,9 +515,9 @@ export function DashboardController({
       if (next.length === 0) next = allDeptIds;
       return { ...c, depts: next.length === allDeptIds.length ? null : next };
     });
-  const reset = () => setCfg({ stats: DEFAULT_STATS, order: [...WIDGET_IDS], hidden: [], periodIdx: latestIdx, mode: "cumulative", depts: null, unmappedOnly: false });
+  const reset = () => setCfg({ stats: DEFAULT_STATS, order: [...WIDGET_IDS], hidden: [], months: [], fy: "current", depts: null, unmappedOnly: false });
 
-  const filtered = cfg.depts !== null || cfg.periodIdx !== latestIdx || cfg.mode !== "cumulative" || cfg.unmappedOnly;
+  const filtered = cfg.depts !== null || !atYtd || cfg.unmappedOnly;
 
   // Accounts the department map couldn't resolve — the ~$888k Micah still needs to
   // assign. "Unmapped only" turns the panel area into this list so it can be chased.
@@ -383,6 +530,27 @@ export function DashboardController({
       {/* Toolbar */}
       <div className="mb-4 flex items-center gap-3">
         <DataQualityBadge issues={issues} />
+        {selected && (
+          <PeriodRangeSelect
+            months={active.months}
+            selectedMonths={selMonths}
+            latest={active.latest}
+            onMonths={(next) => set({ months: next })}
+            fy={onPrior ? "prior" : "current"}
+            onFy={(next) => set({ fy: next, months: [] })}
+            currentFyLabel={snapshot.period.fyLabel}
+            priorFyLabel={priorSupported ? snapshot.priorYear?.fyLabel : undefined}
+            rangeEnabled={rangeSupported || onPrior}
+            rangeDisabledHint={
+              periods.length > 1
+                ? "This snapshot predates the per-account monthly series — the next sync enables month selection."
+                : "Only one month has been synced so far."
+            }
+            periods={archivedPeriods ?? []}
+            selected={selected}
+            isLatest={isLatest}
+          />
+        )}
         {filtered && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold-dim px-2.5 py-0.5 font-mono text-[10px] text-gold-light">
             <Filter className="h-3 w-3" strokeWidth={2} />

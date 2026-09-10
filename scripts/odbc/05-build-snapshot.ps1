@@ -88,10 +88,21 @@ foreach ($p in $deptMap.accounts.PSObject.Properties) { $ACCT2DEPT[$p.Name] = $p
 $DEPTS = [ordered]@{}
 foreach ($d in $deptMap.departments) { $DEPTS[$d.id] = $d }
 
+# Live account -> department, read from Practical's Report Groups further down
+# (see "1b"). Populated only if those tables are readable; empty otherwise.
+$script:LIVE_ACCT2DEPT = @{}
+
 # GL accounts are "1215-1500-0000"; the map keys on the "1215-1500" prefix.
+#
+# PRECEDENCE: Practical's own Report Groups win over department-map.json. Micah
+# maintains the groups in Practical; the JSON is a hand transcription that goes
+# stale the moment he changes one. The live keys are FULL account codes, the JSON
+# keys are 9-char prefixes - check the specific one first.
 function Resolve-Dept([string]$glAccount) {
   if (-not $glAccount) { return $null }
-  $key = $glAccount.Trim()
+  $full = $glAccount.Trim()
+  if ($script:LIVE_ACCT2DEPT.ContainsKey($full)) { return $script:LIVE_ACCT2DEPT[$full] }
+  $key = $full
   if ($key.Length -ge 9) { $key = $key.Substring(0, 9) }
   if ($ACCT2DEPT.ContainsKey($key)) { return $ACCT2DEPT[$key] }
   return $null
@@ -159,6 +170,85 @@ function Slugify([string]$s) {
   $t = $s.ToLower() -replace '&','and' -replace '[^a-z0-9]+','-'
   return ($t.Trim('-'))
 }
+
+# -- 1b. account -> department, LIVE from Practical's Report Groups ------------
+# Micah maps accounts to directorates on Practical's Report Groups screen (the
+# two-pane account picker), backed by:
+#     CVREPORTGROUP      KY, GROUP_NAME, DESCRIPTION, SCOPE, BUDGETEXPORT
+#     CVREPORTGROUPLINK  LINK_KY, MST_KY -> GLMST.KY, GROUP_KY -> CVREPORTGROUP.KY
+#
+# Reading it here makes Practical the single source of truth and retires the
+# hand-kept account list in department-map.json. Note GLMST.REPORTGROUP is NOT
+# the field - it is empty for every account (proved by 31-probe-reportgroup.ps1).
+#
+# Those tables were permission-denied until Civica granted SELECT. If the grant
+# is ever rolled back, this must not take the nightly sync down: catch, warn, and
+# fall through to the JSON map. A stale mapping is recoverable; no snapshot is not.
+#
+# Only the groups that correspond to a directorate are used. The council keeps
+# other groups on that screen (digital services, etc.) and an account may sit in
+# several - the first directorate match wins, and collisions are reported rather
+# than silently resolved.
+$deptGroupHits = 0
+try {
+  $grpRows = Invoke-Rows @"
+SELECT g.GROUP_NAME, m.GLACCOUNT
+FROM CVREPORTGROUPLINK l
+JOIN CVREPORTGROUP g ON g.KY = l.GROUP_KY
+JOIN GLMST m ON m.KY = l.MST_KY
+WHERE m.RECACTIVE='Y'
+"@
+
+  # group name -> department id, matched against each department's reportGroup
+  # ("Finance Director" / "Operations Manager" / "Social Services Director").
+  # Compared on letters only, so spacing, case and punctuation can't break it.
+  function Norm([string]$s) { return (($s -replace '[^A-Za-z]', '').ToLower()) }
+  $groupToDept = @{}
+  foreach ($id in $DEPTS.Keys) {
+    $rg = Norm $DEPTS[$id].reportGroup
+    if ($rg) { $groupToDept[$rg] = $id }
+  }
+
+  $collisions = @()
+  foreach ($r in $grpRows) {
+    $gn = Norm ([string]$r.GROUP_NAME)
+    if (-not $gn) { continue }
+    # exact, else the group name containing the directorate title (or vice versa)
+    $dept = $null
+    if ($groupToDept.ContainsKey($gn)) {
+      $dept = $groupToDept[$gn]
+    } else {
+      foreach ($k in $groupToDept.Keys) {
+        if ($gn.Contains($k) -or $k.Contains($gn)) { $dept = $groupToDept[$k]; break }
+      }
+    }
+    if (-not $dept) { continue }   # a non-directorate group - ignore it
+
+    $acct = ([string]$r.GLACCOUNT).Trim()
+    if ($script:LIVE_ACCT2DEPT.ContainsKey($acct)) {
+      if ($script:LIVE_ACCT2DEPT[$acct] -ne $dept -and $collisions.Count -lt 10) {
+        $collisions += ("{0}: {1} vs {2}" -f $acct, $script:LIVE_ACCT2DEPT[$acct], $dept)
+      }
+      continue                      # first match wins
+    }
+    $script:LIVE_ACCT2DEPT[$acct] = $dept
+    $deptGroupHits++
+  }
+
+  if ($deptGroupHits -gt 0) {
+    Write-Host ("Report Groups: {0} account(s) mapped live from Practical." -f $deptGroupHits) -ForegroundColor Green
+  } else {
+    Write-Host "Report Groups readable but no group matched a directorate - check GROUP_NAME vs department-map.json reportGroup." -ForegroundColor Yellow
+  }
+  if ($collisions.Count) {
+    Write-Host ("  {0} account(s) sit in more than one directorate group; first match kept:" -f $collisions.Count) -ForegroundColor Yellow
+    foreach ($c in $collisions) { Write-Host ("    $c") -ForegroundColor DarkYellow }
+  }
+} catch {
+  Write-Host ("Report Groups unreadable ({0})." -f $_.Exception.Message) -ForegroundColor Yellow
+  Write-Host "  Falling back to department-map.json. Ask Civica for SELECT on CVREPORTGROUP, CVREPORTGROUPLINK." -ForegroundColor Yellow
+}
+$deptMapSource = if ($deptGroupHits -gt 0) { 'practical-report-groups' } else { 'department-map.json' }
 
 # -- 1. period ----------------------------------------------------------------
 $cur = [int](Invoke-Scalar 'SELECT MTH FROM GLCON')
@@ -1636,6 +1726,67 @@ $pyEquity  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m
 # figure - the months-of-cover runway above all - must subtract this. Depreciation
 # is a non-cash charge: it consumes no bank balance and cannot shorten a runway.
 $pyDeprec  = R2 (Invoke-Scalar "SELECT SUM(b.LASTYEAR) FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT=b.GLACCOUNT WHERE b.MTH=12 AND m.RECACTIVE='Y' AND m.ISCONTROL='N' AND m.ACCNTTYPE=6")
+# -- 6d2. PRIOR-YEAR MONTHLY SERIES -------------------------------------------
+# Last year, month by month — so the dashboard's month picker can offer FY2025-26
+# and not just the current year.
+#
+# This costs two queries because of a property of GLBAL that is easy to miss:
+# LASTYEAR is CUMULATIVE-TO-PERIOD, exactly like BALANCE (knowledge-base 01). It
+# is not a single full-year figure parked on the period-12 row — every MTH row
+# carries last year's cumulative position at that month. The balance sheet has
+# been reading it at MTH 12 for the prior-year comparatives all along; reading
+# MTH 1..12 gives the whole of last year at no extra cost to Practical.
+#
+# So the prior year needs no new source, no archive, and no re-import. It has
+# been sitting in the table the feed already reads on every run.
+#
+# Same filters as the current-year blocks, so the two years are comparable:
+# expenses are ISCONTROL='Y' (operating, depreciation excluded).
+$pyCumRows = Invoke-Rows @"
+SELECT b.MTH,
+       SUM(CASE WHEN m.ACCNTTYPE=5 THEN b.LASTYEAR ELSE 0 END) AS INC,
+       SUM(CASE WHEN m.ACCNTTYPE=6 AND m.ISCONTROL='Y' THEN b.LASTYEAR ELSE 0 END) AS EXP
+FROM GLBAL b JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+WHERE m.RECACTIVE='Y' AND m.ACCNTTYPE IN (5,6) AND b.MTH BETWEEN 1 AND 12
+GROUP BY b.MTH ORDER BY b.MTH
+"@
+$pyMonthlyStatements = @()
+foreach ($r in $pyCumRows) {
+  $inc = R2 $r.INC; $exp = R2 $r.EXP
+  if ($inc -eq 0 -and $exp -eq 0) { continue }
+  $idx = [int]$r.MTH
+  if ($idx -lt 1 -or $idx -gt 12) { continue }
+  $pyMonthlyStatements += [ordered]@{
+    idx = $idx; month = $MONTHS[$idx-1]
+    totalIncome = $inc; totalExpenses = $exp; netResult = R2 ($inc - $exp)
+    revenueLines = @()
+  }
+}
+
+# Per-account prior-year series, so DEPARTMENT figures work for last year too and
+# not just the council totals. Without this the month picker could show FY25-26
+# but every directorate would read $0 - worse than not offering the year at all.
+$pyAmRows = Invoke-Rows @"
+SELECT b.GLACCOUNT, b.MTH, b.LASTYEAR
+FROM GLBAL b
+JOIN GLMST m ON m.GLACCOUNT = b.GLACCOUNT
+WHERE b.MTH BETWEEN 1 AND 12 AND m.RECACTIVE='Y' AND m.ISCONTROL='Y' AND m.ACCNTTYPE IN (5,6)
+ORDER BY b.GLACCOUNT, b.MTH
+"@
+$pyByCode = [ordered]@{}
+foreach ($r in $pyAmRows) {
+  $c = ([string]$r.GLACCOUNT).Trim()
+  if (-not $pyByCode.Contains($c)) { $pyByCode[$c] = @() }
+  # `budget` is deliberately 0: GLBAL carries no prior-year budget column, and a
+  # straight-lined guess would show last year's departments against a budget the
+  # Council never set.
+  $pyByCode[$c] += [ordered]@{ m = [int]$r.MTH; balance = (R2 $r.LASTYEAR); budget = 0 }
+}
+$pyAccountMonthly = @()
+foreach ($c in $pyByCode.Keys) { $pyAccountMonthly += [ordered]@{ code = $c; months = @($pyByCode[$c]) } }
+Write-Host ("Prior year ({0}): {1} month checkpoint(s), {2} account series" -f `
+  $pyFyLabel, $pyMonthlyStatements.Count, $pyAccountMonthly.Count) -ForegroundColor Cyan
+
 $priorYear = [ordered]@{
   fyLabel       = $pyFyLabel
   income        = $pyIncome
@@ -1643,6 +1794,10 @@ $priorYear = [ordered]@{
   depreciation  = $pyDeprec
   netResult     = R2 ($pyIncome - $pyExpense)
   closingEquity = $pyEquity
+  # The month-by-month view of last year. Same shape as the current year's, so
+  # the dashboard can treat either financial year with the same code.
+  monthlyStatements = $pyMonthlyStatements
+  accountMonthly    = $pyAccountMonthly
 }
 
 # -- 6e. unmapped-accounts (brief A7) -----------------------------------------
@@ -1933,6 +2088,11 @@ $snapshot = [ordered]@{
     generatedAt = (Get-Date -Format 'yyyy-MM-dd')
     generatedAtUtc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     unmappedAccounts = $unmappedAccounts
+    # Where the account -> directorate mapping came from this run. When Practical's
+    # Report Groups are readable they win; otherwise this says department-map.json
+    # and the dashboard can say so rather than implying the mapping is live.
+    departmentMapSource = $deptMapSource
+    departmentMapLiveAccounts = $deptGroupHits
     # The transaction batch in this payload is INCREMENTAL: everything with
     # GLTRN.KY between sinceKy (exclusive) and maxKy (inclusive). 06-push.ps1
     # writes maxKy to sync-cursor.json only after the server accepts the push.

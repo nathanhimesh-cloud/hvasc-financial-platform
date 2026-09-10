@@ -10,10 +10,19 @@ import { cn } from "@/lib/utils";
  *
  *   usePagination(items, …) — slices a list to the current page, with a
  *     selectable page size and auto-reset when a filter changes.
- *   <TablePager …>         — the sticky control bar: a rows-per-page selector and
+ *   <TablePager …>         — the control bar: a rows-per-page selector and
  *     "x–y of z" on the left, numbered pages (1 2 3 … with prev/next/edge arrows)
- *     on the right. Put it directly above the <table>; it sticks to the top of the
- *     scroll area so it stays in reach while you read down a long list.
+ *     on the right.
+ *
+ * NOT STICKY, deliberately — and it took being reported twice.
+ *
+ * The bar was `sticky top-16`, pinned under the 64px topbar. That is exactly what
+ * sticky is meant to do, and it was still wrong: a 44px bar over ~54px rows left
+ * a row permanently sliced in half behind it, which reads as a rendering fault
+ * rather than a toolbar. Adding a shadow only made it a tidier fault. A control
+ * that obscures the data it pages through is not worth the scrolling it saves, so
+ * it now sits still — above the table, and again below it on long lists, which is
+ * where a pager is expected anyway.
  */
 
 export const PAGE_SIZES = [25, 50, 100, 250];
@@ -74,6 +83,7 @@ export function TablePager({
   onPage,
   onPageSize,
   label = "rows",
+  border = "bottom",
 }: {
   total: number;
   page: number;
@@ -83,13 +93,19 @@ export function TablePager({
   onPageSize: (n: number) => void;
   /** Noun for the row count, e.g. "accounts". */
   label?: string;
+  /**
+   * Which edge carries the rule — "bottom" when the pager sits ABOVE the table,
+   * "top" when it sits below it. Purely so the bar reads as attached to the
+   * table rather than floating between the two.
+   */
+  border?: "top" | "bottom";
 }) {
   const from = total === 0 ? 0 : page * pageSize + 1;
   const to = Math.min(total, (page + 1) * pageSize);
   const nums = windowed(page, pages);
 
   return (
-    <div className="no-print sticky top-16 z-30 flex h-11 items-center justify-between gap-3 overflow-x-auto border-b border-border bg-card px-1">
+    <div className={cn("no-print flex h-11 items-center justify-between gap-3 bg-card px-1", border === "bottom" ? "border-b border-border" : "border-t border-border")}>
       {/* Left: rows-per-page + range */}
       <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
         <label className="flex items-center gap-1.5">

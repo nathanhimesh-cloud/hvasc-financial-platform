@@ -181,6 +181,15 @@ export interface SnapshotMeta {
    * on the Account Mapping page so it can never drift unnoticed.
    */
   unmappedAccounts?: number;
+  /**
+   * Where the account → directorate mapping came from on this sync.
+   * `practical-report-groups` = read live from Practical (CVREPORTGROUP), the
+   * source of truth. `department-map.json` = the bundled hand-kept fallback,
+   * used when those tables aren't readable.
+   */
+  departmentMapSource?: "practical-report-groups" | "department-map.json";
+  /** How many accounts the live Report Group read resolved (0 when falling back). */
+  departmentMapLiveAccounts?: number;
   /** Human-readable caveats shown to maintainers. */
   notes?: string[];
 }
@@ -207,6 +216,17 @@ export interface PriorYear {
   netResult: number;
   /** Prior-year closing total community equity. */
   closingEquity: number;
+  /**
+   * Last year month by month, from `GLBAL.LASTYEAR` — which is cumulative to
+   * period, exactly like BALANCE. Lets the month picker offer the prior
+   * financial year. Absent on snapshots built before Sep 2026.
+   */
+  monthlyStatements?: MonthlyStatement[];
+  /**
+   * Per-account prior-year cumulative series, so DEPARTMENT figures work for last
+   * year too. `budget` is always 0 — GLBAL carries no prior-year budget column.
+   */
+  accountMonthly?: AccountMonthly[];
 }
 
 /** A council-level income statement (P&L) for one period. */
