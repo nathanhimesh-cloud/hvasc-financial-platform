@@ -209,6 +209,13 @@ WHERE m.RECACTIVE='Y'
     if ($rg) { $groupToDept[$rg] = $id }
   }
 
+  # Groups on that screen that DON'T correspond to a directorate, and how many
+  # accounts sit in them. Without this the sync says "217 mapped" and stays quiet
+  # about the rest, so an account Micah HAS mapped - to Capital Works Program, say
+  # - reads as unmapped on the dashboard and nobody can see why. Two people then
+  # disagree about whether the mapping is done, and both are right.
+  $ignoredGroups = @{}
+
   $collisions = @()
   foreach ($r in $grpRows) {
     $gn = Norm ([string]$r.GROUP_NAME)
@@ -222,7 +229,16 @@ WHERE m.RECACTIVE='Y'
         if ($gn.Contains($k) -or $k.Contains($gn)) { $dept = $groupToDept[$k]; break }
       }
     }
-    if (-not $dept) { continue }   # a non-directorate group - ignore it
+    if (-not $dept) {
+      # Not a directorate group. Count it by NAME so the summary can say which
+      # groups were skipped and how big they are.
+      $raw = ([string]$r.GROUP_NAME).Trim()
+      if ($raw) {
+        if (-not $ignoredGroups.ContainsKey($raw)) { $ignoredGroups[$raw] = New-Object System.Collections.Generic.HashSet[string] }
+        [void]$ignoredGroups[$raw].Add(([string]$r.GLACCOUNT).Trim())
+      }
+      continue
+    }
 
     $acct = ([string]$r.GLACCOUNT).Trim()
     if ($script:LIVE_ACCT2DEPT.ContainsKey($acct)) {
@@ -243,6 +259,19 @@ WHERE m.RECACTIVE='Y'
   if ($collisions.Count) {
     Write-Host ("  {0} account(s) sit in more than one directorate group; first match kept:" -f $collisions.Count) -ForegroundColor Yellow
     foreach ($c in $collisions) { Write-Host ("    $c") -ForegroundColor DarkYellow }
+  }
+  # The groups we skipped. An account here IS mapped in Practical, just not to
+  # anything the dashboard reports by - which is exactly the case that looks like
+  # a bug from the Council's side.
+  if ($ignoredGroups.Count) {
+    $skipped = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($k in $ignoredGroups.Keys) { foreach ($a in $ignoredGroups[$k]) { [void]$skipped.Add($a) } }
+    Write-Host ("  {0} account(s) are in a Report Group that is NOT a directorate, so they stay unmapped:" -f $skipped.Count) -ForegroundColor Yellow
+    foreach ($k in ($ignoredGroups.Keys | Sort-Object { -$ignoredGroups[$_].Count })) {
+      Write-Host ("    {0,-40} {1,5} account(s)" -f $k, $ignoredGroups[$k].Count) -ForegroundColor DarkYellow
+    }
+    Write-Host "    These ARE mapped in Practical. Either fold each group into a directorate," -ForegroundColor DarkYellow
+    Write-Host "    or add its name to department-map.json. Run 33-probe-unmapped-vs-groups.ps1 for the detail." -ForegroundColor DarkYellow
   }
 } catch {
   Write-Host ("Report Groups unreadable ({0})." -f $_.Exception.Message) -ForegroundColor Yellow
