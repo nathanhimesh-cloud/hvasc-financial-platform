@@ -109,7 +109,12 @@ export function TablePager({
     <div className={cn("no-print flex h-11 items-center justify-between gap-3 bg-card px-1", border === "bottom" ? "border-b border-border" : "border-t border-border")}>
       {/* Left: rows-per-page + range */}
       <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-        <label className="flex items-center gap-1.5">
+        {/* A SPAN, not a label. SelectField renders its own <label>, and a label
+            inside a label is invalid HTML: the parser relocates the inner one, so
+            the DOM the browser builds stops matching the tree React rendered and
+            hydration fails. The visible "Rows" text is decoration — the field
+            carries its own accessible name. */}
+        <span className="flex items-center gap-1.5">
           <span className="uppercase tracking-[0.06em]">Rows</span>
           <SelectField
             ariaLabel="Rows per page"
@@ -123,7 +128,7 @@ export function TablePager({
               </option>
             ))}
           </SelectField>
-        </label>
+        </span>
         <span className="tabular-nums">
           {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()} {label}
         </span>

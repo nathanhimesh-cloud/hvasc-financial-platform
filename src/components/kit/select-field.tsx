@@ -21,6 +21,12 @@ import { cn } from "@/lib/utils";
  * this.
  *
  * Styling lives here and nowhere else. Callers pass an icon and options.
+ *
+ * DO NOT WRAP THIS IN A <label>. It renders its own, and a label inside a label
+ * is invalid HTML — the browser's parser relocates the inner one, the DOM stops
+ * matching the tree React rendered, and hydration fails on the whole subtree.
+ * The pager did exactly that and took the grants page down with it. Use a
+ * <span> for adjacent text; `ariaLabel` already names the field.
  */
 export function SelectField({
   value,
