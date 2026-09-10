@@ -137,32 +137,34 @@ export function PeriodRangeSelect({
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 top-11 z-50 w-[15rem] overflow-hidden rounded-lg border border-border bg-card shadow-xl shadow-black/40"
+          className="absolute left-0 top-11 z-50 w-[12.5rem] overflow-hidden rounded-md border border-border bg-card py-1 shadow-xl shadow-black/40"
         >
-          <p className="border-b border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-            {anchor
-              ? `From ${nameOf(groups.find((g) => g.fy === anchor.fy)!, anchor.idx)} — now pick the last month.`
-              : "Click a month, then another for a period."}
-          </p>
+          {/* Shown only while a period is half-picked. At rest the list stays as
+              plain as the control it replaces; the instruction appears exactly
+              when it's useful and disappears again. */}
+          {anchor && (
+            <p className="mb-1 border-b border-border px-3 pb-1.5 text-center text-[11px] text-muted-foreground">
+              From {nameOf(groups.find((g) => g.fy === anchor.fy)!, anchor.idx)} — pick the last month
+            </p>
+          )}
 
-          <div className="max-h-[19rem] overflow-y-auto py-1">
+          <div className="max-h-[21rem] overflow-y-auto">
             {groups.map((g) => (
-              <div key={g.fy}>
-                <div className="flex items-center justify-between px-3 pb-1 pt-2">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                    {g.label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onChange({ fy: g.fy, months: g.months.map((m) => m.idx) });
-                      setAnchor(null);
-                      setOpen(false);
-                    }}
-                    className="font-mono text-[10px] uppercase tracking-[0.06em] text-gold-light transition-colors hover:text-gold"
-                  >
-                    All
-                  </button>
+              <div key={g.fy} role="group" aria-label={g.label}>
+                {/* The financial year, as an optgroup heading: centred, bold,
+                    unclickable. Double-click it to take the whole year — the one
+                    affordance kept off the surface, because a visible "All" link
+                    beside every heading was more furniture than the list needed. */}
+                <div
+                  onDoubleClick={() => {
+                    onChange({ fy: g.fy, months: g.months.map((m) => m.idx) });
+                    setAnchor(null);
+                    setOpen(false);
+                  }}
+                  title={`Double-click for all of ${g.label}`}
+                  className="select-none px-3 py-1 text-center text-[12px] font-semibold text-foreground"
+                >
+                  {g.label}
                 </div>
                 {[...g.months].reverse().map((m) => {
                   const on = inSelection(g, m.idx);
@@ -175,12 +177,10 @@ export function PeriodRangeSelect({
                       aria-selected={on}
                       onClick={() => pick(g, m.idx)}
                       className={cn(
-                        "flex w-full items-center px-3 py-[7px] text-left text-[13px] transition-colors",
-                        isAnchor
-                          ? "bg-gold text-black"
-                          : on
-                            ? "bg-gold-dim text-gold-light"
-                            : "text-foreground hover:bg-elevated",
+                        "flex w-full items-center justify-center px-3 py-[5px] text-center text-[13px] transition-colors",
+                        isAnchor || on
+                          ? "bg-gold font-medium text-black"
+                          : "text-muted-foreground hover:bg-elevated hover:text-foreground",
                       )}
                     >
                       {m.month} {yearOf(g, m.idx)}
