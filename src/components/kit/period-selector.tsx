@@ -5,6 +5,7 @@ import { useTransition } from "react";
 import { CalendarRange, History, Loader2 } from "lucide-react";
 import type { PeriodRef } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { SelectField } from "@/components/kit/select-field";
 
 /**
  * Financial-year / period navigation.
@@ -47,32 +48,26 @@ export function PeriodSelector({
 
   return (
     <div className="no-print flex flex-wrap items-center gap-2">
-      <label className="relative flex items-center">
-        <CalendarRange
-          className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-gold"
-          strokeWidth={1.75}
-        />
-        <select
-          aria-label="Financial year and period"
-          value={value}
-          onChange={(e) => go(e.target.value)}
-          disabled={pending || !hasHistory}
-          title={hasHistory ? undefined : "Only one period has been synced so far"}
-          className="h-9 rounded-md border border-border bg-elevated pl-8 pr-8 text-[13px] font-medium text-foreground outline-none transition-colors focus:border-gold/40 disabled:opacity-60"
-        >
-          {years.map((fy) => (
-            <optgroup key={fy} label={fy}>
-              {periods
-                .filter((p) => p.fyLabel === fy)
-                .map((p) => (
-                  <option key={`${p.fyLabel}|${p.periodMonth}`} value={`${p.fyLabel}|${p.periodMonth}`}>
-                    {p.periodLabel}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
+      <SelectField
+        ariaLabel="Financial year and period"
+        icon={CalendarRange}
+        value={value}
+        onChange={go}
+        disabled={pending || !hasHistory}
+        title={hasHistory ? undefined : "Only one period has been synced so far"}
+      >
+        {years.map((fy) => (
+          <optgroup key={fy} label={fy}>
+            {periods
+              .filter((p) => p.fyLabel === fy)
+              .map((p) => (
+                <option key={`${p.fyLabel}|${p.periodMonth}`} value={`${p.fyLabel}|${p.periodMonth}`}>
+                  {p.periodLabel}
+                </option>
+              ))}
+          </optgroup>
+        ))}
+      </SelectField>
 
       {pending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" strokeWidth={2} />}
 

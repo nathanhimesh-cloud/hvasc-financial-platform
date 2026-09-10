@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SelectField } from "@/components/kit/select-field";
 
 /**
  * One pager for every table (Aug 2026 review: "don't make it endless — page it,
@@ -110,17 +111,18 @@ export function TablePager({
       <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
         <label className="flex items-center gap-1.5">
           <span className="uppercase tracking-[0.06em]">Rows</span>
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSize(Number(e.target.value))}
-            className="rounded-md border border-border bg-elevated px-2 py-1 text-[11px] text-foreground outline-none transition-colors focus:border-gold/40"
+          <SelectField
+            ariaLabel="Rows per page"
+            value={String(pageSize)}
+            onChange={(v) => onPageSize(Number(v))}
+            className="h-7 text-[11px]"
           >
             {PAGE_SIZES.map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <span className="tabular-nums">
           {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()} {label}
