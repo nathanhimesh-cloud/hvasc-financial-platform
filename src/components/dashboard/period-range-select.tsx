@@ -1,73 +1,71 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { CalendarRange, Check, ChevronDown, History, Loader2 } from "lucide-react";
-import type { PeriodRef } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import { CalendarRange, ChevronDown, History } from "lucide-react";
 import type { MonthSelection } from "@/lib/period-range";
-import { isYearToDate, normaliseMonths } from "@/lib/period-range";
 import { cn } from "@/lib/utils";
 
 /**
- * The period control: a checkbox multi-select over the months in this financial
- * year, plus a way into an archived snapshot.
+ * One dropdown. Click a month, click another, and everything on the page shows
+ * that period.
  *
- * Checkboxes rather than a from/to pair, because ticking boxes lets you take July
- * and September without August — a real question ("what did the two quarter-end
- * months cost?") that endpoints cannot express. Everything downstream sums per
- * month, so a scattered selection totals exactly the months ticked.
+ * This control has been through three shapes. A from/to pair of selects was two
+ * controls where one would do; a checkbox list with financial-year tabs and an
+ * archived-snapshot panel was accurate but cluttered, and nobody wants to operate
+ * a form to answer "how did August go". A plain list you click twice is what a
+ * date-range picker is, so that is what this is.
  *
- * Selected months show as chips on the closed button, so the page never displays
- * a filtered figure without saying what it is filtered to.
- *
- * No search box: twelve months is a list you read, not one you search, and a
- * search field over twelve items is furniture.
+ * The months of BOTH financial years live in the one list, newest first, under a
+ * quiet year heading. A period cannot straddle 30 June — the ledger closes and
+ * reopens at zero, so a total spanning both years would be adding up movements
+ * either side of a reset — and rather than refusing the click, picking a month in
+ * the other year simply starts a fresh period there. Nothing to read, nothing to
+ * undo.
  */
-export function PeriodRangeSelect({
-  months,
-  selectedMonths,
-  latest,
-  onMonths,
-  rangeEnabled,
-  rangeDisabledHint,
-  periods,
-  selected,
-  isLatest,
-  fy,
-  onFy,
-  currentFyLabel,
-  priorFyLabel,
-}: {
-  /** Months in the CURRENT snapshot, oldest first. */
-  months: { idx: number; month: string }[];
-  selectedMonths: MonthSelection;
-  latest: number;
-  onMonths: (next: MonthSelection) => void;
-  rangeEnabled: boolean;
-  rangeDisabledHint?: string;
-  /** Archived snapshots, newest first. */
-  periods: PeriodRef[];
-  selected: PeriodRef;
-  isLatest: boolean;
-  /** Which financial year the checkboxes below belong to. */
+export interface MonthGroup {
   fy: "current" | "prior";
-  onFy: (next: "current" | "prior") => void;
-  currentFyLabel: string;
-  /** Undefined when the snapshot carries no prior-year monthly series. */
-  priorFyLabel?: string;
+  label: string;
+  /** Oldest first; rendered newest first. */
+  months: { idx: number; month: string }[];
+}
+
+export function PeriodRangeSelect({
+  groups,
+  fy,
+  selectedMonths,
+  onChange,
+  enabled,
+  disabledHint,
+  isLatest,
+}: {
+  groups: MonthGroup[];
+  /** Which year the current selection belongs to. */
+  fy: "current" | "prior";
+  selectedMonths: MonthSelection;
+  onChange: (next: { fy: "current" | "prior"; months: MonthSelection }) => void;
+  enabled: boolean;
+  disabledHint?: string;
+  isLatest: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // First month of a period being picked, waiting for its partner.
+  const [anchor, setAnchor] = useState<{ fy: "current" | "prior"; idx: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-  const pathname = usePathname();
-  const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setAnchor(null);
+      }
     };
-    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setAnchor(null);
+      }
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onEsc);
     return () => {
@@ -76,74 +74,53 @@ export function PeriodRangeSelect({
     };
   }, [open]);
 
-  const sel = normaliseMonths(selectedMonths, latest);
-  const allOn = isYearToDate(sel, latest);
-  const isOn = (idx: number) => sel.includes(idx);
-  // On the prior year the calendar year differs from the loaded snapshot label,
-  // so take it from the month itself rather than from the snapshot.
-  const fyYear =
-    fy === "prior"
-      ? (months[months.length - 1]?.month ?? "").split(" ")[1] ?? (priorFyLabel ?? "")
-      : selected.periodLabel.split(" ")[1] ?? "";
+  const active = groups.find((g) => g.fy === fy) ?? groups[0];
+  const all = active?.months.map((m) => m.idx) ?? [];
+  const isWholeYear = all.length > 0 && selectedMonths.length === all.length;
+  const nameOf = (g: MonthGroup, idx: number) => g.months.find((m) => m.idx === idx)?.month ?? `M${idx}`;
 
-  const toggle = (idx: number) => {
-    const next = isOn(idx) ? sel.filter((m) => m !== idx) : [...sel, idx];
-    // Unticking the last box would blank the page; treat it as "back to all".
-    onMonths(next.length ? next : months.map((m) => m.idx));
-  };
+  const first = selectedMonths[0];
+  const last = selectedMonths[selectedMonths.length - 1];
+  const label = !active
+    ? "Period"
+    : isWholeYear
+      ? `${active.label} · all months`
+      : first === last
+        ? `${nameOf(active, first)} ${yearOf(active, first)}`
+        : `${nameOf(active, first)} – ${nameOf(active, last)} ${yearOf(active, last)}`;
 
-  const go = (p: PeriodRef) => {
-    startTransition(() => router.push(`${pathname}?fy=${encodeURIComponent(p.fyLabel)}&m=${p.periodMonth}`));
+  /** Click a month: open a period, or close the one already open. */
+  const pick = (g: MonthGroup, idx: number) => {
+    // Anchor in a different year? That period can't span the boundary, so this
+    // click starts a new one here instead of being rejected.
+    if (!anchor || anchor.fy !== g.fy) {
+      setAnchor({ fy: g.fy, idx });
+      onChange({ fy: g.fy, months: [idx] });
+      return;
+    }
+    const lo = Math.min(anchor.idx, idx);
+    const hi = Math.max(anchor.idx, idx);
+    const span = g.months.map((m) => m.idx).filter((m) => m >= lo && m <= hi);
+    onChange({ fy: g.fy, months: span });
+    setAnchor(null);
     setOpen(false);
   };
 
-  const earlier = periods.filter(
-    (p) => !(p.fyLabel === selected.fyLabel && p.periodMonth === selected.periodMonth),
-  );
-
-  // Chips on the closed button. Past three, the count says it better.
-  const chips = allOn ? [] : sel.map((m) => months.find((x) => x.idx === m)?.month ?? `M${m}`);
+  const inSelection = (g: MonthGroup, idx: number) => g.fy === fy && selectedMonths.includes(idx);
 
   return (
     <div className="no-print relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => enabled && setOpen((v) => !v)}
+        disabled={!enabled}
+        title={enabled ? undefined : disabledHint}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="inline-flex h-9 max-w-[24rem] items-center gap-2 rounded-md border border-border bg-elevated pl-3 pr-2.5 text-[13px] font-medium text-foreground transition-colors hover:border-gold/40"
+        className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-elevated pl-3 pr-2.5 text-[13px] font-medium text-foreground transition-colors hover:border-gold/40 disabled:opacity-50"
       >
         <CalendarRange className="h-3.5 w-3.5 flex-shrink-0 text-gold" strokeWidth={1.75} />
-
-        {/* Chips first, THEN the year — so a single month reads "Aug 2026" the way
-            anyone would say it, not "2026 Aug". */}
-        {allOn ? (
-          <span className="flex-shrink-0">
-            {fy === "prior" ? `${priorFyLabel} · full year` : `${selected.periodLabel} · YTD`}
-          </span>
-        ) : (
-          <>
-            <span className="flex items-center gap-1 overflow-hidden">
-              {chips.length <= 3 ? (
-                chips.map((c) => (
-                  <span
-                    key={c}
-                    className="rounded border border-gold/40 bg-gold-dim px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.04em] text-gold-light"
-                  >
-                    {c}
-                  </span>
-                ))
-              ) : (
-                <span className="rounded border border-gold/40 bg-gold-dim px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.04em] text-gold-light">
-                  {chips.length} months
-                </span>
-              )}
-            </span>
-            <span className="flex-shrink-0 text-muted-foreground">{fyYear}</span>
-          </>
-        )}
-
-        {pending && <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin text-muted-foreground" strokeWidth={2} />}
+        {label}
         <ChevronDown
           className={cn("h-3 w-3 flex-shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
           strokeWidth={2}
@@ -160,130 +137,72 @@ export function PeriodRangeSelect({
       {open && (
         <div
           role="listbox"
-          aria-multiselectable
-          className="absolute left-0 top-11 z-50 w-[17rem] overflow-hidden rounded-lg border border-border bg-card shadow-xl shadow-black/40"
+          className="absolute left-0 top-11 z-50 w-[15rem] overflow-hidden rounded-lg border border-border bg-card shadow-xl shadow-black/40"
         >
-          <div className="border-b border-border px-3 py-2">
-            {/* Financial-year switch. Two tabs, not one merged list, because a
-                selection can't span both: the ledger closes at 30 June and
-                reopens at zero, so adding July 2025 to August 2026 would be
-                summing movements either side of a reset. */}
-            {priorFyLabel ? (
-              <div className="flex items-center overflow-hidden rounded-md border border-border">
-                {[
-                  { key: "current" as const, label: currentFyLabel },
-                  { key: "prior" as const, label: priorFyLabel },
-                ].map((y) => (
-                  <button
-                    key={y.key}
-                    type="button"
-                    onClick={() => onFy(y.key)}
-                    className={cn(
-                      "flex-1 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.06em] transition-colors",
-                      fy === y.key
-                        ? "bg-gold-dim text-gold-light"
-                        : "bg-elevated text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {y.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                {currentFyLabel}
-              </span>
-            )}
-            {!rangeEnabled && (
-              <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-                {rangeDisabledHint ?? "Only one month is available."}
-              </p>
-            )}
-          </div>
+          <p className="border-b border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+            {anchor
+              ? `From ${nameOf(groups.find((g) => g.fy === anchor.fy)!, anchor.idx)} — now pick the last month.`
+              : "Click a month, then another for a period."}
+          </p>
 
-          <div className="max-h-[17rem] overflow-y-auto py-1">
-            <Row
-              label="All months"
-              checked={allOn}
-              disabled={!rangeEnabled}
-              onToggle={() => onMonths(months.map((m) => m.idx))}
-              strong
-            />
-            {months.map((m) => (
-              <Row
-                key={m.idx}
-                label={`${m.month} ${fyYear}`}
-                checked={isOn(m.idx)}
-                disabled={!rangeEnabled}
-                onToggle={() => toggle(m.idx)}
-              />
+          <div className="max-h-[19rem] overflow-y-auto py-1">
+            {groups.map((g) => (
+              <div key={g.fy}>
+                <div className="flex items-center justify-between px-3 pb-1 pt-2">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                    {g.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange({ fy: g.fy, months: g.months.map((m) => m.idx) });
+                      setAnchor(null);
+                      setOpen(false);
+                    }}
+                    className="font-mono text-[10px] uppercase tracking-[0.06em] text-gold-light transition-colors hover:text-gold"
+                  >
+                    All
+                  </button>
+                </div>
+                {[...g.months].reverse().map((m) => {
+                  const on = inSelection(g, m.idx);
+                  const isAnchor = anchor?.fy === g.fy && anchor.idx === m.idx;
+                  return (
+                    <button
+                      key={`${g.fy}-${m.idx}`}
+                      type="button"
+                      role="option"
+                      aria-selected={on}
+                      onClick={() => pick(g, m.idx)}
+                      className={cn(
+                        "flex w-full items-center px-3 py-[7px] text-left text-[13px] transition-colors",
+                        isAnchor
+                          ? "bg-gold text-black"
+                          : on
+                            ? "bg-gold-dim text-gold-light"
+                            : "text-foreground hover:bg-elevated",
+                      )}
+                    >
+                      {m.month} {yearOf(g, m.idx)}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
-
-          {earlier.length > 0 && (
-            <div className="border-t border-border bg-elevated/40 px-3 py-2.5">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                Earlier periods
-              </span>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                A saved snapshot from a previous sync — a different dataset, so it
-                can&apos;t be combined with the months above.
-              </p>
-              <div className="mt-2 flex max-h-28 flex-wrap gap-1 overflow-y-auto">
-                {earlier.map((p) => (
-                  <button
-                    key={`${p.fyLabel}|${p.periodMonth}`}
-                    type="button"
-                    onClick={() => go(p)}
-                    className="rounded border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-gold/40 hover:text-gold-light"
-                  >
-                    {p.periodLabel}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
   );
 }
 
-function Row({
-  label,
-  checked,
-  disabled,
-  onToggle,
-  strong,
-}: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: () => void;
-  strong?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="option"
-      aria-selected={checked}
-      disabled={disabled}
-      onClick={onToggle}
-      className={cn(
-        "flex w-full items-center gap-2.5 px-3 py-[7px] text-left text-[13px] transition-colors",
-        "hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-40",
-        strong ? "font-semibold text-foreground" : "text-foreground",
-      )}
-    >
-      <span
-        className={cn(
-          "flex h-[15px] w-[15px] flex-shrink-0 items-center justify-center rounded-[3px] border transition-colors",
-          checked ? "border-gold bg-gold text-black" : "border-border bg-elevated",
-        )}
-      >
-        {checked && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
-      </span>
-      {label}
-    </button>
-  );
+/**
+ * The calendar year a financial-year month falls in. The FY runs July→June, so
+ * months 1–6 are the year the label opens with and 7–12 have rolled into the
+ * next one: FY2026-27 month 7 is January 2027, not January 2026.
+ */
+function yearOf(g: MonthGroup, idx: number): string {
+  const start = Number(g.label.replace(/^FY/i, "").split("-")[0]);
+  if (!Number.isFinite(start)) return "";
+  return String(idx <= 6 ? start : start + 1);
 }

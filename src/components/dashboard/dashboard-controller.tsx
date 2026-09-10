@@ -391,6 +391,21 @@ export function DashboardController({
     });
   }, [snapshot, selMonths, allDepts, atYtd, active]);
 
+  /** Both financial years the snapshot can describe, for the one dropdown. */
+  const monthGroups = useMemo(() => {
+    const gs: { fy: "current" | "prior"; label: string; months: { idx: number; month: string }[] }[] = [
+      { fy: "current", label: snapshot.period.fyLabel, months: periods.map((p) => ({ idx: p.idx, month: p.month })) },
+    ];
+    if (priorSupported) {
+      gs.push({
+        fy: "prior",
+        label: snapshot.priorYear?.fyLabel ?? "Last year",
+        months: priorMonths.map((s) => ({ idx: s.idx, month: s.month })),
+      });
+    }
+    return gs;
+  }, [snapshot, periods, priorMonths, priorSupported]);
+
   const scopedDepts = rangedDepts ?? allDepts;
   const depts = cfg.depts ? scopedDepts.filter((d) => cfg.depts!.includes(d.id)) : scopedDepts;
   const grants = cfg.depts ? snapshot.grants.filter((g) => cfg.depts!.includes(g.departmentId)) : snapshot.grants;
@@ -532,22 +547,16 @@ export function DashboardController({
         <DataQualityBadge issues={issues} />
         {selected && (
           <PeriodRangeSelect
-            months={active.months}
-            selectedMonths={selMonths}
-            latest={active.latest}
-            onMonths={(next) => set({ months: next })}
+            groups={monthGroups}
             fy={onPrior ? "prior" : "current"}
-            onFy={(next) => set({ fy: next, months: [] })}
-            currentFyLabel={snapshot.period.fyLabel}
-            priorFyLabel={priorSupported ? snapshot.priorYear?.fyLabel : undefined}
-            rangeEnabled={rangeSupported || onPrior}
-            rangeDisabledHint={
+            selectedMonths={selMonths}
+            onChange={(next) => set({ fy: next.fy, months: next.months })}
+            enabled={rangeSupported || priorSupported}
+            disabledHint={
               periods.length > 1
                 ? "This snapshot predates the per-account monthly series — the next sync enables month selection."
                 : "Only one month has been synced so far."
             }
-            periods={archivedPeriods ?? []}
-            selected={selected}
             isLatest={isLatest}
           />
         )}
