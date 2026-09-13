@@ -18,7 +18,7 @@ import { grantDeadlines } from "@/lib/grant-deadlines";
 import { DeadlinePanel } from "@/components/grants/deadline-panel";
 import { NarrativeDrafter } from "@/components/grants/narrative-drafter";
 import { aiConfigured } from "@/lib/ai/narrative";
-import { getSession } from "@/lib/auth/session";
+import { getSession, isAuthConfigured } from "@/lib/auth/session";
 import { can } from "@/lib/auth/roles";
 import { ReferenceUploadButton } from "@/components/kit/reference-upload";
 import { referenceMeta } from "@/lib/reference";
@@ -39,6 +39,8 @@ export default async function GrantsPage({
   const deadlines = grantDeadlines(figures);
   const session = await getSession();
   const mayDraft = can(session?.role, "grants.edit");
+  // The risk panel links to Account Mapping; only offer that to roles that can open it.
+  const canMap = !isAuthConfigured() || can(session?.role, "mapping.edit");
   const utilisation = s.totalBudgetedExpense > 0 ? s.expenseToDate / s.totalBudgetedExpense : 0;
 
   // Income received and spend to date are year-to-date FLOWS, so they only compare
@@ -139,7 +141,7 @@ export default async function GrantsPage({
 
       <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <GrantMix summary={s} periodLabel={snapshot.period.label} />
-        <GrantRiskPanel risk={risk} />
+        <GrantRiskPanel risk={risk} canMap={canMap} />
       </div>
 
       <div className="mb-6">

@@ -19,6 +19,8 @@ import {
   type RuntimeStatements,
 } from "@/lib/feed/store";
 import { clearSnapshotCache } from "@/lib/data";
+import { getSession, isAuthConfigured } from "@/lib/auth/session";
+import { can } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +33,19 @@ function fileToRows(buf: Buffer): string[][] {
 }
 
 export async function POST(request: Request) {
-  // Optional shared-secret protection. If UPLOAD_PASSWORD is set, require it.
+  // Admin only, checked HERE and not just on the page. Hiding /data from other
+  // roles stops the form rendering; it does not stop anyone POSTing to this route
+  // directly. The nightly server push is unaffected: 06-push.ps1 PUTs to
+  // /api/feed/snapshot, never to this route, so this route only ever serves the
+  // browser upload form.
+  if (isAuthConfigured()) {
+    const session = await getSession();
+    if (!can(session?.role, "data.upload")) {
+      return Response.json({ ok: false, error: "Not permitted." }, { status: 403 });
+    }
+  }
+
+  // Shared-secret protection on top. If UPLOAD_PASSWORD is set, require it.
   const required = process.env.UPLOAD_PASSWORD;
   const form = await request.formData();
   if (required) {

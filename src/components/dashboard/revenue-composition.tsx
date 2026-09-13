@@ -25,12 +25,15 @@ export function RevenueComposition({
   departments,
   totalIncome,
   periodLabel,
+  canMap = true,
 }: {
   /** Kept for API compatibility; the breakdown is by directorate. */
   lines?: RevenueLine[];
   departments: DepartmentDerived[];
   totalIncome: number;
   periodLabel: string;
+  /** Show the "Map →" shortcut. False for roles that can't reach /mapping. */
+  canMap?: boolean;
 }) {
   // Revenue mapped to each directorate (same figure the Department Summary shows).
   const rows = departments
@@ -131,13 +134,18 @@ export function RevenueComposition({
                 <Num>{formatCurrency(unmapped)}</Num>
                 <Num muted>{formatPercent(unmapped / denom, 1)}</Num>
                 <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3.5 text-right">
-                  <Link
-                    href="/mapping"
-                    className="rounded-[7px] border border-[var(--hairline)] px-3 py-[5px] text-[11px] font-bold text-subtle transition-colors hover:border-[rgba(212,168,76,0.35)] hover:bg-gold-dim hover:text-gold-light"
-                    title="Assign revenue accounts to a directorate"
-                  >
-                    Map →
-                  </Link>
+                  {/* Only for roles that can map. The row itself stays — read-only
+                      users still need to see the figure — just not a button that
+                      would take them to a page that refuses them. */}
+                  {canMap && (
+                    <Link
+                      href="/mapping"
+                      className="rounded-[7px] border border-[var(--hairline)] px-3 py-[5px] text-[11px] font-bold text-subtle transition-colors hover:border-[rgba(212,168,76,0.35)] hover:bg-gold-dim hover:text-gold-light"
+                      title="Assign revenue accounts to a directorate"
+                    >
+                      Map →
+                    </Link>
+                  )}
                 </td>
               </tr>
             )}

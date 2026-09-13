@@ -39,11 +39,17 @@ export type Capability =
   /** Edit grant milestones, dates, documents (never GL-sourced actuals). */
   | "grants.edit"
   /** Create, suspend and remove users. */
-  | "users.manage";
+  | "users.manage"
+  /**
+   * Upload a snapshot or report export through the browser (/data). Replaces what
+   * every other page reads, so it sits with the admin tier: a CEO or department
+   * head who could push a file here could overwrite the figures they're shown.
+   */
+  | "data.upload";
 
 const CAPABILITIES: Record<Role, Capability[]> = {
-  // CFO / Finance is the full-access tier — mapping, grants, users AND the audit log.
-  finance: ["audit.view", "mapping.edit", "grants.edit", "users.manage"],
+  // CFO / Finance is the full-access tier — mapping, grants, users, uploads AND the audit log.
+  finance: ["audit.view", "mapping.edit", "grants.edit", "users.manage", "data.upload"],
   ceo: [],
   manager: [],
   "grant-manager": ["grants.edit"],

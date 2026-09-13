@@ -205,6 +205,7 @@ export function DashboardController({
   periods: archivedPeriods,
   selected,
   isLatest = true,
+  canMap = true,
 }: {
   snapshot: FinancialSnapshot;
   /** Same-month prior-year values keyed by metric key, + a label. Empty stats = not archived yet. */
@@ -213,6 +214,8 @@ export function DashboardController({
   periods?: PeriodRef[];
   selected?: PeriodRef;
   isLatest?: boolean;
+  /** Show the "Map →" shortcuts. False for roles that can't reach /mapping. */
+  canMap?: boolean;
 }) {
   const allDepts = useMemo(() => deriveDepartments(snapshot), [snapshot]);
   const allDeptIds = useMemo(() => allDepts.map((d) => d.id), [allDepts]);
@@ -500,13 +503,13 @@ export function DashboardController({
     // is how Aug departments ($3,110,259) ended up reconciled against Jul income
     // ($2,118,455) and the $991,804 difference was reported as unmapped revenue.
     "revenue-composition": (
-      <RevenueComposition lines={revLines} departments={depts} totalIncome={fin.income} periodLabel={fin.label} />
+      <RevenueComposition lines={revLines} departments={depts} totalIncome={fin.income} periodLabel={fin.label} canMap={canMap} />
     ),
     "cash-position": <CashPosition cash={cash} periodLabel={snapshot.period.label} />,
     "grant-mix": <GrantMix summary={grantMix} periodLabel={snapshot.period.label} />,
     "budget-chart": <BudgetBarChart departments={depts} monthlySpend={snapshot.monthlySpend} trend={spendTrend(snapshot, monthKeys(selMonths, active.fyLabel))} monthLabel={fin.label} budgetEstimated={budgetEstimated} trendEstimated={trendEstimated} comparisonLabel={comparisonLabel} />,
     "allocation-donut": <AllocationDonut allocation={allocation} totalBudget={totalBudget} revenueLines={snapshot.revenueLines} totalRevenue={fin.income} budgetEstimated={budgetEstimated} comparisonLabel={comparisonLabel} />,
-    "department-table": <DepartmentTable departments={depts} periodLabel={fin.label} comparisonLabel={comparisonLabel} totalExpenses={cfg.depts === null ? fin.expenses : undefined} />,
+    "department-table": <DepartmentTable departments={depts} periodLabel={fin.label} comparisonLabel={comparisonLabel} totalExpenses={cfg.depts === null ? fin.expenses : undefined} canMap={canMap} />,
   };
   const visibleWidgets = cfg.order.filter((id) => !cfg.hidden.includes(id));
 
@@ -738,7 +741,7 @@ export function DashboardController({
 
       {/* Panels — or, in unmapped-only mode, the list of accounts to chase. */}
       {cfg.unmappedOnly ? (
-        <UnmappedPanel accounts={unmappedAccounts} />
+        <UnmappedPanel accounts={unmappedAccounts} canMap={canMap} />
       ) : visibleWidgets.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-card/40 px-6 py-10 text-center text-[13px] text-muted-foreground">
           All panels hidden — open <span className="text-foreground">Customize dashboard → Panels</span> to bring some back.
@@ -761,7 +764,7 @@ export function DashboardController({
  * finance officer can see exactly what needs assigning in Practical (the ~$888k
  * behind the dashboard's "Unassigned" / "Other revenue" lines).
  */
-function UnmappedPanel({ accounts }: { accounts: AccountRef[] }) {
+function UnmappedPanel({ accounts, canMap }: { accounts: AccountRef[]; canMap: boolean }) {
   if (!accounts.length) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-dashed border-border bg-card/40 px-6 py-10 text-center text-[13px] text-muted-foreground">
@@ -778,7 +781,7 @@ function UnmappedPanel({ accounts }: { accounts: AccountRef[] }) {
         title="Unmapped accounts"
         subtitle={`${accounts.length} with no department · revenue ${formatCompact(revTotal)} · expense ${formatCompact(expTotal)}`}
         right={
-          <Link
+          canMap && <Link
             href="/mapping"
             className="rounded-[7px] border border-[var(--hairline)] px-3 py-[5px] text-[11px] font-bold text-subtle transition-colors hover:border-[rgba(212,168,76,0.35)] hover:bg-gold-dim hover:text-gold-light"
           >

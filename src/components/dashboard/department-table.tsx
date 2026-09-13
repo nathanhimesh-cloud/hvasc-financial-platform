@@ -15,6 +15,7 @@ export function DepartmentTable({
   periodLabel,
   comparisonLabel = "Budget",
   totalExpenses,
+  canMap = true,
 }: {
   departments: DepartmentDerived[];
   periodLabel: string;
@@ -26,6 +27,8 @@ export function DepartmentTable({
    * so the YTD Actual column ties to the headline rather than sitting short.
    */
   totalExpenses?: number;
+  /** Show the "Map →" shortcut. False for roles that can't reach /mapping. */
+  canMap?: boolean;
 }) {
   const isFy25 = comparisonLabel === "FY25";
 
@@ -203,13 +206,15 @@ export function DepartmentTable({
                 <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3.5 text-right text-muted-foreground">—</td>
                 <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3.5" />
                 <td className="border-b border-[var(--hairline-soft)] px-3.5 py-3.5">
-                  <Link
-                    href="/mapping"
-                    className="rounded-[7px] border border-[var(--hairline)] px-3 py-[5px] text-[11px] font-bold text-subtle transition-colors hover:border-[rgba(212,168,76,0.35)] hover:bg-gold-dim hover:text-gold-light"
-                    title="See which accounts aren't assigned to a department yet"
-                  >
-                    Map →
-                  </Link>
+                  {canMap && (
+                    <Link
+                      href="/mapping"
+                      className="rounded-[7px] border border-[var(--hairline)] px-3 py-[5px] text-[11px] font-bold text-subtle transition-colors hover:border-[rgba(212,168,76,0.35)] hover:bg-gold-dim hover:text-gold-light"
+                      title="See which accounts aren't assigned to a department yet"
+                    >
+                      Map →
+                    </Link>
+                  )}
                 </td>
               </tr>
             )}

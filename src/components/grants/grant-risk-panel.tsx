@@ -11,7 +11,14 @@ import { cn } from "@/lib/utils";
  * The number that matters is not "how much have we been given" — it's how much we're
  * SITTING ON. Money received and not spent belongs, conditionally, to somebody else.
  */
-export function GrantRiskPanel({ risk }: { risk: RiskSummary }) {
+export function GrantRiskPanel({
+  risk,
+  canMap = true,
+}: {
+  risk: RiskSummary;
+  /** Link "Account Mapping" only for roles that can open it. */
+  canMap?: boolean;
+}) {
   const atRisk = risk.rows.filter((r) => r.level === "high" || r.level === "medium");
   const clean = risk.highCount === 0 && risk.overdueCount === 0;
 
@@ -118,11 +125,20 @@ export function GrantRiskPanel({ risk }: { risk: RiskSummary }) {
           <HelpCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber" strokeWidth={1.75} />
           <p className="text-[12px] leading-relaxed text-muted-foreground">
             <span className="text-amber">{risk.unknownCount} grants can&rsquo;t be assessed</span> —
-            their register codes don&rsquo;t resolve, so spend is unknown (not zero). Fix them in{" "}
-            <Link href="/mapping" className="text-foreground underline decoration-border underline-offset-2">
-              Account Mapping
-            </Link>
-            .
+            their register codes don&rsquo;t resolve, so spend is unknown (not zero).{" "}
+            {/* The explanation matters to everyone; the link only to people who
+                can act on it. Read-only roles get the fact without a dead end. */}
+            {canMap ? (
+              <>
+                Fix them in{" "}
+                <Link href="/mapping" className="text-foreground underline decoration-border underline-offset-2">
+                  Account Mapping
+                </Link>
+                .
+              </>
+            ) : (
+              <>Finance can correct them in Account Mapping.</>
+            )}
           </p>
         </div>
       )}
